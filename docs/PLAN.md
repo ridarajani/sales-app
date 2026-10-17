@@ -10,13 +10,16 @@ Each phase ends with something Rida can try before the next one starts. In every
 |---|---|
 | Admin | Adds users, resets PINs, changes settings |
 | Management | Sees all four companies, approves, reads every report |
-| Sales manager | Books orders, makes loading plans, records collections for their facility (Mr. Abbas: LV and ZT; Mr. Kashif: ZF and GL) |
+| Sales manager | Books orders, makes loading plans, records collections for their facility (Mr. Abbas: LV and ZT; Mr. Kashif: ZF and GL); adds their salesmen |
+| Salesman | Works under a sales manager with their own login; makes sales and collects payments for that manager's companies |
 | Warehouse | Receives stock, picks and loads vehicles; one login per facility |
 | Driver | Delivers, takes signature and photo, records shortages |
 | Cashier | Counts and confirms the cash handed over |
 | Accounts | Invoices, credit and debit notes, customer ledger, reports |
 
-Each user only sees their own companies. Still to confirm with the client: whether cashier and accounts are one person, and whether salesmen under the sales managers need their own logins.
+Each user only sees their own companies. The client confirmed on 17 October 2026 that cashier and accounts are different people and that salesmen get their own logins.
+
+Other client decisions of 17 October 2026: invoices are made after the vehicle is loaded; prices are typed on each order (no prefill); the customer signs for every delivery and every payment collection.
 
 ## How staff get the app
 
@@ -29,7 +32,7 @@ Each user only sees their own companies. Still to confirm with the client: wheth
 | Phase | What it covers |
 |---|---|
 | 0. Setup | Server, database and an empty Android app |
-| 1. Login, users and roles | PIN sign-in for the seven roles; add and switch off users; audit log; private download page (not on Play Store); in-app update check, user taps Install |
+| 1. Login, users and roles | PIN sign-in for the eight roles; add and switch off users; audit log; private download page (not on Play Store); in-app update check, user taps Install |
 | 2. Basic lists | Companies (TPIN, VAT), customers, products, vehicles, drivers; Excel templates and import; opening balances; document numbering |
 | 3. Stock | Receive stock with batch and expiry; stock per facility; short-dated alerts; adjustments and stock count |
 | 4. Orders | Typed prices, one LPO per company, both companies of a facility on one order, stock held oldest expiry first, change or cancel |
