@@ -18,6 +18,12 @@ Each phase ends with something Rida can try before the next one starts. In every
 
 Each user only sees their own companies. Still to confirm with the client: whether cashier and accounts are one person, and whether salesmen under the sales managers need their own logins.
 
+## How staff get the app
+
+- **Private download page:** the app stays off the Play Store. Our server hosts a download page, only for staff, where they get the app.
+- **Automatic updates:** each time the app opens, it checks the server for a newer version. If there is one, it downloads it and asks the user to tap Install.
+- **Only staff can sign in:** someone the admin hasn't added can install the app, but can't use it.
+
 ## Phases
 
 | Phase | What it covers |
