@@ -1,0 +1,26 @@
+# Local database for development, with a browser view of the tables.
+#   docker compose up -d
+#   Database:  postgres://sales:sales@localhost:5432/sales_dev
+#   Browse it: http://localhost:8080  (System: PostgreSQL, Server: db, User: sales, Password: sales, Database: sales_dev)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sales
+      POSTGRES_PASSWORD: sales
+      POSTGRES_DB: sales_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/db-init:/docker-entrypoint-initdb.d:ro
+
+  adminer:
+    image: adminer:4
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
