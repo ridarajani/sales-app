@@ -57,7 +57,9 @@ class Api(private val baseUrl: String, private val tokenProvider: () -> String?)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            throw ApiException("offline", OFFLINE_MESSAGE)
+            // Keep the plain message first; the technical reason underneath helps whoever is testing.
+            val reason = e.message?.take(160) ?: (e::class.simpleName ?: "unknown")
+            throw ApiException("offline", "$OFFLINE_MESSAGE\nReason: $reason")
         }
         if (!response.status.isSuccess()) throw errorFrom(response)
         return response
