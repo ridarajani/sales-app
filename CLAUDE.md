@@ -33,5 +33,6 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 - Each user only sees their own companies. Roles: Admin, Management, Sales manager, Salesman, Warehouse, Driver, Cashier, Accounts.
 - Prices are typed on each order; the customer signs for every delivery and every payment collection.
 - Money is whole Malawi kwacha (MWK), shown with thousands separators.
+- Phone numbers are Malawi mobiles. Store them as `+265` plus 9 digits (for example `+265991234567`). Accept `0991 234 567`, `991234567` or `+265 991 234 567`, ignoring spaces and dashes. Show them as `0991 234 567`. Login phone numbers are unique.
 - The app is not on Google Play or the App Store: Android installs from a private download page with an in-app update check; iPhone uses TestFlight.
 - This repo is public: never commit client data, TPINs, phone numbers, passwords or keys.
