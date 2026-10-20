@@ -26,11 +26,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
+import com.salesapp.ui.components.Avatar
 import com.salesapp.ui.components.PIN_LENGTH
 import com.salesapp.ui.components.PinEntry
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.Burgundy
+import com.salesapp.ui.theme.Ink
 import com.salesapp.ui.theme.Muted
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -64,13 +66,22 @@ fun PinScreen(state: AppState, phone: String, name: String) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar("Hello, ${name.trim().substringBefore(' ')}", onBack = { state.nav.pop() }, sub = {
-            Text("Type your PIN.", color = Muted, fontSize = 14.sp)
-        })
+        TopBar("Sign in", onBack = { state.nav.pop() })
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Avatar(name, size = 56.dp)
+                Text(
+                    "Hello, ${name.trim().substringBefore(' ')}",
+                    color = Ink,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text("Type your PIN.", color = Muted, fontSize = 14.sp)
+            }
             PinEntry(
                 pin = pin,
                 enabled = !busy,

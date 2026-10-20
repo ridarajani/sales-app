@@ -1,24 +1,21 @@
 package com.salesapp.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,7 +24,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,92 +37,94 @@ import com.salesapp.core.currentHour
 import com.salesapp.data.Api
 import com.salesapp.data.AppState
 import com.salesapp.data.Screen
-import com.salesapp.data.User
 import com.salesapp.data.roleLabel
-import com.salesapp.ui.components.CompanyTag
-import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.components.AppIcons
+import com.salesapp.ui.components.Avatar
+import com.salesapp.ui.components.Badge
+import com.salesapp.ui.components.CompanyDot
+import com.salesapp.ui.components.DangerButton
+import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.Tile
-import com.salesapp.ui.theme.AccentSoft
-import com.salesapp.ui.theme.Burgundy
+import com.salesapp.ui.theme.Ink
 import com.salesapp.ui.theme.Muted
 import kotlinx.coroutines.launch
 
 // One square on the home screen. If it has no screen yet, `opens` is null.
-private class TileDef(val label: String, val sub: String, val opens: Screen? = null)
+private class TileDef(val label: String, val sub: String, val icon: ImageVector, val opens: Screen? = null)
 
-private val more = TileDef("More", "Everything else")
+private val more = TileDef("More", "Everything else", AppIcons.Grid)
 
 // The squares each kind of person sees, in order. The first one is highlighted.
 private fun tilesFor(role: String): List<TileDef> = when (role) {
     "admin" -> listOf(
-        TileDef("Users", "Add, switch off, reset PIN", Screen.Users),
-        TileDef("Audit trail", "Who did what"),
-        TileDef("Settings", "Companies and rules"),
-        TileDef("Reports", "Sales and money owed"),
+        TileDef("Users", "Add, switch off, reset PIN", AppIcons.Person, Screen.Users),
+        TileDef("Audit trail", "Who did what", AppIcons.List),
+        TileDef("Settings", "Companies and rules", AppIcons.Settings),
+        TileDef("Reports", "Sales and money owed", AppIcons.Chart),
         more,
     )
     "management" -> listOf(
-        TileDef("Today's numbers", "Sales, money owed, cash"),
-        TileDef("Approve", "Nothing waiting"),
-        TileDef("Loading plans", "Nothing waiting"),
-        TileDef("Airtel Money", "Both wallets"),
-        TileDef("Reports", "Excel, PDF, print"),
-        TileDef("Stock", "Free, reserved, on the road"),
-        TileDef("Invoices", "Register"),
-        TileDef("Customers", "Who owes money"),
-        TileDef("Users", "Who can sign in", Screen.Users),
+        TileDef("Today's numbers", "Sales, money owed, cash", AppIcons.Chart),
+        TileDef("Approve", "Nothing waiting", AppIcons.Inbox),
+        TileDef("Loading plans", "Nothing waiting", AppIcons.Truck),
+        TileDef("Airtel Money", "Both wallets", AppIcons.Money),
+        TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
+        TileDef("Stock", "Free, reserved, on the road", AppIcons.Box),
+        TileDef("Invoices", "Register", AppIcons.Receipt),
+        TileDef("Customers", "Who owes money", AppIcons.People),
+        TileDef("Users", "Who can sign in", AppIcons.Person, Screen.Users),
         more,
     )
     "sales_manager" -> listOf(
-        TileDef("New order", "Take an order"),
-        TileDef("Loading plan", "Nothing waiting"),
-        TileDef("Collect money", "Customer pays you"),
-        TileDef("Airtel Money", "Wallet ledger"),
-        TileDef("Hand over cash", "Nothing to hand over"),
-        TileDef("My salesmen", "Add or switch off", Screen.Users),
-        TileDef("My orders", "Balances and status"),
-        TileDef("My customers", "Who owes money"),
-        TileDef("Invoices", "Print or share"),
-        TileDef("Reports", "Sales and money owed"),
+        TileDef("New order", "Take an order", AppIcons.Cart),
+        TileDef("Loading plan", "Nothing waiting", AppIcons.Truck),
+        TileDef("Collect money", "Customer pays you", AppIcons.Money),
+        TileDef("Airtel Money", "Wallet ledger", AppIcons.Money),
+        TileDef("Hand over cash", "Nothing to hand over", AppIcons.Money),
+        TileDef("My salesmen", "Add or switch off", AppIcons.People, Screen.Users),
+        TileDef("My orders", "Balances and status", AppIcons.Cart),
+        TileDef("My customers", "Who owes money", AppIcons.People),
+        TileDef("Invoices", "Print or share", AppIcons.Receipt),
+        TileDef("Reports", "Sales and money owed", AppIcons.Chart),
         more,
     )
     "salesman" -> listOf(
-        TileDef("New order", "Take an order"),
-        TileDef("Collect money", "Customer pays you"),
-        TileDef("Hand over cash", "Nothing to hand over"),
-        TileDef("My orders", "Balances and status"),
-        TileDef("My customers", "Who owes money"),
+        TileDef("New order", "Take an order", AppIcons.Cart),
+        TileDef("Collect money", "Customer pays you", AppIcons.Money),
+        TileDef("Hand over cash", "Nothing to hand over", AppIcons.Money),
+        TileDef("My orders", "Balances and status", AppIcons.Cart),
+        TileDef("My customers", "Who owes money", AppIcons.People),
         more,
     )
     "warehouse" -> listOf(
-        TileDef("Jobs to do", "Nothing waiting"),
-        TileDef("Load a trip van", "Nothing waiting"),
-        TileDef("Receive stock", "New cartons arrived"),
-        TileDef("Check stock", "Free, reserved, on the road"),
-        TileDef("Report damage", "Or a count difference"),
-        TileDef("Reports", "Stock and deliveries"),
+        TileDef("Jobs to do", "Nothing waiting", AppIcons.Box),
+        TileDef("Load a trip van", "Nothing waiting", AppIcons.Truck),
+        TileDef("Receive stock", "New cartons arrived", AppIcons.Box),
+        TileDef("Check stock", "Free, reserved, on the road", AppIcons.Box),
+        TileDef("Report damage", "Or a count difference", AppIcons.Inbox),
+        TileDef("Reports", "Stock and deliveries", AppIcons.Chart),
         more,
     )
     "driver" -> listOf(
-        TileDef("Your deliveries", "Nothing waiting"),
-        TileDef("Hand over goods", "Signature and photo"),
-        TileDef("Report a shortage", "Goods missing or damaged"),
+        TileDef("Your deliveries", "Nothing waiting", AppIcons.Truck),
+        TileDef("Hand over goods", "Signature and photo", AppIcons.Box),
+        TileDef("Report a shortage", "Goods missing or damaged", AppIcons.Inbox),
         more,
     )
     "cashier" -> listOf(
-        TileDef("Count cash", "Nothing waiting"),
-        TileDef("Record a payment", "Bank transfer or cash"),
-        TileDef("Who owes money", "Customer balances"),
-        TileDef("Invoices", "Register and print"),
-        TileDef("Reports", "Excel, PDF, print"),
+        TileDef("Count cash", "Nothing waiting", AppIcons.Money),
+        TileDef("Record a payment", "Bank transfer or cash", AppIcons.Money),
+        TileDef("Who owes money", "Customer balances", AppIcons.People),
+        TileDef("Invoices", "Register and print", AppIcons.Receipt),
+        TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
         more,
     )
     "accounts" -> listOf(
-        TileDef("Invoices", "Register and print"),
-        TileDef("Credit and debit notes", "Fix an invoice"),
-        TileDef("Customer ledger", "Invoices, payments, tax"),
-        TileDef("Who owes money", "Customer balances"),
-        TileDef("Reports", "Excel, PDF, print"),
+        TileDef("Invoices", "Register and print", AppIcons.Receipt),
+        TileDef("Credit and debit notes", "Fix an invoice", AppIcons.Receipt),
+        TileDef("Customer ledger", "Invoices, payments, tax", AppIcons.List),
+        TileDef("Who owes money", "Customer balances", AppIcons.People),
+        TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
         more,
     )
     else -> listOf(more)
@@ -136,46 +139,41 @@ private fun greeting(): String {
     }
 }
 
-// The first screen after signing in: a greeting and big tiles for the person's job.
+// The first screen after signing in: a greeting with the person's picture, then cards for the person's job.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(state: AppState) {
     val user = state.user ?: return
     var showMenu by remember { mutableStateOf(false) }
     val firstName = user.name.trim().substringBefore(' ')
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            title = "${greeting()}, $firstName",
-            sub = { HomeSubLine(user) },
-            trailing = {
-                Text(
-                    user.name,
-                    color = Burgundy,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .widthIn(max = 110.dp)
-                        .heightIn(min = 48.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(AccentSoft)
-                        .clickable(role = Role.Button) { showMenu = true }
-                        .padding(horizontal = 12.dp, vertical = 14.dp),
-                )
-            },
-        )
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${greeting()},", color = Muted, fontSize = 14.sp)
+                Text(firstName, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Badge(roleLabel(user.role))
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .semantics { contentDescription = "Your account" }
+                    .clickable(role = Role.Button) { showMenu = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Avatar(user.name, size = 44.dp)
+            }
+        }
+        SectionLabel("What do you want to do?", modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             tilesFor(user.role).chunked(2).forEachIndexed { rowIndex, pair ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     pair.forEachIndexed { colIndex, tile ->
                         Tile(
                             label = tile.label,
                             sub = tile.sub,
+                            icon = tile.icon,
                             primary = rowIndex == 0 && colIndex == 0,
                             modifier = Modifier.weight(1f),
                             onClick = {
@@ -191,12 +189,17 @@ fun HomeScreen(state: AppState) {
     }
 
     if (showMenu) {
-        AlertDialog(
-            onDismissRequest = { showMenu = false },
-            title = { Text(user.name) },
-            text = { Text("Signed in as ${roleLabel(user.role)}.") },
-            confirmButton = {
-                TextButton(onClick = {
+        ModalBottomSheet(onDismissRequest = { showMenu = false }, containerColor = Color.White) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(user.name, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                Badge(roleLabel(user.role))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    user.companies.forEach { CompanyDot(it) }
+                }
+                DangerButton("Sign out", modifier = Modifier.padding(top = 4.dp), onClick = {
                     showMenu = false
                     // Sign out on the phone at once; tell the server in the background.
                     val token = state.session.token
@@ -211,23 +214,8 @@ fun HomeScreen(state: AppState) {
                             oldApi.close()
                         }
                     }
-                }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Sign out", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { showMenu = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel", fontSize = 16.sp) } },
-        )
-    }
-}
-
-// "Sales manager · [dot] Lucky Ventures [dot] Zoona Trading"
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun HomeSubLine(user: User) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        itemVerticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("${roleLabel(user.role)} ·", color = Muted, fontSize = 14.sp)
-        user.companies.forEach { CompanyTag(it) }
+                })
+            }
+        }
     }
 }

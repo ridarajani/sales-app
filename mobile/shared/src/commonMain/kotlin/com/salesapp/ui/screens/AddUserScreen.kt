@@ -25,7 +25,7 @@ import com.salesapp.data.NewUserRequest
 import com.salesapp.data.Role
 import com.salesapp.data.companyCodes
 import com.salesapp.data.companyName
-import com.salesapp.ui.components.BigButton
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.ChoiceButton
 import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.Field
@@ -210,7 +210,7 @@ fun AddUserScreen(state: AppState) {
                 enabled = !busy,
                 note = "The user types this to sign in. They can't change it; the admin resets it.",
             )
-            BigButton("Add user", enabled = !busy, onClick = ::submit)
+            PrimaryButton("Add user", enabled = !busy, onClick = ::submit)
         }
     }
 }

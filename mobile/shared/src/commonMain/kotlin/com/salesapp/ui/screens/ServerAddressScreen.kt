@@ -17,7 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.salesapp.core.AppConfig
 import com.salesapp.data.AppState
-import com.salesapp.ui.components.BigButton
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
@@ -43,7 +43,7 @@ fun ServerAddressScreen(state: AppState) {
                 onValueChange = { url = it },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
-            BigButton("Save", onClick = {
+            PrimaryButton("Save", onClick = {
                 val clean = url.trim().trimEnd('/')
                 if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
                     error = "The address must start with http:// or https://"

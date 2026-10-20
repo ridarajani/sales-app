@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,12 +34,16 @@ import com.salesapp.data.AppState
 import com.salesapp.data.Screen
 import com.salesapp.data.companyName
 import com.salesapp.data.roleLabel
-import com.salesapp.ui.components.BigButton
+import com.salesapp.ui.components.Avatar
+import com.salesapp.ui.components.Badge
+import com.salesapp.ui.components.BadgeTone
+import com.salesapp.ui.components.DangerButton
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
-import com.salesapp.ui.components.StatusPill
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.Ink
+import com.salesapp.ui.theme.Line
 import com.salesapp.ui.theme.Muted
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -79,22 +90,33 @@ fun UserDetailScreen(state: AppState, id: Int) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             error?.let { Say(it, error = true) }
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                StatusPill(if (row.active) "Can sign in" else "Switched off", good = row.active)
+            val cardShape = RoundedCornerShape(14.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(cardShape).background(Color.White).border(1.dp, Line, cardShape).padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Avatar(row.name, size = 56.dp)
+                Column(modifier = Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(row.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Badge(roleLabel(row.role))
+                        Badge(if (row.active) "Can sign in" else "Switched off", tone = if (row.active) BadgeTone.On else BadgeTone.Off)
+                    }
+                }
             }
-            Detail("Name", row.name)
-            Detail("Job", roleLabel(row.role))
             Detail("Phone number", row.phone)
             Detail("Companies", row.companies.joinToString(", ") { companyName(it) })
             if (row.managerName != null) Detail("Works under", row.managerName)
             if (row.id == me.id) {
                 Say("This is you.")
             } else if (canManage) {
-                BigButton("Reset PIN", enabled = !busy, onClick = { state.nav.push(Screen.ResetPin(row.id)) })
-                if (row.active) {
-                    SecondaryButton("Switch off", danger = true, enabled = !busy, onClick = { confirmOff = true })
-                } else {
-                    SecondaryButton("Switch on", enabled = !busy, onClick = { change(true) })
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PrimaryButton("Reset PIN", modifier = Modifier.weight(1f).height(44.dp), enabled = !busy, onClick = { state.nav.push(Screen.ResetPin(row.id)) })
+                    if (row.active) {
+                        DangerButton("Switch off", modifier = Modifier.weight(1f), enabled = !busy, onClick = { confirmOff = true })
+                    } else {
+                        SecondaryButton("Switch on", modifier = Modifier.weight(1f), enabled = !busy, onClick = { change(true) })
+                    }
                 }
             }
         }
@@ -107,7 +129,7 @@ fun UserDetailScreen(state: AppState, id: Int) {
                     TextButton(onClick = {
                         confirmOff = false
                         change(false)
-                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Switch off", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Switch off", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
                 },
                 dismissButton = { TextButton(onClick = { confirmOff = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel", fontSize = 16.sp) } },
             )
@@ -119,7 +141,7 @@ fun UserDetailScreen(state: AppState, id: Int) {
 @Composable
 private fun Detail(label: String, value: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(label, color = Muted, fontSize = 14.sp)
-        Text(value, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = Muted, fontSize = 13.sp)
+        Text(value, color = Ink, fontSize = 15.sp)
     }
 }

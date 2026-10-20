@@ -17,9 +17,25 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 
 ## Rules
 
-- Users are not tech savvy: big buttons, plain words, few fields, one main action per screen, same look as the prototype (burgundy, gold, warm white).
+- Users are not tech savvy: clear buttons, plain words, few fields, one main action per screen, same look as the prototype (burgundy, gold, warm white).
 - Each user only sees their own companies. Roles: Admin, Management, Sales manager, Salesman, Warehouse, Driver, Cashier, Accounts.
 - Prices are typed on each order; the customer signs for every delivery and every payment collection.
 - Money is whole Malawi kwacha (MWK), shown with thousands separators.
 - The app is not on Google Play or the App Store: Android installs from a private download page with an in-app update check; iPhone uses TestFlight.
 - This repo is public: never commit client data, TPINs, phone numbers, passwords or keys.
+
+### Screen style (decided by Rida, 20 October 2026)
+
+Future phases must follow these.
+
+- Every screen except Home has one top bar: 56dp, a round "<" back button on the left (transparent, thin burgundy border, no label), the title centred in 18sp semi-bold, and a thin grey line below. No gold bar.
+- Buttons are compact with 12dp rounded corners: main action 48dp burgundy and full width, second choices 44dp with a thin grey outline, dangerous ones (switch off, sign out) 44dp with a red outline.
+- People show as a round avatar with their initials; jobs and states show as small pills (job gold, off red, on green).
+- List rows are white cards: 14dp corners, thin border, 14dp padding, avatar on the left, name with job pill beside it, companies below as coloured dot plus name.
+- Home has no top bar: greeting, first name and job pill on the left, avatar on the right. Tapping the avatar opens a bottom sheet with full name, job, companies and Sign out. Company names never go in the header.
+- Home tiles are compact white cards (min 104dp) with a small icon chip, a 15sp name and a one-line 12sp sub-line; the first tile is burgundy. Two columns, 10dp gaps.
+- Form labels are 13sp grey upper-case; fields are at least 48dp tall with 12dp corners; choice buttons are 44dp with a thin border, and the chosen one gets a burgundy border and soft pink fill.
+- On a form, the main action is a PrimaryButton at the bottom.
+- Text is never smaller than 12sp: labels 13-14sp, body 15-16sp. Every tap target is at least 44dp.
+- PINs are typed with the phone's own number keyboard (no custom keypad); the field opens the keyboard by itself.
+- When two actions belong together (e.g. Reset PIN and Switch off) put them side by side in one row, half width each.

@@ -31,7 +31,7 @@ import com.salesapp.core.AppConfig
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.Screen
-import com.salesapp.ui.components.BigButton
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.theme.Burgundy
@@ -93,11 +93,11 @@ fun PhoneScreen(state: AppState) {
             error?.let { Say(it, error = true) }
         }
         if (busy) {
-            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Burgundy)
             }
         } else {
-            BigButton("Next", enabled = ready, onClick = ::next)
+            PrimaryButton("Next", enabled = ready, onClick = ::next)
         }
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Text(

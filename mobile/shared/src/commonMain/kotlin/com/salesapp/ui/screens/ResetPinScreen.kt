@@ -25,6 +25,8 @@ import com.salesapp.ui.components.PinEntry
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.Burgundy
+import com.salesapp.ui.theme.Ink
+import com.salesapp.ui.theme.Muted
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -100,10 +102,10 @@ fun ResetPinScreen(state: AppState, id: Int) {
             Text(
                 if (confirming) "Confirm PIN" else "New PIN for $name",
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Burgundy,
+                fontWeight = FontWeight.SemiBold,
+                color = Ink,
             )
-            Text(if (confirming) "Type it again" else "Type the new PIN", fontSize = 16.sp)
+            Text(if (confirming) "Type it again" else "Type the new PIN", fontSize = 15.sp, color = Muted)
             error?.let { Say(it, error = true) }
             PinEntry(pin = pin, onChange = ::onPin, enabled = !busy)
             if (busy) CircularProgressIndicator(color = Burgundy)

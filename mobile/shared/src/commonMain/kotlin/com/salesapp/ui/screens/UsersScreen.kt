@@ -6,7 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,18 +31,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.Screen
 import com.salesapp.data.UserRow
-import com.salesapp.data.companyName
 import com.salesapp.data.roleLabel
-import com.salesapp.ui.components.BigButton
+import com.salesapp.ui.components.Avatar
+import com.salesapp.ui.components.Badge
+import com.salesapp.ui.components.BadgeTone
+import com.salesapp.ui.components.CompanyDot
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
-import com.salesapp.ui.components.StatusPill
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.Ink
 import com.salesapp.ui.theme.Line
@@ -89,7 +95,7 @@ fun UsersScreen(state: AppState) {
             }
             val shown = if (isSalesManager) state.userRows.filter { it.id != me.id } else state.userRows
             if (!loading && error == null && shown.isEmpty()) {
-                Text("No one here yet.", color = Muted, fontSize = 16.sp, modifier = Modifier.padding(top = 16.dp))
+                Text("No one here yet.", color = Muted, fontSize = 15.sp, modifier = Modifier.padding(top = 16.dp))
             }
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                 item { Box(modifier = Modifier.padding(top = 2.dp)) }
@@ -100,7 +106,7 @@ fun UsersScreen(state: AppState) {
         }
         if (canAdd) {
             Box(modifier = Modifier.padding(16.dp)) {
-                BigButton(
+                PrimaryButton(
                     if (isSalesManager) "Add a salesman" else "Add a user",
                     onClick = { state.nav.push(Screen.AddUser) },
                 )
@@ -109,7 +115,8 @@ fun UsersScreen(state: AppState) {
     }
 }
 
-// One person in the list: name, job, companies, and a red label if switched off.
+// One person in the list: avatar, name with job badge, and the companies underneath.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UserCard(row: UserRow, onClick: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
@@ -123,11 +130,19 @@ private fun UserCard(row: UserRow, onClick: () -> Unit) {
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(row.name, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(roleLabel(row.role), color = Muted, fontSize = 14.sp)
-            Text(row.companies.joinToString(", ") { companyName(it) }, color = Muted, fontSize = 14.sp)
+        Avatar(row.name, size = 44.dp)
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(row.name, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Badge(roleLabel(row.role), modifier = Modifier.padding(start = 8.dp))
+                if (!row.active) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Badge("Off", tone = BadgeTone.Off, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.companies.forEach { CompanyDot(it) }
+            }
         }
-        if (!row.active) StatusPill("Switched off", good = false, modifier = Modifier.padding(start = 8.dp))
     }
 }

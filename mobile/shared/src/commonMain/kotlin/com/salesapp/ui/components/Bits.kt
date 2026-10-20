@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesapp.data.companyName
@@ -32,34 +34,63 @@ import com.salesapp.ui.theme.Bad
 import com.salesapp.ui.theme.BadSoft
 import com.salesapp.ui.theme.Burgundy
 import com.salesapp.ui.theme.Good
+import com.salesapp.ui.theme.GoldSoft
 import com.salesapp.ui.theme.GoodSoft
 import com.salesapp.ui.theme.Ink
 import com.salesapp.ui.theme.Line
 import com.salesapp.ui.theme.Muted
 import com.salesapp.ui.theme.companyColor
 
-// A small coloured square followed by the full company name.
+// A round picture with a person's initials.
 @Composable
-fun CompanyTag(code: String, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(9.dp).clip(RoundedCornerShape(2.dp)).background(companyColor(code)))
-        Text(companyName(code), color = Muted, fontSize = 14.sp, modifier = Modifier.padding(start = 6.dp))
+fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tone: Color = AccentSoft) {
+    val initials = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.take(1).uppercase() }
+    val onBurgundy = tone == Burgundy
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).background(tone),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            initials,
+            color = if (onBurgundy) Color.White else Burgundy,
+            fontSize = if (size >= 56.dp) 20.sp else 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
-// A small rounded label such as "Switched off".
+enum class BadgeTone { Role, Off, On }
+
+// A small pill: a job, "Off" or "Can sign in".
 @Composable
-fun StatusPill(text: String, good: Boolean, modifier: Modifier = Modifier) {
+fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTone.Role) {
+    val fill = when (tone) {
+        BadgeTone.Role -> GoldSoft
+        BadgeTone.Off -> BadSoft
+        BadgeTone.On -> GoodSoft
+    }
+    val ink = when (tone) {
+        BadgeTone.Role -> Ink
+        BadgeTone.Off -> Bad
+        BadgeTone.On -> Good
+    }
     Text(
         text,
-        color = if (good) Good else Bad,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (good) GoodSoft else BadSoft)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+        color = ink,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        modifier = modifier.clip(RoundedCornerShape(11.dp)).background(fill).padding(horizontal = 10.dp, vertical = 4.dp),
     )
+}
+
+// A small coloured dot followed by the company name.
+@Composable
+fun CompanyDot(code: String, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(companyColor(code)))
+        Text(companyName(code), color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+    }
 }
 
 // A box with a message: blue-ish for information, red for a problem.
@@ -77,7 +108,7 @@ fun Say(text: String, modifier: Modifier = Modifier, error: Boolean = false) {
     )
 }
 
-// A text box with a big label above it.
+// A text box with a small label above it.
 @Composable
 fun Field(
     label: String,
@@ -90,7 +121,7 @@ fun Field(
     note: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(label, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
+        Text(label.uppercase(), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 6.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -98,7 +129,7 @@ fun Field(
             singleLine = true,
             keyboardOptions = keyboardOptions,
             placeholder = if (placeholder.isEmpty()) null else ({ Text(placeholder) }),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Burgundy,
@@ -111,7 +142,7 @@ fun Field(
     }
 }
 
-// A big button you can switch on, used to pick one or more choices.
+// A button you can switch on, used to pick one or more choices.
 @Composable
 fun ChoiceButton(
     text: String,
@@ -123,27 +154,27 @@ fun ChoiceButton(
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
-            .heightIn(min = 52.dp)
+            .heightIn(min = 44.dp)
             .clip(shape)
             .background(if (selected) AccentSoft else Color.White)
-            .border(BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Burgundy else Line), shape)
+            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) Burgundy else Line), shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
             text,
             color = if (selected) Burgundy else Ink,
-            fontSize = 16.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 15.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }
 
-// A heading above a group of fields.
+// A small upper-case heading above a group of fields or tiles.
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = modifier.padding(bottom = 2.dp))
+    Text(text.uppercase(), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = modifier.padding(bottom = 2.dp))
 }
 
 // Choice buttons laid out one under another.
