@@ -1,6 +1,5 @@
 package com.salesapp.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -31,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import com.salesapp.ui.theme.Burgundy
 import com.salesapp.ui.theme.Ink
-import com.salesapp.ui.theme.Line
 
 // The bar at the top of every screen except Home: round "<" back button, centred title, thin line below.
 @Composable
@@ -41,28 +38,29 @@ fun TopBar(
     onBack: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Column(modifier = modifier.fillMaxWidth().background(Color.White)) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp)) {
             if (onBack != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .border(1.dp, Burgundy, CircleShape)
                         .semantics { contentDescription = "Back" }
                         .clickable(role = Role.Button, onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Canvas(modifier = Modifier.size(16.dp)) {
+                  Box(modifier = Modifier.size(32.dp).border(1.dp, Burgundy, CircleShape), contentAlignment = Alignment.Center) {
+                    Canvas(modifier = Modifier.size(width = 6.dp, height = 9.dp)) {
                         val stroke = 1.5.dp.toPx()
                         val path = Path().apply {
-                            moveTo(size.width * 0.65f, size.height * 0.1f)
-                            lineTo(size.width * 0.25f, size.height * 0.5f)
-                            lineTo(size.width * 0.65f, size.height * 0.9f)
+                            moveTo(size.width, 0f)
+                            lineTo(0f, size.height * 0.5f)
+                            lineTo(size.width, size.height)
                         }
                         drawPath(path, Burgundy, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
+                  }
                 }
             }
             Text(
@@ -79,6 +77,5 @@ fun TopBar(
                 Box(modifier = Modifier.align(Alignment.CenterEnd)) { trailing() }
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Line))
     }
 }

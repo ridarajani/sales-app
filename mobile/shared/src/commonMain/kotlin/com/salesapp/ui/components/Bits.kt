@@ -77,10 +77,10 @@ fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTo
     Text(
         text,
         color = ink,
-        fontSize = 12.sp,
+        fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
-        modifier = modifier.clip(RoundedCornerShape(11.dp)).background(fill).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier = modifier.clip(RoundedCornerShape(10.dp)).background(fill).padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }
 

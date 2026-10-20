@@ -41,7 +41,6 @@ import com.salesapp.data.roleLabel
 import com.salesapp.ui.components.AppIcons
 import com.salesapp.ui.components.Avatar
 import com.salesapp.ui.components.Badge
-import com.salesapp.ui.components.CompanyDot
 import com.salesapp.ui.components.DangerButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.Tile
@@ -192,14 +191,11 @@ fun HomeScreen(state: AppState) {
         ModalBottomSheet(onDismissRequest = { showMenu = false }, containerColor = Color.White) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(user.name, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Badge(roleLabel(user.role))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    user.companies.forEach { CompanyDot(it) }
-                }
-                DangerButton("Sign out", modifier = Modifier.padding(top = 4.dp), onClick = {
+                DangerButton("Sign out", onClick = {
                     showMenu = false
                     // Sign out on the phone at once; tell the server in the background.
                     val token = state.session.token

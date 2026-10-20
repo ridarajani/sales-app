@@ -97,11 +97,11 @@ fun UserDetailScreen(state: AppState, id: Int) {
             ) {
                 Avatar(row.name, size = 56.dp)
                 Column(modifier = Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(row.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Badge(roleLabel(row.role))
                         Badge(if (row.active) "Can sign in" else "Switched off", tone = if (row.active) BadgeTone.On else BadgeTone.Off)
                     }
+                    Text(row.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Detail("Phone number", row.phone)

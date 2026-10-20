@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -131,15 +130,12 @@ private fun UserCard(row: UserRow, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(row.name, size = 44.dp)
-        Column(modifier = Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(row.name, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                Badge(roleLabel(row.role), modifier = Modifier.padding(start = 8.dp))
-                if (!row.active) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    Badge("Off", tone = BadgeTone.Off, modifier = Modifier.padding(start = 8.dp))
-                }
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Badge(roleLabel(row.role))
+                if (!row.active) Badge("Off", tone = BadgeTone.Off)
             }
+            Text(row.name, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.companies.forEach { CompanyDot(it) }
             }
