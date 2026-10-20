@@ -6,6 +6,12 @@ import type { Db } from './db/pool.js';
 import { appRoutes } from './routes/app.js';
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/users.js';
+import { companyRoutes } from './lists/companies.js';
+import { customerRoutes } from './lists/customers.js';
+import { importRoutes } from './lists/import.js';
+import { openingBalanceRoutes } from './lists/openingBalances.js';
+import { productRoutes } from './lists/products.js';
+import { vehicleRoutes } from './lists/vehicles.js';
 
 export function buildApp(db: Db, options: { apkDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -52,6 +58,12 @@ export function buildApp(db: Db, options: { apkDir?: string } = {}) {
   authRoutes(app, db);
   userRoutes(app, db);
   appRoutes(app, db, apkDir);
+  companyRoutes(app, db);
+  customerRoutes(app, db);
+  productRoutes(app, db);
+  vehicleRoutes(app, db);
+  openingBalanceRoutes(app, db);
+  importRoutes(app, db);
 
   return app;
 }

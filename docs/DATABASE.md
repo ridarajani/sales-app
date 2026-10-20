@@ -20,6 +20,13 @@ erDiagram
     companies ||--o{ user_companies : "visible to"
     users ||--o{ user_companies : "sees"
     users ||--o{ sessions : "signed in as"
+    customers ||--o{ customer_companies : "buys from"
+    companies ||--o{ customer_companies : "sells to"
+    companies ||--o{ products : "sells"
+    facilities ||--o{ vehicles : "based at"
+    users ||--o{ vehicles : "usual driver"
+    customer_companies ||--o| opening_balances : "starts with"
+    companies ||--o{ number_series : "numbers"
     facilities {
         text code PK "F1, F2"
         text name
@@ -30,6 +37,9 @@ erDiagram
         text facility_code FK
         text tpin "empty until go-live"
         numeric vat_rate "empty until go-live"
+        text phone
+        text email
+        text address
         int sort_order
     }
     users {
@@ -52,6 +62,51 @@ erDiagram
         int user_id FK
         timestamptz last_used_at
     }
+    customers {
+        int id PK
+        text name UK "unique, any case"
+        text channel "supermarket, wholesaler, minibus, upcountry"
+        text area
+        text phone
+        boolean needs_lpo
+        boolean cash_only
+        boolean active
+    }
+    customer_companies {
+        int customer_id PK, FK
+        text company_code PK, FK
+        int payment_terms_days "0 to 365"
+    }
+    products {
+        int id PK
+        text code UK
+        text company_code FK
+        text brand
+        text name
+        text pack_size
+        int pieces_per_carton
+        boolean active
+    }
+    vehicles {
+        int id PK
+        text plate UK
+        text description
+        text facility_code FK
+        int default_driver_id FK
+        boolean active
+    }
+    opening_balances {
+        int customer_id PK, FK
+        text company_code PK, FK
+        bigint amount "whole kwacha"
+        date as_of
+        int entered_by FK
+    }
+    number_series {
+        text company_code PK, FK
+        text doc_type PK "SO, INV, ..."
+        int last_number
+    }
 ```
 
 | Table | Added in | What it holds |
@@ -64,6 +119,12 @@ erDiagram
 | `sessions` | Phase 1 | Signed-in sessions, until the user signs out |
 | `audit_log` | Phase 1 | Who did what and when |
 | `app_versions` | Phase 1 | Released versions of the phone app |
+| `customers` | Phase 2 | Shops and traders we sell to |
+| `customer_companies` | Phase 2 | Which companies sell to each customer, and the payment terms |
+| `products` | Phase 2 | Products, each belonging to one company |
+| `vehicles` | Phase 2 | Trucks and vans, with their usual driver |
+| `opening_balances` | Phase 2 | What each customer owed each company on the start date |
+| `number_series` | Phase 2 | The last document number used per company and type |
 
 ## Phase 1 notes
 
@@ -75,3 +136,12 @@ erDiagram
 - **Audit actions (`audit_log.action`):** `login`, `login_failed`, `logout`, `user_created`, `user_switched_off`, `user_switched_on`, `pin_reset`, `app_version_added`.
 - **Failed logins by an unknown phone:** `audit_log.user_id` is empty.
 - **App versions (`app_versions`):** one row per platform and version code. Platform is `android` for now.
+
+## Phase 2 notes
+
+- **Customers** can buy from several companies. Each user only sees the companies they work for, and only those companies' payment terms.
+- **Cash-only customers** always have 0 payment terms.
+- **Who edits lists:** Admin and Accounts edit customers and products; a sales manager can add or edit customers for their own companies only. Only Admin edits vehicles and company details.
+- **Opening balances** are entered once by Accounts or Admin. After that only Admin can correct one, and both are written to the audit log (`opening_balance_entered`, `opening_balance_corrected`).
+- **Document numbers** look like `LV-SO-000123`: company, document type, then a counter. Taken inside the same transaction as the document, so a cancelled save does not use up a number.
+- **Excel import:** download a template, upload it to check (nothing is saved), then upload again to save. Either every row is saved or none.
