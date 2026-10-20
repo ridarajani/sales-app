@@ -12,6 +12,7 @@ import { importRoutes } from './lists/import.js';
 import { openingBalanceRoutes } from './lists/openingBalances.js';
 import { productRoutes } from './lists/products.js';
 import { vehicleRoutes } from './lists/vehicles.js';
+import { stockRoutes } from './stock/stock.js';
 
 export function buildApp(db: Db, options: { apkDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -64,6 +65,7 @@ export function buildApp(db: Db, options: { apkDir?: string } = {}) {
   vehicleRoutes(app, db);
   openingBalanceRoutes(app, db);
   importRoutes(app, db);
+  stockRoutes(app, db);
 
   return app;
 }
