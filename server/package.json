@@ -13,6 +13,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@fastify/static": "^10.1.6",
+    "exceljs": "^4.4.0",
     "fastify": "^5.12.7",
     "pg": "^8.23.1",
     "zod": "^4.6.7"
@@ -25,5 +26,8 @@
     "vitest": "^5.0.5"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
 }
