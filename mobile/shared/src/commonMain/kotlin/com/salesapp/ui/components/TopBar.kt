@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,8 +28,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Ink
 
 // The bar at the top of every screen except Home: round "<" back button, centred title, thin line below.
 @Composable
@@ -38,6 +37,7 @@ fun TopBar(
     onBack: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Column(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp)) {
             if (onBack != null) {
@@ -50,7 +50,7 @@ fun TopBar(
                         .clickable(role = Role.Button, onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
-                  Box(modifier = Modifier.size(32.dp).border(1.dp, Burgundy, CircleShape), contentAlignment = Alignment.Center) {
+                  Box(modifier = Modifier.size(32.dp).border(1.dp, scheme.primary, CircleShape), contentAlignment = Alignment.Center) {
                     Canvas(modifier = Modifier.size(width = 6.dp, height = 9.dp)) {
                         val stroke = 1.5.dp.toPx()
                         val path = Path().apply {
@@ -58,14 +58,14 @@ fun TopBar(
                             lineTo(0f, size.height * 0.5f)
                             lineTo(size.width, size.height)
                         }
-                        drawPath(path, Burgundy, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        drawPath(path, scheme.primary, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
                   }
                 }
             }
             Text(
                 title,
-                color = Ink,
+                color = scheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,

@@ -4,10 +4,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -36,8 +39,22 @@ import androidx.compose.ui.unit.sp
 import com.salesapp.core.currentHour
 import com.salesapp.data.Api
 import com.salesapp.data.AppState
+import com.salesapp.data.ListsStart
 import com.salesapp.data.Screen
 import com.salesapp.data.roleLabel
+import com.salesapp.resources.Res
+import com.salesapp.resources.tile_balances_terms
+import com.salesapp.resources.tile_companies
+import com.salesapp.resources.tile_companies_sub
+import com.salesapp.resources.tile_customers
+import com.salesapp.resources.tile_customers_add
+import com.salesapp.resources.tile_look_up
+import com.salesapp.resources.tile_my_customers
+import com.salesapp.resources.tile_products
+import com.salesapp.resources.tile_products_sub
+import com.salesapp.resources.tile_vehicles
+import com.salesapp.resources.tile_vehicles_sub
+import com.salesapp.resources.tile_who_owes
 import com.salesapp.ui.components.AppIcons
 import com.salesapp.ui.components.Avatar
 import com.salesapp.ui.components.Badge
@@ -47,9 +64,22 @@ import com.salesapp.ui.components.Tile
 import com.salesapp.ui.theme.Ink
 import com.salesapp.ui.theme.Muted
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 // One square on the home screen. If it has no screen yet, `opens` is null.
-private class TileDef(val label: String, val sub: String, val icon: ImageVector, val opens: Screen? = null)
+private class TileDef(
+    val label: String,
+    val sub: String,
+    val icon: ImageVector,
+    val opens: Screen? = null,
+    val labelRes: StringResource? = null,
+    val subRes: StringResource? = null,
+)
+
+// A tile whose texts come from the string resources.
+private fun listTile(label: StringResource, sub: StringResource, icon: ImageVector, opens: Screen) =
+    TileDef("", "", icon, opens, label, sub)
 
 private val more = TileDef("More", "Everything else", AppIcons.Grid)
 
@@ -57,8 +87,11 @@ private val more = TileDef("More", "Everything else", AppIcons.Grid)
 private fun tilesFor(role: String): List<TileDef> = when (role) {
     "admin" -> listOf(
         TileDef("Users", "Add, switch off, reset PIN", AppIcons.Person, Screen.Users),
+        listTile(Res.string.tile_customers, Res.string.tile_customers_add, AppIcons.People, Screen.Lists(ListsStart.Customers)),
+        listTile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, Screen.Lists(ListsStart.Products)),
+        listTile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, Screen.Lists(ListsStart.Vehicles)),
+        listTile(Res.string.tile_companies, Res.string.tile_companies_sub, AppIcons.Settings, Screen.Lists(ListsStart.Companies)),
         TileDef("Audit trail", "Who did what", AppIcons.List),
-        TileDef("Settings", "Companies and rules", AppIcons.Settings),
         TileDef("Reports", "Sales and money owed", AppIcons.Chart),
         more,
     )
@@ -70,7 +103,9 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
         TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
         TileDef("Stock", "Free, reserved, on the road", AppIcons.Box),
         TileDef("Invoices", "Register", AppIcons.Receipt),
-        TileDef("Customers", "Who owes money", AppIcons.People),
+        listTile(Res.string.tile_customers, Res.string.tile_look_up, AppIcons.People, Screen.Lists(ListsStart.Customers)),
+        listTile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, Screen.Lists(ListsStart.Products)),
+        listTile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, Screen.Lists(ListsStart.Vehicles)),
         TileDef("Users", "Who can sign in", AppIcons.Person, Screen.Users),
         more,
     )
@@ -82,7 +117,8 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
         TileDef("Hand over cash", "Nothing to hand over", AppIcons.Money),
         TileDef("My salesmen", "Add or switch off", AppIcons.People, Screen.Users),
         TileDef("My orders", "Balances and status", AppIcons.Cart),
-        TileDef("My customers", "Who owes money", AppIcons.People),
+        listTile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, Screen.Lists(ListsStart.Customers)),
+        listTile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, Screen.Lists(ListsStart.Products)),
         TileDef("Invoices", "Print or share", AppIcons.Receipt),
         TileDef("Reports", "Sales and money owed", AppIcons.Chart),
         more,
@@ -92,7 +128,7 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
         TileDef("Collect money", "Customer pays you", AppIcons.Money),
         TileDef("Hand over cash", "Nothing to hand over", AppIcons.Money),
         TileDef("My orders", "Balances and status", AppIcons.Cart),
-        TileDef("My customers", "Who owes money", AppIcons.People),
+        listTile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, Screen.Lists(ListsStart.Customers)),
         more,
     )
     "warehouse" -> listOf(
@@ -101,6 +137,8 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
         TileDef("Receive stock", "New cartons arrived", AppIcons.Box),
         TileDef("Check stock", "Free, reserved, on the road", AppIcons.Box),
         TileDef("Report damage", "Or a count difference", AppIcons.Inbox),
+        listTile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, Screen.Lists(ListsStart.Products)),
+        listTile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, Screen.Lists(ListsStart.Vehicles)),
         TileDef("Reports", "Stock and deliveries", AppIcons.Chart),
         more,
     )
@@ -113,7 +151,7 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
     "cashier" -> listOf(
         TileDef("Count cash", "Nothing waiting", AppIcons.Money),
         TileDef("Record a payment", "Bank transfer or cash", AppIcons.Money),
-        TileDef("Who owes money", "Customer balances", AppIcons.People),
+        listTile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, Screen.Lists(ListsStart.Customers)),
         TileDef("Invoices", "Register and print", AppIcons.Receipt),
         TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
         more,
@@ -122,7 +160,8 @@ private fun tilesFor(role: String): List<TileDef> = when (role) {
         TileDef("Invoices", "Register and print", AppIcons.Receipt),
         TileDef("Credit and debit notes", "Fix an invoice", AppIcons.Receipt),
         TileDef("Customer ledger", "Invoices, payments, tax", AppIcons.List),
-        TileDef("Who owes money", "Customer balances", AppIcons.People),
+        listTile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, Screen.Lists(ListsStart.Customers)),
+        listTile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, Screen.Lists(ListsStart.Products)),
         TileDef("Reports", "Excel, PDF, print", AppIcons.Chart),
         more,
     )
@@ -167,14 +206,15 @@ fun HomeScreen(state: AppState) {
         SectionLabel("What do you want to do?", modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             tilesFor(user.role).chunked(2).forEachIndexed { rowIndex, pair ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Both tiles in a row are as tall as the taller one.
+                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     pair.forEachIndexed { colIndex, tile ->
                         Tile(
-                            label = tile.label,
-                            sub = tile.sub,
+                            label = tile.labelRes?.let { stringResource(it) } ?: tile.label,
+                            sub = tile.subRes?.let { stringResource(it) } ?: tile.sub,
                             icon = tile.icon,
                             primary = rowIndex == 0 && colIndex == 0,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             onClick = {
                                 val target = tile.opens
                                 if (target != null) state.nav.push(target) else state.message = "This is coming soon."
@@ -199,7 +239,7 @@ fun HomeScreen(state: AppState) {
                     showMenu = false
                     // Sign out on the phone at once; tell the server in the background.
                     val token = state.session.token
-                    val oldApi = Api(state.apiUrl) { token }
+                    val oldApi = Api({ state.apiUrl }) { token }
                     state.signedOut()
                     state.backgroundScope.launch {
                         try {

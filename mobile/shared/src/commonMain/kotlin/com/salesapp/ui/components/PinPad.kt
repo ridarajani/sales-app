@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,16 +23,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Line
-import com.salesapp.ui.theme.Muted
 
 const val PIN_LENGTH = 4
 
@@ -45,6 +42,7 @@ fun PinEntry(
     modifier: Modifier = Modifier,
     belowDots: @Composable () -> Unit = {},
 ) {
+    val scheme = MaterialTheme.colorScheme
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -73,14 +71,14 @@ fun PinEntry(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(if (filled) Burgundy else Color.White)
-                                .border(2.dp, if (filled) Burgundy else Line, CircleShape),
+                                .background(if (filled) scheme.primary else scheme.surface)
+                                .border(2.dp, if (filled) scheme.primary else scheme.outline, CircleShape),
                         )
                     }
                 }
             },
         )
-        Text("Tap the dots if the keyboard is hidden.", color = Muted, fontSize = 13.sp)
+        Text("Tap the dots if the keyboard is hidden.", color = scheme.onSurfaceVariant, fontSize = 13.sp)
         belowDots()
     }
 }

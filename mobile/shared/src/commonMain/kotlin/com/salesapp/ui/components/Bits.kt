@@ -28,31 +28,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
 import com.salesapp.data.companyName
-import com.salesapp.ui.theme.AccentSoft
-import com.salesapp.ui.theme.Bad
-import com.salesapp.ui.theme.BadSoft
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Good
-import com.salesapp.ui.theme.GoldSoft
-import com.salesapp.ui.theme.GoodSoft
-import com.salesapp.ui.theme.Ink
-import com.salesapp.ui.theme.Line
-import com.salesapp.ui.theme.Muted
 import com.salesapp.ui.theme.companyColor
+import com.salesapp.ui.theme.sales
 
 // A round picture with a person's initials.
 @Composable
-fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tone: Color = AccentSoft) {
+fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tone: Color = Color.Unspecified) {
     val initials = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.take(1).uppercase() }
-    val onBurgundy = tone == Burgundy
+    val primary = MaterialTheme.colorScheme.primary
+    val fill = if (tone == Color.Unspecified) MaterialTheme.sales.accentSoft else tone
+    val onPrimary = fill == primary
     Box(
-        modifier = modifier.size(size).clip(CircleShape).background(tone),
+        modifier = modifier.size(size).clip(CircleShape).background(fill),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             initials,
-            color = if (onBurgundy) Color.White else Burgundy,
+            color = if (onPrimary) MaterialTheme.colorScheme.onPrimary else primary,
             fontSize = if (size >= 56.dp) 20.sp else 16.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -64,15 +58,16 @@ enum class BadgeTone { Role, Off, On }
 // A small pill: a job, "Off" or "Can sign in".
 @Composable
 fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTone.Role) {
+    val sales = MaterialTheme.sales
     val fill = when (tone) {
-        BadgeTone.Role -> GoldSoft
-        BadgeTone.Off -> BadSoft
-        BadgeTone.On -> GoodSoft
+        BadgeTone.Role -> sales.goldSoft
+        BadgeTone.Off -> sales.badSoft
+        BadgeTone.On -> sales.goodSoft
     }
     val ink = when (tone) {
-        BadgeTone.Role -> Ink
-        BadgeTone.Off -> Bad
-        BadgeTone.On -> Good
+        BadgeTone.Role -> MaterialTheme.colorScheme.onSurface
+        BadgeTone.Off -> sales.bad
+        BadgeTone.On -> sales.good
     }
     Text(
         text,
@@ -89,21 +84,22 @@ fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTo
 fun CompanyDot(code: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(companyColor(code)))
-        Text(companyName(code), color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+        Text(companyName(code), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
 // A box with a message: blue-ish for information, red for a problem.
 @Composable
 fun Say(text: String, modifier: Modifier = Modifier, error: Boolean = false) {
+    val sales = MaterialTheme.sales
     Text(
         text,
-        color = if (error) Bad else Ink,
+        color = if (error) sales.bad else MaterialTheme.colorScheme.onSurface,
         fontSize = 15.sp,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (error) BadSoft else AccentSoft)
+            .background(if (error) sales.badSoft else sales.accentSoft)
             .padding(12.dp),
     )
 }
@@ -120,8 +116,9 @@ fun Field(
     enabled: Boolean = true,
     note: String? = null,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(label.uppercase(), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+        Text(label.uppercase(), color = scheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 6.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -132,13 +129,13 @@ fun Field(
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Burgundy,
-                unfocusedBorderColor = Line,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
+                focusedBorderColor = scheme.primary,
+                unfocusedBorderColor = scheme.outline,
+                focusedContainerColor = scheme.surface,
+                unfocusedContainerColor = scheme.surface,
             ),
         )
-        if (note != null) Text(note, color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        if (note != null) Text(note, color = scheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -152,19 +149,20 @@ fun ChoiceButton(
     enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(12.dp)
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .heightIn(min = 44.dp)
             .clip(shape)
-            .background(if (selected) AccentSoft else Color.White)
-            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) Burgundy else Line), shape)
+            .background(if (selected) MaterialTheme.sales.accentSoft else scheme.surface)
+            .border(BorderStroke(if (selected) 1.5.dp else 1.dp, if (selected) scheme.primary else scheme.outline), shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
             text,
-            color = if (selected) Burgundy else Ink,
+            color = if (selected) scheme.primary else scheme.onSurface,
             fontSize = 15.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
@@ -174,7 +172,7 @@ fun ChoiceButton(
 // A small upper-case heading above a group of fields or tiles.
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), color = Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = modifier.padding(bottom = 2.dp))
+    Text(text.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = modifier.padding(bottom = 2.dp))
 }
 
 // Choice buttons laid out one under another.

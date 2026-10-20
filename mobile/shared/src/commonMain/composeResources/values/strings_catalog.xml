@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="products_title">Products</string>
+    <string name="vehicles_title">Vehicles</string>
+    <string name="companies_title">Companies</string>
+
+    <string name="catalog_save">Save</string>
+    <string name="catalog_saved">Saved.</string>
+    <string name="catalog_added">%1$s added.</string>
+    <string name="catalog_load_failed">Could not load. Try again.</string>
+
+    <string name="products_search_hint">Search products</string>
+    <string name="products_empty">No products yet.</string>
+    <string name="products_show_off">Show switched off</string>
+    <string name="products_hide_off">Hide switched off</string>
+    <string name="products_add">Add a product</string>
+    <string name="products_edit">Edit product</string>
+    <string name="products_pack_line">%1$s · 1 carton = %2$s pieces</string>
+    <string name="catalog_off">Off</string>
+    <string name="product_company">Company</string>
+    <string name="product_brand">Brand</string>
+    <string name="product_name">Product name</string>
+    <string name="product_pack">Pack size</string>
+    <string name="product_pack_hint">400g tin</string>
+    <string name="product_pack_note">Every pack size is its own product.</string>
+    <string name="product_pieces">Pieces per carton</string>
+    <string name="product_code">Code</string>
+    <string name="product_code_hint">LV-KG-400</string>
+    <string name="product_code_note">Short and unique. Letters and numbers.</string>
+    <string name="product_selling">Selling</string>
+    <string name="product_selling_note">Switch off to hide it from orders.</string>
+    <string name="product_err_company">Please choose the company.</string>
+    <string name="product_err_brand">Please type the brand.</string>
+    <string name="product_err_name">Please type the product name.</string>
+    <string name="product_err_pack">Please type the pack size, for example 400g tin.</string>
+    <string name="product_err_pieces">Please type how many pieces are in a carton.</string>
+    <string name="product_err_code">Please type a code for the product.</string>
+
+    <string name="vehicles_empty">No vehicles yet.</string>
+    <string name="vehicles_add">Add a vehicle</string>
+    <string name="vehicles_edit">Edit vehicle</string>
+    <string name="vehicle_no_description">No description</string>
+    <string name="vehicle_no_driver">No usual driver</string>
+    <string name="vehicle_usual_driver">Usual driver: %1$s</string>
+    <string name="vehicle_line">%1$s · %2$s</string>
+    <string name="facility_1">Facility 1</string>
+    <string name="facility_2">Facility 2</string>
+    <string name="facility_none">No facility</string>
+    <string name="vehicle_plate">Number plate</string>
+    <string name="vehicle_plate_hint">MZ 4421</string>
+    <string name="vehicle_description">Description</string>
+    <string name="vehicle_description_hint">3 ton truck</string>
+    <string name="vehicle_facility">Facility</string>
+    <string name="vehicle_driver">Usual driver</string>
+    <string name="vehicle_no_drivers">No drivers yet. Add a user with the job Driver first.</string>
+    <string name="vehicle_in_use">In use</string>
+    <string name="vehicle_in_use_note">Switch off when the vehicle is sold or broken.</string>
+    <string name="vehicle_err_plate">Please type the number plate.</string>
+
+    <string name="company_name">Company name</string>
+    <string name="company_tpin">TPIN</string>
+    <string name="company_tpin_note">Tax number, 6 to 12 digits.</string>
+    <string name="company_vat">VAT rate %</string>
+    <string name="company_vat_note">For example 16.5</string>
+    <string name="company_phone">Phone number</string>
+    <string name="company_email">Email</string>
+    <string name="company_address">Address</string>
+    <string name="company_err_name">Please type the company name.</string>
+    <string name="company_err_tpin">The TPIN should be numbers only, 6 to 12 digits.</string>
+    <string name="company_err_vat">The VAT rate should be a number from 0 to 100.</string>
+    <string name="company_err_email">That email does not look right.</string>
+    <string name="company_err_phone">That phone number does not look right.</string>
+</resources>

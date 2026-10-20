@@ -18,6 +18,7 @@ export type Customer = {
   cashOnly: boolean;
   active: boolean;
   companies: CustomerCompany[];
+  canEdit: boolean;
 };
 
 const companyEntry = z.object({
@@ -25,16 +26,22 @@ const companyEntry = z.object({
   paymentTermsDays: z.number().int().min(0, 'Payment terms cannot be below 0 days.').max(365, 'Payment terms cannot be over 365 days.'),
 });
 
-const customerBody = z.object({
+const customerFields = z.object({
   name: z.string().trim().min(1, 'Please type the customer name.'),
   channel: z.enum(CHANNELS, 'Please pick a channel.'),
-  area: z.string().trim().default(''),
+  area: z.string().trim(),
   phone: z.string().nullish(),
-  needsLpo: z.boolean().default(false),
-  cashOnly: z.boolean().default(false),
+  needsLpo: z.boolean(),
+  cashOnly: z.boolean(),
   companies: z.array(companyEntry).min(1, 'Pick at least one company.'),
 });
-const updateBody = customerBody.partial().extend({ active: z.boolean().optional() });
+// Defaults apply only when creating. An update leaves out fields it does not send.
+const customerBody = customerFields.extend({
+  area: z.string().trim().default(''),
+  needsLpo: z.boolean().default(false),
+  cashOnly: z.boolean().default(false),
+});
+const updateBody = customerFields.partial().extend({ active: z.boolean().optional() });
 const listQuery = z.object({
   q: z.string().trim().optional(),
   company: z.string().optional(),
@@ -45,13 +52,27 @@ const listQuery = z.object({
 const customerSelect = `select c.id, c.name, c.channel, c.area, c.phone, c.needs_lpo as "needsLpo", c.cash_only as "cashOnly", c.active,
     coalesce((select json_agg(json_build_object('code', cc.company_code, 'paymentTermsDays', cc.payment_terms_days) order by co.sort_order)
               from customer_companies cc join companies co on co.code = cc.company_code
-              where cc.customer_id = c.id and cc.company_code = any($1)), '[]') as companies
+              where cc.customer_id = c.id and cc.company_code = any($1)), '[]') as companies,
+    (select array_agg(cc.company_code) from customer_companies cc where cc.customer_id = c.id) as "allCompanies"
   from customers c
   where exists (select 1 from customer_companies cc where cc.customer_id = c.id and cc.company_code = any($1))`;
 
+type CustomerRow = Omit<Customer, 'canEdit'> & { allCompanies: string[] };
+
+// canEdit uses ALL the customer's companies, not just the ones this user can see.
+function withCanEdit(user: AuthUser, { allCompanies, ...rest }: CustomerRow): Customer {
+  let canEdit = true;
+  try {
+    assertCanEditCompanies(user, allCompanies);
+  } catch {
+    canEdit = false;
+  }
+  return { ...rest, canEdit };
+}
+
 export async function getCustomer(db: Db | PoolClient, user: AuthUser, id: number): Promise<Customer | null> {
-  const { rows } = await db.query<Customer>(`${customerSelect} and c.id = $2`, [user.companies, id]);
-  return rows[0] ?? null;
+  const { rows } = await db.query<CustomerRow>(`${customerSelect} and c.id = $2`, [user.companies, id]);
+  return rows[0] ? withCanEdit(user, rows[0]) : null;
 }
 
 // All companies of a customer, whatever the user may see. Used to check edit rights.
@@ -106,8 +127,8 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       params.push(`%${q.replace(/[\\%_]/g, (m) => '\\' + m)}%`);
       where += ` and (c.name ilike $${params.length} or c.area ilike $${params.length} or c.phone like $${params.length})`;
     }
-    const { rows } = await db.query<Customer>(`${customerSelect}${where} order by lower(c.name) limit 500`, params);
-    return rows;
+    const { rows } = await db.query<CustomerRow>(`${customerSelect}${where} order by lower(c.name) limit 500`, params);
+    return rows.map((r) => withCanEdit(request.user, r));
   });
 
   app.get('/customers/:id', { onRequest: auth }, async (request) => {
@@ -170,7 +191,14 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
         await client.query('rollback');
         throw nameTaken();
       }
-      await client.query('delete from customer_companies where customer_id = $1', [id]);
+      // Replace only the companies this user can see (and any they name); the rest stay as they are.
+      const mergedCodes = merged.companies.map((c) => c.code);
+      await client.query('delete from customer_companies where customer_id = $1 and (company_code = any($2) or company_code = any($3))', [
+        id,
+        request.user.companies,
+        mergedCodes,
+      ]);
+      if (merged.cashOnly) await client.query('update customer_companies set payment_terms_days = 0 where customer_id = $1', [id]);
       for (const co of merged.companies) {
         await client.query('insert into customer_companies (customer_id, company_code, payment_terms_days) values ($1, $2, $3)', [
           id,
