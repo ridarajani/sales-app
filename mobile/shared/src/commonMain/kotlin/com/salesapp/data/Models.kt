@@ -1,6 +1,9 @@
 package com.salesapp.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 // The eight kinds of people who use the app.
 enum class Role(val code: String, val label: String) {
@@ -97,3 +100,158 @@ data class NewUserRequest(
 
 @Serializable
 data class ResetPinRequest(val pin: String)
+
+@Serializable
+data class CustomerCompany(val code: String, val paymentTermsDays: Int = 0)
+
+@Serializable
+data class Customer(
+    val id: Int,
+    val name: String,
+    val channel: String = "",
+    val area: String = "",
+    val phone: String? = null,
+    val needsLpo: Boolean = false,
+    val cashOnly: Boolean = false,
+    val active: Boolean = true,
+    // Whether the server says this user may change the customer; null from an older server.
+    val canEdit: Boolean? = null,
+    val companies: List<CustomerCompany> = emptyList(),
+)
+
+// Fields left null are not sent, so a change only touches what was set.
+@Serializable
+data class CustomerRequest(
+    val name: String? = null,
+    val channel: String? = null,
+    val area: String? = null,
+    val phone: String? = null,
+    val needsLpo: Boolean? = null,
+    val cashOnly: Boolean? = null,
+    val companies: List<CustomerCompany>? = null,
+    val active: Boolean? = null,
+)
+
+@Serializable
+data class Product(
+    val id: Int,
+    val code: String,
+    val companyCode: String,
+    val brand: String = "",
+    val name: String,
+    val packSize: String = "",
+    val piecesPerCarton: Int = 1,
+    val active: Boolean = true,
+)
+
+@Serializable
+data class ProductRequest(
+    val code: String? = null,
+    val companyCode: String? = null,
+    val brand: String? = null,
+    val name: String? = null,
+    val packSize: String? = null,
+    val piecesPerCarton: Int? = null,
+    val active: Boolean? = null,
+)
+
+@Serializable
+data class Vehicle(
+    val id: Int,
+    val plate: String,
+    val description: String = "",
+    val facilityCode: String? = null,
+    val defaultDriverId: Int? = null,
+    val defaultDriverName: String? = null,
+    val active: Boolean = true,
+)
+
+// For adding a vehicle. Changing one uses a hand-built JSON object (see vehicleChange) so that
+// facilityCode and defaultDriverId can be sent as null to clear them.
+@Serializable
+data class VehicleRequest(
+    val plate: String? = null,
+    val description: String? = null,
+    val facilityCode: String? = null,
+    val defaultDriverId: Int? = null,
+    val active: Boolean? = null,
+)
+
+// Builds the body for changing a vehicle. Only the fields passed are sent; a passed null is sent
+// as null (clears the value). Leave a field out to keep it as it is.
+fun vehicleChange(
+    plate: String? = null,
+    description: String? = null,
+    facilityCode: Optional<String?> = Optional.Absent,
+    defaultDriverId: Optional<Int?> = Optional.Absent,
+    active: Boolean? = null,
+): JsonObject = buildJsonObject {
+    if (plate != null) put("plate", plate)
+    if (description != null) put("description", description)
+    if (facilityCode is Optional.Present) put("facilityCode", facilityCode.value)
+    if (defaultDriverId is Optional.Present) put("defaultDriverId", defaultDriverId.value)
+    if (active != null) put("active", active)
+}
+
+// Builds the body for changing a company. Only the fields passed are sent; a passed null is sent
+// as null (clears the value). Leave a field Absent to keep it as it is.
+fun companyChange(
+    name: Optional<String> = Optional.Absent,
+    tpin: Optional<String> = Optional.Absent,
+    vatRate: Optional<Double?> = Optional.Absent,
+    phone: Optional<String> = Optional.Absent,
+    email: Optional<String> = Optional.Absent,
+    address: Optional<String?> = Optional.Absent,
+): JsonObject = buildJsonObject {
+    if (name is Optional.Present) put("name", name.value)
+    if (tpin is Optional.Present) put("tpin", tpin.value)
+    if (vatRate is Optional.Present) put("vatRate", vatRate.value)
+    if (phone is Optional.Present) put("phone", phone.value)
+    if (email is Optional.Present) put("email", email.value)
+    if (address is Optional.Present) put("address", address.value)
+}
+
+// A value that is either left out or given (and the given value may be null).
+sealed interface Optional<out T> {
+    data object Absent : Optional<Nothing>
+    data class Present<T>(val value: T) : Optional<T>
+}
+
+@Serializable
+data class Driver(val id: Int, val name: String, val phone: String = "")
+
+@Serializable
+data class CompanyDetails(
+    val code: String,
+    val name: String,
+    val facilityCode: String = "",
+    val tpin: String? = null,
+    val vatRate: Double? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val address: String? = null,
+)
+
+@Serializable
+data class CompanyDetailsRequest(
+    val name: String? = null,
+    val tpin: String? = null,
+    val vatRate: Double? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val address: String? = null,
+)
+
+@Serializable
+data class OpeningBalance(
+    val customerId: Int,
+    val customerName: String = "",
+    val companyCode: String,
+    val amount: Long,
+    val asOf: String,
+    val enteredBy: String = "",
+    val enteredAt: String = "",
+)
+
+@Serializable
+data class OpeningBalanceRequest(val companyCode: String, val amount: Long, val asOf: String)

@@ -249,3 +249,64 @@ test('product import, and who may use the import', async () => {
   expect(r.json().message).toMatch(/do not match the template/);
   expect((await upload(admin, '/import/products/check', Buffer.from('not excel'))).json().message).toMatch(/could not be opened/);
 });
+
+test('a partial update keeps the fields it does not send', async () => {
+  const v = await post(app, admin, '/vehicles', { plate: 'BT 9001', description: 'Isuzu 7 ton', defaultDriverId: null });
+  expect(v.statusCode).toBe(201);
+  const upd = await put(admin, `/vehicles/${v.json().id}`, { defaultDriverId: driverId });
+  expect(upd.statusCode).toBe(200);
+  expect(upd.json()).toMatchObject({ description: 'Isuzu 7 ton', defaultDriverId: driverId });
+
+  const c = await post(app, admin, '/customers', {
+    name: 'Keep Me Stores',
+    channel: 'wholesaler',
+    area: 'Area 25',
+    needsLpo: true,
+    cashOnly: false,
+    companies: [{ code: 'LV', paymentTermsDays: 14 }, { code: 'ZF', paymentTermsDays: 30 }],
+  });
+  expect(c.statusCode).toBe(201);
+  const off = await put(admin, `/customers/${c.json().id}`, { active: false });
+  expect(off.statusCode).toBe(200);
+  expect(off.json()).toMatchObject({ active: false, area: 'Area 25', needsLpo: true, cashOnly: false });
+  expect(off.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 14 }, { code: 'ZF', paymentTermsDays: 30 }]);
+});
+
+test('an accounts user with fewer companies cannot delete the ones they cannot see', async () => {
+  const limited = await addUser({ name: 'Accounts LV', phone: '0992000010', role: 'accounts', companies: ['LV'] });
+  expect(limited).toBeGreaterThan(0);
+  const token = (await login(app, '0992000010', '1111')).token;
+  const c = await post(app, admin, '/customers', {
+    name: 'Two Company Shop',
+    channel: 'supermarket',
+    companies: [{ code: 'LV', paymentTermsDays: 7 }, { code: 'ZT', paymentTermsDays: 21 }],
+  });
+  const id = c.json().id;
+  const r = await put(token, `/customers/${id}`, { companies: [{ code: 'LV', paymentTermsDays: 10 }] });
+  expect(r.statusCode).toBe(200);
+  expect(r.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 10 }]);
+  expect((await get(app, admin, `/customers/${id}`)).json().companies).toEqual([
+    { code: 'LV', paymentTermsDays: 10 },
+    { code: 'ZT', paymentTermsDays: 21 },
+  ]);
+  const name = await put(token, `/customers/${id}`, { area: 'New area' });
+  expect(name.statusCode).toBe(200);
+  expect((await get(app, admin, `/customers/${id}`)).json().companies).toHaveLength(2);
+});
+
+test('canEdit says whether the caller may change the customer', async () => {
+  const mixed = await post(app, admin, '/customers', {
+    name: 'ZF And LV Shop',
+    channel: 'wholesaler',
+    companies: [{ code: 'ZF', paymentTermsDays: 0 }, { code: 'LV', paymentTermsDays: 0 }],
+  });
+  const only = await post(app, admin, '/customers', { name: 'ZF Only Shop', channel: 'wholesaler', companies: [{ code: 'ZF', paymentTermsDays: 0 }] });
+  expect(mixed.json().canEdit).toBe(true);
+  const list = (await get(app, kashif, '/customers')).json() as { name: string; canEdit: boolean }[];
+  expect(list.find((c) => c.name === 'ZF And LV Shop')!.canEdit).toBe(false);
+  expect(list.find((c) => c.name === 'ZF Only Shop')!.canEdit).toBe(true);
+  expect((await get(app, kashif, `/customers/${mixed.json().id}`)).json().canEdit).toBe(false);
+  expect((await get(app, kashif, `/customers/${only.json().id}`)).json().canEdit).toBe(true);
+  expect((await get(app, accounts, `/customers/${mixed.json().id}`)).json().canEdit).toBe(true);
+  expect((await get(app, salesman, '/customers')).json().every((c: { canEdit: boolean }) => c.canEdit === false)).toBe(true);
+});

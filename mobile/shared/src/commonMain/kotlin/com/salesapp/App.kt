@@ -31,7 +31,16 @@ import com.salesapp.core.Updater
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.AppVersion
+import com.salesapp.data.ListsStart
 import com.salesapp.data.Screen
+import com.salesapp.di.appModule
+import com.salesapp.resources.Res
+import com.salesapp.resources.err_signed_out
+import com.salesapp.ui.navigation.CompaniesRoute
+import com.salesapp.ui.navigation.CustomersRoute
+import com.salesapp.ui.navigation.ListsHost
+import com.salesapp.ui.navigation.ProductsRoute
+import com.salesapp.ui.navigation.VehiclesRoute
 import com.salesapp.ui.screens.AddUserScreen
 import com.salesapp.ui.screens.HomeScreen
 import com.salesapp.ui.screens.PhoneScreen
@@ -44,16 +53,28 @@ import com.salesapp.ui.theme.SalesTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
+import org.jetbrains.compose.resources.getString
+import org.koin.compose.KoinApplication
+import org.koin.compose.koinInject
+import org.koin.dsl.koinConfiguration
 
 // The whole app, used as is by both the Android and the iPhone app.
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun App() {
-    val state = remember { AppState() }
+    KoinApplication(koinConfiguration { modules(appModule) }) {
+        AppContent()
+    }
+}
+
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+private fun AppContent() {
+    val state = koinInject<AppState>()
     val snackbar = remember { SnackbarHostState() }
 
-    // Phone Back button (Android) goes to the previous screen.
-    BackHandler(enabled = state.nav.canGoBack) { state.nav.pop() }
+    // Phone Back button (Android) goes to the previous screen. Inside the lists area its own
+    // navigation handles Back first; this one steps in once that is at its first screen.
+    BackHandler(enabled = state.nav.canGoBack && !state.listsCanPop) { state.nav.pop() }
 
     // Show short messages at the bottom, one at a time.
     LaunchedEffect(Unit) {
@@ -78,7 +99,7 @@ fun App() {
             throw e
         } catch (e: ApiException) {
             if (e.isSignedOut && state.session.token == startToken) {
-                state.signedOut("You were signed out. Sign in again.")
+                state.signedOut(getString(Res.string.err_signed_out))
             }
         }
     }
@@ -95,6 +116,16 @@ fun App() {
                     is Screen.UserDetail -> UserDetailScreen(state, screen.id)
                     is Screen.ResetPin -> ResetPinScreen(state, screen.id)
                     Screen.ServerAddress -> ServerAddressScreen(state)
+                    is Screen.Lists -> ListsHost(
+                        start = when (screen.start) {
+                            ListsStart.Customers -> CustomersRoute
+                            ListsStart.Products -> ProductsRoute
+                            ListsStart.Vehicles -> VehiclesRoute
+                            ListsStart.Companies -> CompaniesRoute
+                        },
+                        onExit = { state.nav.pop() },
+                        onCanPopInner = { state.listsCanPop = it },
+                    )
                 }
                 SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
                 UpdatePrompt(state)

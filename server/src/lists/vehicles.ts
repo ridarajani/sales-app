@@ -6,13 +6,15 @@ import type { Db } from '../db/pool.js';
 import { parse } from '../users.js';
 import { idParams, invalid, notFound } from './common.js';
 
-const vehicleBody = z.object({
+const vehicleFields = z.object({
   plate: z.string().trim().min(1, 'Please type the number plate.').max(20).transform((s) => s.toUpperCase().replace(/\s+/g, ' ')),
-  description: z.string().trim().default(''),
+  description: z.string().trim(),
   facilityCode: z.string().nullish(),
   defaultDriverId: z.number().int().positive().max(2147483647).nullish(),
 });
-const updateBody = vehicleBody.partial().extend({ active: z.boolean().optional() });
+// Defaults apply only when creating. An update leaves out fields it does not send.
+const vehicleBody = vehicleFields.extend({ description: z.string().trim().default('') });
+const updateBody = vehicleFields.partial().extend({ active: z.boolean().optional() });
 
 type Vehicle = {
   id: number;

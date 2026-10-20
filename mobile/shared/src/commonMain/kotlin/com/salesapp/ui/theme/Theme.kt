@@ -6,6 +6,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 
@@ -25,13 +27,75 @@ val BadSoft = Color(0xFFFBE2DF)
 val Good = Color(0xFF1D7536)
 val GoodSoft = Color(0xFFDCF1E1)
 
+// Brand colours that Material's colour scheme has no slot for, with a light and a dark set.
+data class SalesColors(
+    val line: Color,
+    val muted: Color,
+    val accentSoft: Color,
+    val goldSoft: Color,
+    val gold: Color,
+    val good: Color,
+    val goodSoft: Color,
+    val bad: Color,
+    val badSoft: Color,
+    val surface2: Color,
+    val companyLV: Color,
+    val companyZT: Color,
+    val companyZF: Color,
+    val companyGL: Color,
+)
+
+val LightSalesColors = SalesColors(
+    line = Line,
+    muted = Muted,
+    accentSoft = AccentSoft,
+    goldSoft = GoldSoft,
+    gold = Gold,
+    good = Good,
+    goodSoft = GoodSoft,
+    bad = Bad,
+    badSoft = BadSoft,
+    surface2 = Surface2,
+    companyLV = Color(0xFFB8892B),
+    companyZT = Color(0xFF8A4FA3),
+    companyZF = Color(0xFF2F62A8),
+    companyGL = Color(0xFFC25A2E),
+)
+
+val DarkSalesColors = SalesColors(
+    line = Color(0xFF4A3A40),
+    muted = Color(0xFFB9A5AA),
+    accentSoft = Color(0xFF4A2630),
+    goldSoft = Color(0xFF4A3A1A),
+    gold = Color(0xFFE2B85E),
+    good = Color(0xFF7AD08E),
+    goodSoft = Color(0xFF1F3A27),
+    bad = Color(0xFFFF8A80),
+    badSoft = Color(0xFF4A2220),
+    surface2 = Color(0xFF33252A),
+    companyLV = Color(0xFFE2B85E),
+    companyZT = Color(0xFFC592DA),
+    companyZF = Color(0xFF7FA8E6),
+    companyGL = Color(0xFFE8895C),
+)
+
+val LocalSalesColors = staticCompositionLocalOf { LightSalesColors }
+
+// The extra brand colours of the current theme: MaterialTheme.sales.line, .muted and so on.
+val MaterialTheme.sales: SalesColors
+    @Composable
+    get() = LocalSalesColors.current
+
 // Each company has its own colour.
-fun companyColor(code: String): Color = when (code) {
-    "LV" -> Color(0xFFB8892B)
-    "ZT" -> Color(0xFF8A4FA3)
-    "ZF" -> Color(0xFF2F62A8)
-    "GL" -> Color(0xFFC25A2E)
-    else -> Muted
+@Composable
+fun companyColor(code: String): Color = companyColorIn(MaterialTheme.sales, code)
+
+fun companyColorIn(colors: SalesColors, code: String): Color = when (code) {
+    "LV" -> colors.companyLV
+    "ZT" -> colors.companyZT
+    "ZF" -> colors.companyZF
+    "GL" -> colors.companyGL
+    else -> colors.muted
 }
 
 private val LightColors = lightColorScheme(
@@ -59,6 +123,10 @@ private val DarkColors = darkColorScheme(
     onBackground = Color(0xFFF3E9E6),
     surface = Color(0xFF271B1F),
     onSurface = Color(0xFFF3E9E6),
+    error = Color(0xFFFF8A80),
+    outline = Color(0xFF4A3A40),
+    surfaceVariant = Color(0xFF33252A),
+    onSurfaceVariant = Color(0xFFB9A5AA),
 )
 
 /**
@@ -68,6 +136,7 @@ private val DarkColors = darkColorScheme(
 @Composable
 internal expect fun platformColorScheme(darkTheme: Boolean): ColorScheme?
 
+// darkTheme stays false by default: the Phase 1 screens still use the light colours directly.
 /**
  * App theme. With [dynamicColor] on, Android 12+ phones use their wallpaper colours instead of
  * burgundy and gold; it is off by default to keep the brand look. Dark mode is ready in the
@@ -90,5 +159,8 @@ fun SalesTheme(
         titleLarge = base.titleLarge.copy(fontWeight = FontWeight.Bold),
         titleMedium = base.titleMedium.copy(fontWeight = FontWeight.Bold),
     )
-    MaterialTheme(colorScheme = colors, typography = typography, content = content)
+    val sales = if (darkTheme) DarkSalesColors else LightSalesColors
+    CompositionLocalProvider(LocalSalesColors provides sales) {
+        MaterialTheme(colorScheme = colors, typography = typography, content = content)
+    }
 }

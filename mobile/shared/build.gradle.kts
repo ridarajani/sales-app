@@ -52,6 +52,13 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+            implementation(libs.koin.compose.viewmodel.navigation)
+            implementation(libs.jetbrains.navigation.compose)
+            implementation(libs.jetbrains.lifecycle.viewmodel.compose)
+            implementation(libs.jetbrains.lifecycle.runtime.compose)
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
@@ -62,6 +69,13 @@ kotlin {
             implementation(libs.ktor.client.darwin)
         }
     }
+}
+
+// Strings live in src/commonMain/composeResources/values.
+compose.resources {
+    publicResClass = false
+    packageOfResClass = "com.salesapp.resources"
+    generateResClass = auto
 }
 
 dependencies {

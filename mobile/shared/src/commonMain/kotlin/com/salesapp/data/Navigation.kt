@@ -14,7 +14,11 @@ sealed interface Screen {
     data class UserDetail(val id: Int) : Screen
     data class ResetPin(val id: Int) : Screen
     data object ServerAddress : Screen
+    data class Lists(val start: ListsStart) : Screen
 }
+
+// Which list the lists area opens on.
+enum class ListsStart { Customers, Products, Vehicles, Companies }
 
 // Remembers which screens were opened so Back can return to them.
 class Navigator(start: Screen) {

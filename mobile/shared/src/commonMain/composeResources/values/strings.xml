@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string>
+    <string name="search_clear">Clear</string>
+    <string name="all">All</string>
+    <string name="try_again">Try again</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="mwk_prefix">MWK</string>
+    <string name="empty_nothing_matches">Nothing matches.</string>
+    <string name="coming_next">Coming next.</string>
+    <string name="channel_supermarket">Supermarket</string>
+    <string name="channel_wholesaler">Wholesaler</string>
+    <string name="channel_minibus">Minibus or local market</string>
+    <string name="channel_upcountry">Upcountry</string>
+    <string name="badge_off">Off</string>
+    <string name="badge_cash_only">Cash only</string>
+    <string name="badge_needs_lpo">Needs LPO</string>
+    <string name="badge_switched_off">Switched off</string>
+    <string name="err_signed_out">You were signed out. Sign in again.</string>
+    <string name="err_generic">Something went wrong. Try again.</string>
+    <string name="none_placeholder">-</string>
+    <string name="tile_customers">Customers</string>
+    <string name="tile_my_customers">My customers</string>
+    <string name="tile_who_owes">Who owes money</string>
+    <string name="tile_customers_add">Add and look after</string>
+    <string name="tile_look_up">Look up customers</string>
+    <string name="tile_balances_terms">Balances and terms</string>
+    <string name="tile_products">Products</string>
+    <string name="tile_products_sub">Packs and cartons</string>
+    <string name="tile_vehicles">Vehicles</string>
+    <string name="tile_vehicles_sub">Vans and drivers</string>
+    <string name="tile_companies">Companies</string>
+    <string name="tile_companies_sub">TPIN, VAT, contact</string>
+</resources>

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,10 +20,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.salesapp.ui.theme.Bad
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Ink
-import com.salesapp.ui.theme.Line
 
 private val ButtonShape = RoundedCornerShape(12.dp)
 
@@ -34,17 +31,18 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
             .clip(ButtonShape)
-            .background(if (enabled) Burgundy else Burgundy.copy(alpha = 0.4f))
+            .background(if (enabled) scheme.primary else scheme.primary.copy(alpha = 0.4f))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = scheme.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -56,7 +54,7 @@ fun SecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    OutlinedButtonBox(text, onClick, modifier, enabled, borderColor = Line, textColor = Ink)
+    OutlinedButtonBox(text, onClick, modifier, enabled, borderColor = MaterialTheme.colorScheme.outline, textColor = MaterialTheme.colorScheme.onSurface)
 }
 
 // An outlined red button for things that switch something off or sign out.
@@ -67,7 +65,7 @@ fun DangerButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    OutlinedButtonBox(text, onClick, modifier, enabled, borderColor = Bad, textColor = Bad)
+    OutlinedButtonBox(text, onClick, modifier, enabled, borderColor = MaterialTheme.colorScheme.error, textColor = MaterialTheme.colorScheme.error)
 }
 
 @Composable
@@ -79,13 +77,14 @@ private fun OutlinedButtonBox(
     borderColor: Color,
     textColor: Color,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
             .clip(ButtonShape)
-            .background(Color.White)
-            .border(BorderStroke(1.dp, if (enabled) borderColor else Line), ButtonShape)
+            .background(scheme.surface)
+            .border(BorderStroke(1.dp, if (enabled) borderColor else scheme.outline), ButtonShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
