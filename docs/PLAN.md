@@ -23,15 +23,19 @@ Other client decisions of 17 October 2026: invoices are made after the vehicle i
 
 ## How staff get the app
 
-- **Private download page:** the app stays off the Play Store. Our server hosts a download page, only for staff, where they get the app.
-- **Automatic updates:** each time the app opens, it checks the server for a newer version. If there is one, it downloads it and asks the user to tap Install.
+The app runs on Android and iPhone from one codebase (Kotlin Multiplatform). Staff use Android; management uses iPhone (client, 20 October 2026).
+
+
+- **Android, private download page:** the app stays off the Play Store. Our server hosts a download page, only for staff, where they get the app.
+- **iPhone, TestFlight:** management installs the app through TestFlight, Apple's private test channel, so it stays off the public App Store. TestFlight shows each new version as an update.
+- **Automatic updates (Android):** each time the app opens, it checks the server for a newer version. If there is one, it downloads it and asks the user to tap Install.
 - **Only staff can sign in:** someone the admin hasn't added can install the app, but can't use it.
 
 ## Phases
 
 | Phase | What it covers |
 |---|---|
-| 0. Setup | Server, database and an empty Android app |
+| 0. Setup | Server, database and an empty phone app for Android and iPhone |
 | 1. Login, users and roles | PIN sign-in for the eight roles; add and switch off users; audit log; private download page (not on Play Store); in-app update check, user taps Install |
 | 2. Basic lists | Companies (TPIN, VAT), customers, products, vehicles, drivers; Excel templates and import; opening balances; document numbering |
 | 3. Stock | Receive stock with batch and expiry; stock per facility; short-dated alerts; adjustments and stock count |
