@@ -7,13 +7,25 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 - `index.html`: the clickable prototype, served on GitHub Pages. Never change or move it. It is the agreed behaviour, together with the client's brief of 16 October 2026.
 - `server/`: Node.js 22, TypeScript, Fastify, PostgreSQL. Database changes are numbered SQL files in `server/src/db/migrations`, each run once.
 - `mobile/`: one phone app for Android and iPhone (Kotlin Multiplatform, Compose Multiplatform). Screens live in `mobile/shared/src/commonMain`; `androidApp` and `iosApp` are thin shells.
+- `docs/DATABASE.md`: tables and how to view the data. Update it with every migration.
 - `docs/PLAN.md`: phases 0 to 11, the eight roles, and how staff get the app. Work one phase at a time, each in its own pull request.
 
 ## Commands
 
-- Server: `cd server && npm install && npm run seed && npm test` (needs PostgreSQL with `sales_dev` and `sales_test` databases).
+- Database: `docker compose up -d` starts PostgreSQL and a browser view at http://localhost:8080.
+- Server: `cd server && npm install && npm run seed && npm test`.
 - Android: `cd mobile && ./gradlew :androidApp:assembleDebug`
 - iPhone: open `mobile/iosApp/iosApp.xcodeproj` in Xcode; the Apple team ID goes in `mobile/iosApp/Configuration/Config.xcconfig`.
+
+## Phone app rules (Kotlin Multiplatform)
+
+- All UI lives in `mobile/shared/src/commonMain`: screens, components, view models, navigation, strings and images. `androidApp` and `iosApp` only start the shared `App()`.
+- No Android or iOS imports in `commonMain`. Platform code goes in `androidMain` / `iosMain` behind `expect`/`actual` or an interface injected with Koin.
+- Libraries: Compose Multiplatform Material 3, JetBrains lifecycle `ViewModel` with `StateFlow`, type-safe Navigation Compose, Koin, Ktor client with kotlinx.serialization. Add them through `gradle/libs.versions.toml`.
+- One screen = a stateless `...Screen(state, onEvent)` composable plus its `ViewModel`; state flows down, events flow up. Give every screen a `@Preview`.
+- Theme: always wrap in `SalesTheme`, which follows the phone's light or dark mode. Colours come from `MaterialTheme.colorScheme` and text from `MaterialTheme.typography`; never hard-code colours or sizes in screens. `dynamicColor` (Material You on Android 12+) is off by default to keep the brand colours.
+- User-facing text goes in `composeResources/values/strings.xml`, never inline.
+- Tap targets at least 48dp, body text at least 16sp, and screens must work with large system font sizes.
 
 ## Rules
 
@@ -21,5 +33,6 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 - Each user only sees their own companies. Roles: Admin, Management, Sales manager, Salesman, Warehouse, Driver, Cashier, Accounts.
 - Prices are typed on each order; the customer signs for every delivery and every payment collection.
 - Money is whole Malawi kwacha (MWK), shown with thousands separators.
+- Phone numbers are Malawi mobiles. Store them as `+265` plus 9 digits (for example `+265991234567`). Accept `0991 234 567`, `991234567` or `+265 991 234 567`, ignoring spaces and dashes. Show them as `0991 234 567`. Login phone numbers are unique.
 - The app is not on Google Play or the App Store: Android installs from a private download page with an in-app update check; iPhone uses TestFlight.
 - This repo is public: never commit client data, TPINs, phone numbers, passwords or keys.
