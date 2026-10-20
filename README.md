@@ -9,7 +9,7 @@ In-house sales and distribution app for Lucky Ventures, Zoona Trading, Zangafee 
 
 ## Run the server
 
-Needs Node.js 22 and PostgreSQL 16.
+Needs Node.js 22 and either Docker or PostgreSQL 16. With Docker, `docker compose up -d` in the repo folder starts the database and a browser view of it at http://localhost:8080 (see `docs/DATABASE.md`).
 
 ```sh
 cd server
