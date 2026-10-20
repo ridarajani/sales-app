@@ -27,6 +27,10 @@ erDiagram
     users ||--o{ vehicles : "usual driver"
     customer_companies ||--o| opening_balances : "starts with"
     companies ||--o{ number_series : "numbers"
+    products ||--o{ stock_batches : "kept in"
+    stock_batches ||--o{ stock_movements : "changed by"
+    stock_receipts ||--o{ stock_movements : "adds"
+    stock_counts ||--o{ stock_movements : "corrects"
     facilities {
         text code PK "F1, F2"
         text name
@@ -107,6 +111,38 @@ erDiagram
         text doc_type PK "SO, INV, ..."
         int last_number
     }
+    stock_batches {
+        int id PK
+        int product_id FK
+        text batch_no "unique per product"
+        date expiry_date
+        int on_hand "pieces, never below 0"
+    }
+    stock_receipts {
+        int id PK
+        text number UK "LV-GRN-000001"
+        text company_code FK
+        text supplier
+        text reference
+        date received_on
+        int received_by FK
+    }
+    stock_counts {
+        int id PK
+        text number UK "LV-CNT-000001"
+        text company_code FK
+        int counted_by FK
+    }
+    stock_movements {
+        bigint id PK
+        int batch_id FK
+        int change "pieces, + or -"
+        text kind "received, adjusted, counted"
+        text reason "damaged, expired, lost, found, other"
+        int receipt_id FK
+        int count_id FK
+        int user_id FK
+    }
 ```
 
 | Table | Added in | What it holds |
@@ -125,6 +161,10 @@ erDiagram
 | `vehicles` | Phase 2 | Trucks and vans, with their usual driver |
 | `opening_balances` | Phase 2 | What each customer owed each company on the start date |
 | `number_series` | Phase 2 | The last document number used per company and type |
+| `stock_batches` | Phase 3 | Stock of each product, per batch and expiry date |
+| `stock_receipts` | Phase 3 | Goods received into the warehouse |
+| `stock_counts` | Phase 3 | Stock counts |
+| `stock_movements` | Phase 3 | Every change to stock: received, adjusted or counted |
 
 ## Phase 1 notes
 
@@ -145,3 +185,14 @@ erDiagram
 - **Opening balances** are entered once by Accounts or Admin. After that only Admin can correct one, and both are written to the audit log (`opening_balance_entered`, `opening_balance_corrected`).
 - **Document numbers** look like `LV-SO-000123`: company, document type, then a counter. Taken inside the same transaction as the document, so a cancelled save does not use up a number.
 - **Excel import:** download a template, upload it to check (nothing is saved), then upload again to save. Either every row is saved or none.
+
+## Phase 3 notes
+
+- **Pieces:** stock is stored in pieces, the unit a product is sold in (tin, box, sachet). The app shows it as cartons plus loose pieces, using `products.pieces_per_carton`.
+- **Facility:** a batch belongs to the facility of its product's company, so the Facility 1 warehouse sees Lucky Ventures and Zoona Trading stock only.
+- **Who sees stock:** Admin, Management and Warehouse. Salesmen never see stock (client, 7 Oct). Only Admin and Warehouse change it.
+- **Receiving** the same batch number again adds to that batch, but only when the expiry date matches. Expired goods cannot be received.
+- **`on_hand`** can never go below 0. Every change also writes a `stock_movements` row, so each batch has a full history.
+- **Stock count:** the counted amount replaces what the app had; each difference is a `counted` movement.
+- **Short-dated:** batches expiring within 90 days (changeable per request) or already expired. Dates use Malawi time.
+- **Audit actions:** `stock_received`, `stock_adjusted`, `stock_counted`.
