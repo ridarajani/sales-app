@@ -112,7 +112,7 @@ fun HomeScreen(state: HomeState, onEvent: (HomeEvent) -> Unit) {
                     pair.forEachIndexed { colIndex, tile ->
                         Tile(
                             label = stringResource(tile.labelRes),
-                            sub = stringResource(tile.subRes),
+                            sub = tile.subText ?: stringResource(tile.subRes),
                             icon = tile.icon,
                             primary = rowIndex == 0 && colIndex == 0,
                             modifier = Modifier.weight(1f).fillMaxHeight(),

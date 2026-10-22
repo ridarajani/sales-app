@@ -52,6 +52,7 @@ import com.salesapp.ui.screens.PhonePage
 import com.salesapp.ui.screens.PinPage
 import com.salesapp.ui.screens.ServerAddressPage
 import com.salesapp.ui.screens.usersGraph
+import com.salesapp.ui.stock.stockGraph
 import com.salesapp.ui.theme.SalesTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -137,6 +138,7 @@ private fun AppContent() {
                     composable<HomeRoute> { HomePage(onOpen = { nav.open(it) }) }
                     composable<ServerAddressRoute> { ServerAddressPage(onBack = { nav.popBackStack() }) }
                     usersGraph(nav)
+                    stockGraph(nav)
                     customersGraph(nav, onExit = { nav.popBackStack() })
                     catalogGraph(nav, onExit = { nav.popBackStack() })
                 }

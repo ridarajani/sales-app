@@ -12,5 +12,5 @@ val phase1Module = module {
     viewModel { PhoneViewModel(get()) }
     viewModel { (phone: String, name: String) -> PinViewModel(phone, name, get()) }
     viewModel { ServerAddressViewModel(get()) }
-    viewModel { HomeViewModel(get()) }
+    viewModel { HomeViewModel(get(), get()) }
 }

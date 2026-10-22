@@ -26,3 +26,7 @@ fun User.canEditProducts(): Boolean = role == "admin" || role == "accounts"
 fun User.canEditVehicles(): Boolean = role == "admin"
 
 fun User.canEditCompanies(): Boolean = role == "admin"
+
+fun User.canSeeStock(): Boolean = role == "admin" || role == "management" || role == "warehouse"
+
+fun User.canKeepStock(): Boolean = role == "admin" || role == "warehouse"

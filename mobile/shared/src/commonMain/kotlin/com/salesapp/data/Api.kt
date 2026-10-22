@@ -182,4 +182,20 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun setOpeningBalance(customerId: Int, request: OpeningBalanceRequest): OpeningBalance =
         put<OpeningBalance, OpeningBalanceRequest>("/customers/$customerId/opening-balance", request)
+
+    // Stock.
+
+    suspend fun stock(company: String?, q: String?, includeEmpty: Boolean): List<StockProduct> =
+        get("/stock", mapOf("company" to company, "q" to q?.trim()?.ifEmpty { null }, "includeEmpty" to if (includeEmpty) "true" else null))
+
+    suspend fun shortDated(company: String?, days: Int? = null): List<ShortDatedBatch> =
+        get("/stock/short-dated", mapOf("company" to company, "days" to days?.toString()))
+
+    suspend fun batchMovements(batchId: Int): List<StockMovement> = get("/stock/batches/$batchId/movements")
+
+    suspend fun receiveStock(request: ReceiptRequest): ReceiptDetail = post<ReceiptDetail, ReceiptRequest>("/stock/receipts", request)
+
+    suspend fun adjustStock(request: AdjustRequest): AdjustResult = post<AdjustResult, AdjustRequest>("/stock/adjustments", request)
+
+    suspend fun countStock(request: CountRequest): CountResult = post<CountResult, CountRequest>("/stock/counts", request)
 }
