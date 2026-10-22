@@ -14,3 +14,15 @@ export async function nextNumber(db: Db | PoolClient, companyCode: string, docTy
   );
   return `${companyCode}-${docType}-${String(rows[0]!.n).padStart(6, '0')}`;
 }
+
+// Next number of a series shared by all companies, for example nextSharedNumber(client, 'SO') -> 'SO-000123'.
+// Same rules as nextNumber: call it inside the transaction that saves the document.
+export async function nextSharedNumber(db: Db | PoolClient, docType: string): Promise<string> {
+  const { rows } = await db.query<{ n: number }>(
+    `insert into shared_number_series (doc_type, last_number) values ($1, 1)
+     on conflict (doc_type) do update set last_number = shared_number_series.last_number + 1
+     returning last_number as n`,
+    [docType],
+  );
+  return `${docType}-${String(rows[0]!.n).padStart(6, '0')}`;
+}

@@ -20,7 +20,7 @@ export const ADJUST_REASONS = ['damaged', 'expired', 'lost', 'found', 'other'] a
 const REMOVING = new Set(['damaged', 'expired', 'lost']);
 
 // Malawi time, so "today" does not depend on where the server runs.
-const TODAY = `(now() at time zone 'Africa/Blantyre')::date`;
+export const TODAY = `(now() at time zone 'Africa/Blantyre')::date`;
 const DEFAULT_SHORT_DATED_DAYS = 90;
 
 const quantity = {
@@ -127,7 +127,7 @@ async function applyChange(
   );
 }
 
-async function inTransaction<T>(db: Db, work: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function inTransaction<T>(db: Db, work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await db.connect();
   try {
     await client.query('begin');
@@ -184,14 +184,18 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
       piecesPerCarton: number;
       onHand: number;
       nearestExpiry: string | null;
-      batches: { id: number; batchNo: string; expiryDate: string; onHand: number }[];
+      reserved: number;
+      batches: { id: number; batchNo: string; expiryDate: string; onHand: number; reserved: number }[];
     }>(
       `select p.id as "productId", p.code, p.company_code as "companyCode", p.brand, p.name, p.pack_size as "packSize",
          p.pieces_per_carton as "piecesPerCarton",
          coalesce((select sum(b.on_hand) from stock_batches b where b.product_id = p.id), 0)::int as "onHand",
          (select to_char(min(b.expiry_date), 'YYYY-MM-DD') from stock_batches b where b.product_id = p.id and b.on_hand > 0) as "nearestExpiry",
+         coalesce((select sum(a.pieces) from order_allocations a join stock_batches b on b.id = a.batch_id where b.product_id = p.id), 0)::int
+           as reserved,
          coalesce((select json_agg(json_build_object('id', b.id, 'batchNo', b.batch_no, 'expiryDate', to_char(b.expiry_date, 'YYYY-MM-DD'),
-             'onHand', b.on_hand) order by b.expiry_date, b.id)
+             'onHand', b.on_hand, 'reserved', coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0))
+             order by b.expiry_date, b.id)
            from stock_batches b where b.product_id = p.id and b.on_hand > 0), '[]') as batches
        from products p join companies co on co.code = p.company_code
        ${where}
@@ -203,7 +207,9 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
       .map((r) => ({
         ...r,
         ...split(r.onHand, r.piecesPerCarton),
-        batches: r.batches.map((b) => ({ ...b, ...split(b.onHand, r.piecesPerCarton) })),
+        // Set aside for open orders (Phase 4). Free is what can still be sold.
+        free: Math.max(0, r.onHand - r.reserved),
+        batches: r.batches.map((b) => ({ ...b, ...split(b.onHand, r.piecesPerCarton), free: Math.max(0, b.onHand - b.reserved) })),
       }));
   });
 
