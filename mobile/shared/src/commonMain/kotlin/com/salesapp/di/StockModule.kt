@@ -2,6 +2,7 @@ package com.salesapp.di
 
 import com.salesapp.data.StockRepository
 import com.salesapp.ui.stock.AdjustStockViewModel
+import com.salesapp.ui.stock.ApprovalsViewModel
 import com.salesapp.ui.stock.BatchHistoryViewModel
 import com.salesapp.ui.stock.ExpiringViewModel
 import com.salesapp.ui.stock.ReceiveStockViewModel
@@ -18,6 +19,7 @@ val stockModule = module {
     viewModel { (productId: Int) -> StockProductViewModel(productId, get(), get()) }
     viewModel { (batchId: Int) -> BatchHistoryViewModel(batchId, get(), get()) }
     viewModel { ExpiringViewModel(get(), get()) }
+    viewModel { ApprovalsViewModel(get(), get()) }
     viewModel { ReceiveStockViewModel(get(), get()) }
     viewModel { (batchId: Int) -> AdjustStockViewModel(batchId, get(), get()) }
     viewModel { StockCountViewModel(get(), get()) }

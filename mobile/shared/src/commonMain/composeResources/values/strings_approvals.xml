@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="approvals_title">Approvals</string>
+    <string name="approvals_intro">Damaged stock the warehouse wants to write off.</string>
+    <string name="approvals_empty">Nothing waiting for approval.</string>
+    <string name="approvals_take_off">Take off %1$d cartons · %2$d pieces</string>
+    <string name="approvals_asked_by">Asked by %1$s · %2$s</string>
+    <string name="approvals_approve">Approve</string>
+    <string name="approvals_reject">Reject</string>
+    <string name="approvals_approve_title">Approve this write-off?</string>
+    <string name="approvals_approve_text">%1$d cartons · %2$d pieces of %3$s will be taken off batch %4$s.</string>
+    <string name="approvals_approve_yes">Yes, approve</string>
+    <string name="approvals_reject_title">Reject this write-off?</string>
+    <string name="approvals_reject_text">The stock stays as it is.</string>
+    <string name="approvals_approved">Write-off approved.</string>
+    <string name="approvals_rejected">Write-off rejected.</string>
+    <string name="tile_approvals">Approvals</string>
+    <string name="tile_approvals_one">1 waiting for you</string>
+    <string name="tile_approvals_count">%1$d waiting for you</string>
+    <string name="tile_approvals_loading">Damaged stock to check</string>
+</resources>

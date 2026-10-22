@@ -7,7 +7,10 @@ import com.salesapp.data.NewUserRequest
 import com.salesapp.data.Role
 import com.salesapp.data.UserRow
 import com.salesapp.data.UsersRepository
+import com.salesapp.core.isValidPhone
+import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.companyCodes
+import com.salesapp.data.companyName
 import com.salesapp.resources.Res
 import com.salesapp.resources.user_add_added
 import com.salesapp.resources.user_add_err_company
@@ -15,6 +18,7 @@ import com.salesapp.resources.user_add_err_job
 import com.salesapp.resources.user_add_err_manager
 import com.salesapp.resources.user_add_err_name
 import com.salesapp.resources.user_add_err_phone
+import com.salesapp.resources.user_add_err_phone_bad
 import com.salesapp.resources.user_add_err_pin
 import com.salesapp.ui.components.PIN_LENGTH
 import kotlinx.coroutines.CancellationException
@@ -36,27 +40,31 @@ data class AddUserState(
     val name: String = "",
     val phone: String = "",
     val role: Role? = null,
+    // Only set when a sales manager adds a salesman: it is always themselves.
     val managerId: Int? = null,
+    // Admin or management adding a salesman: the sales manager chosen for each company.
+    val companyManagers: Map<String, Int> = emptyMap(),
     val companies: Set<String> = emptySet(),
     val pin: String = "",
     val busy: Boolean = false,
     val loadingList: Boolean = true,
     val error: String? = null,
 ) {
-    val managers: List<UserRow> get() = users.filter { it.role == "sales_manager" && it.active }
-
-    val managerCompanies: List<String>
-        get() = if (isSalesManager) myCompanies else managers.firstOrNull { it.id == managerId }?.companies ?: emptyList()
+    fun managersFor(code: String): List<UserRow> =
+        users.filter { it.role == "sales_manager" && it.active && code in it.companies }
 
     val pickableCompanies: List<String>
-        get() = if (role == Role.Salesman) companyCodes.filter { it in managerCompanies } else companyCodes
+        get() = if (role == Role.Salesman && isSalesManager) companyCodes.filter { it in myCompanies } else companyCodes
+
+    // The chosen companies in the usual order.
+    val chosenCompanies: List<String> get() = companyCodes.filter { it in companies }
 }
 
 sealed interface AddUserEvent {
     data class Name(val value: String) : AddUserEvent
     data class Phone(val value: String) : AddUserEvent
     data class RoleChosen(val role: Role) : AddUserEvent
-    data class ManagerChosen(val id: Int) : AddUserEvent
+    data class ManagerChosen(val code: String, val id: Int) : AddUserEvent
     data class CompanyToggled(val code: String) : AddUserEvent
     data class Pin(val value: String) : AddUserEvent
     data object Submit : AddUserEvent
@@ -96,18 +104,22 @@ class AddUserViewModel(
         when (event) {
             is AddUserEvent.Name -> _state.update { it.copy(name = event.value) }
             is AddUserEvent.Phone -> _state.update {
-                it.copy(phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' })
+                it.copy(phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' || c == '-' })
             }
             is AddUserEvent.RoleChosen -> _state.update {
                 it.copy(
                     role = event.role,
                     companies = emptySet(),
-                    managerId = if (event.role != Role.Salesman) null else it.managerId,
+                    companyManagers = emptyMap(),
                 )
             }
-            is AddUserEvent.ManagerChosen -> _state.update { it.copy(managerId = event.id, companies = emptySet()) }
+            is AddUserEvent.ManagerChosen -> _state.update { it.copy(companyManagers = it.companyManagers + (event.code to event.id)) }
             is AddUserEvent.CompanyToggled -> _state.update {
-                it.copy(companies = if (event.code in it.companies) it.companies - event.code else it.companies + event.code)
+                if (event.code in it.companies) {
+                    it.copy(companies = it.companies - event.code, companyManagers = it.companyManagers - event.code)
+                } else {
+                    it.copy(companies = it.companies + event.code)
+                }
             }
             is AddUserEvent.Pin -> _state.update { it.copy(pin = event.value.filter { c -> c.isDigit() }.take(PIN_LENGTH)) }
             AddUserEvent.Submit -> submit()
@@ -138,9 +150,11 @@ class AddUserViewModel(
             val problem = when {
                 s.name.isBlank() -> getString(Res.string.user_add_err_name)
                 s.phone.isBlank() -> getString(Res.string.user_add_err_phone)
+                !isValidPhone(normalisePhoneInput(s.phone.trim())) -> getString(Res.string.user_add_err_phone_bad)
                 r == null -> getString(Res.string.user_add_err_job)
-                r == Role.Salesman && s.managerId == null -> getString(Res.string.user_add_err_manager)
                 !r.seesAllCompanies && s.companies.isEmpty() -> getString(Res.string.user_add_err_company)
+                r == Role.Salesman && !s.isSalesManager && s.chosenCompanies.any { it !in s.companyManagers } ->
+                    getString(Res.string.user_add_err_manager, companyName(s.chosenCompanies.first { it !in s.companyManagers }))
                 s.pin.length != PIN_LENGTH -> getString(Res.string.user_add_err_pin, PIN_LENGTH)
                 else -> null
             }
@@ -149,14 +163,21 @@ class AddUserViewModel(
                 return@launch
             }
             _state.update { it.copy(busy = true, error = null) }
+            val chosen = s.chosenCompanies
+            val perCompany = r == Role.Salesman && !s.isSalesManager
             try {
                 val added = repository.createUser(
                     NewUserRequest(
                         name = s.name.trim(),
-                        phone = s.phone.trim(),
+                        phone = normalisePhoneInput(s.phone.trim()),
                         role = r.code,
-                        companies = if (r.seesAllCompanies) companyCodes else companyCodes.filter { it in s.companies },
-                        managerId = if (r == Role.Salesman) s.managerId else null,
+                        companies = if (r.seesAllCompanies) companyCodes else chosen,
+                        managerId = when {
+                            r != Role.Salesman -> null
+                            perCompany -> chosen.firstOrNull()?.let { s.companyManagers[it] }
+                            else -> s.managerId
+                        },
+                        companyManagers = if (perCompany) s.companyManagers.filterKeys { it in chosen } else null,
                         pin = s.pin,
                     ),
                 )

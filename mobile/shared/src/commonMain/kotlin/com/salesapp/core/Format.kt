@@ -19,25 +19,38 @@ fun formatThousands(amount: Long): String {
 // 1234567 -> "MWK 1,234,567"
 fun formatMwk(amount: Long): String = "MWK ${formatThousands(amount)}"
 
-// "0991234567" -> "0991 234 567". Anything that is not 10 digits is shown as it is.
-fun formatPhone(digits: String?): String {
-    if (digits == null) return ""
-    val clean = digits.filter { it.isDigit() }
-    if (clean.length != 10) return digits
+// "0991234567" -> "0991 234 567". Foreign numbers (+971501234567) are shown as stored.
+fun formatPhone(phone: String?): String {
+    if (phone.isNullOrBlank()) return ""
+    val clean = normalisePhoneInput(phone)
+    if (clean.length != 10 || !clean.all { it in '0'..'9' } || clean[0] != '0') return clean
     return "${clean.substring(0, 4)} ${clean.substring(4, 7)} ${clean.substring(7)}"
 }
 
-// Keeps only the digits and turns +265 / 265 / 00265 at the front into a leading 0.
+private val MALAWI_PREFIX = Regex("^(?:\\+265|00265|265)(.*)$")
+private val MALAWI_SHORT = Regex("^[389][0-9]{8}$")
+private val LOCAL_PHONE = Regex("^0[0-9]{9}$")
+private val INTERNATIONAL_PHONE = Regex("^\\+[1-9][0-9]{7,14}$")
+
+// Mirrors the server: strips spaces, '-', '(', ')' and '.'; Malawi numbers (+265 / 00265 / 265 / 9 digits)
+// become 0 + 9 digits, other +country numbers keep the '+', 00country becomes +country.
 fun normalisePhoneInput(raw: String): String {
-    val digits = raw.filter { it.isDigit() }
-    val local = when {
-        digits.startsWith("00265") -> "0" + digits.removePrefix("00265")
-        digits.startsWith("265") -> "0" + digits.removePrefix("265")
-        else -> digits
+    val p = raw.filter { !it.isWhitespace() && it != '-' && it != '(' && it != ')' && it != '.' }
+    val malawi = MALAWI_PREFIX.matchEntire(p)
+    return when {
+        malawi != null -> {
+            val rest = malawi.groupValues[1]
+            if (rest.startsWith("0")) rest else "0$rest"
+        }
+        p.startsWith("+") -> p
+        p.startsWith("00") -> "+" + p.substring(2)
+        MALAWI_SHORT.matches(p) -> "0$p"
+        else -> p
     }
-    // 991234567 (nine digits, no leading 0) is accepted too.
-    return if (local.length == 9 && !local.startsWith("0")) "0$local" else local
 }
+
+// For an already normalised number: 0 + 9 digits, or + country code with 8 to 15 digits.
+fun isValidPhone(phone: String): Boolean = LOCAL_PHONE.matches(phone) || INTERNATIONAL_PHONE.matches(phone)
 
 @Composable
 fun channelLabel(code: String): String = when (code) {

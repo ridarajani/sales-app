@@ -4,6 +4,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesapp.core.AppConfig
+import com.salesapp.core.isValidPhone
+import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import kotlinx.coroutines.CancellationException
@@ -15,8 +17,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-private const val MIN_PHONE_DIGITS = 9
 
 data class PhoneState(
     val phone: String = "",
@@ -65,7 +65,7 @@ class PhoneViewModel(private val app: AppState) : ViewModel() {
     fun onEvent(event: PhoneEvent) {
         when (event) {
             is PhoneEvent.PhoneChanged -> {
-                val phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' }
+                val phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' || c == '-' }
                 _state.update { it.copy(phone = phone, ready = isReady(phone), error = null) }
             }
             PhoneEvent.Next -> next()
@@ -76,7 +76,7 @@ class PhoneViewModel(private val app: AppState) : ViewModel() {
     private fun next() {
         val current = _state.value
         if (current.busy || !current.ready) return
-        val clean = current.phone.trim()
+        val clean = normalisePhoneInput(current.phone.trim())
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
@@ -94,5 +94,5 @@ class PhoneViewModel(private val app: AppState) : ViewModel() {
         }
     }
 
-    private fun isReady(phone: String) = phone.count { it.isDigit() } >= MIN_PHONE_DIGITS
+    private fun isReady(phone: String) = isValidPhone(normalisePhoneInput(phone))
 }

@@ -20,7 +20,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.core.formatPhone
-import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.Driver
 import com.salesapp.resources.Res
 import com.salesapp.resources.catalog_save
@@ -119,7 +118,7 @@ fun VehicleFormScreen(state: VehicleFormState, onEvent: (VehicleFormEvent) -> Un
                         )
                         state.drivers.forEach { driver ->
                             ChoiceButton(
-                                listOf(driver.name, formatPhone(normalisePhoneInput(driver.phone))).filter { it.isNotBlank() }.joinToString(" · "),
+                                listOf(driver.name, formatPhone(driver.phone)).filter { it.isNotBlank() }.joinToString(" · "),
                                 selected = state.driverId == driver.id,
                                 onClick = { onEvent(VehicleFormEvent.DriverChosen(driver.id)) },
                                 modifier = Modifier.fillMaxWidth(),

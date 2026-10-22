@@ -5,6 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.salesapp.ui.navigation.AdjustStockRoute
+import com.salesapp.ui.navigation.ApprovalsRoute
 import com.salesapp.ui.navigation.BatchHistoryRoute
 import com.salesapp.ui.navigation.ExpiringRoute
 import com.salesapp.ui.navigation.ReceiveStockRoute
@@ -49,5 +50,8 @@ fun NavGraphBuilder.stockGraph(nav: NavController) {
     }
     composable<ExpiringRoute> {
         ExpiringPage(onBack = { back() }, onOpenBatch = { nav.open(BatchHistoryRoute(it)) })
+    }
+    composable<ApprovalsRoute> {
+        ApprovalsPage(onBack = { back() })
     }
 }

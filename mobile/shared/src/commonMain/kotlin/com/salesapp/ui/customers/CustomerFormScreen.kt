@@ -21,6 +21,12 @@ import com.salesapp.core.channelLabel
 import com.salesapp.data.companyName
 import com.salesapp.resources.Res
 import com.salesapp.resources.form_add_title
+import com.salesapp.resources.form_address
+import com.salesapp.resources.form_address_hint
+import com.salesapp.resources.form_city
+import com.salesapp.resources.form_city_hint
+import com.salesapp.resources.form_reg_no
+import com.salesapp.resources.form_tpin
 import com.salesapp.resources.form_area
 import com.salesapp.resources.form_area_hint
 import com.salesapp.resources.form_can_buy
@@ -103,6 +109,25 @@ private fun androidx.compose.foundation.layout.ColumnScope.FormBody(state: Custo
             { onEvent(CustomerFormEvent.PhoneChanged(it)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         )
+        Field(
+            stringResource(Res.string.form_address),
+            state.address,
+            { onEvent(CustomerFormEvent.AddressChanged(it)) },
+            placeholder = stringResource(Res.string.form_address_hint),
+        )
+        Field(
+            stringResource(Res.string.form_city),
+            state.city,
+            { onEvent(CustomerFormEvent.CityChanged(it)) },
+            placeholder = stringResource(Res.string.form_city_hint),
+        )
+        Field(
+            stringResource(Res.string.form_tpin),
+            state.tpin,
+            { onEvent(CustomerFormEvent.TpinChanged(it)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        Field(stringResource(Res.string.form_reg_no), state.regNo, { onEvent(CustomerFormEvent.RegNoChanged(it)) })
         SectionLabel(stringResource(Res.string.form_type))
         ChoiceColumn {
             CustomerChannels.forEach { code ->
@@ -162,6 +187,10 @@ private fun previewState(edit: Boolean) = CustomerFormState(
     name = if (edit) "Area 47 Superstore" else "",
     area = if (edit) "Area 47, Lilongwe" else "",
     phone = if (edit) "0991234567" else "",
+    address = if (edit) "Shop 4, Area 47 market" else "",
+    city = if (edit) "Lilongwe" else "",
+    tpin = if (edit) "20123456" else "",
+    regNo = if (edit) "BN12345" else "",
     channel = if (edit) "supermarket" else "",
     availableCompanies = listOf("LV", "ZT", "ZF", "GL"),
     selected = if (edit) setOf("LV", "ZT") else emptySet(),

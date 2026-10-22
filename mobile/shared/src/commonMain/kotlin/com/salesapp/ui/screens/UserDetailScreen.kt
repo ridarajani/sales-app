@@ -19,6 +19,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.core.formatPhone
+import com.salesapp.data.UserManager
 import com.salesapp.data.UserRow
 import com.salesapp.data.companyName
 import com.salesapp.data.roleLabel
@@ -107,9 +109,14 @@ private fun UserDetailBody(state: UserDetailState, row: UserRow, onEvent: (UserD
                 Text(row.name, color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
             }
         }
-        Detail(stringResource(Res.string.users_label_phone), row.phone)
+        Detail(stringResource(Res.string.users_label_phone), formatPhone(row.phone))
         Detail(stringResource(Res.string.users_label_companies), row.companies.joinToString(", ") { companyName(it) })
-        if (row.managerName != null) Detail(stringResource(Res.string.users_label_works_under), row.managerName)
+        if (row.managers.isNotEmpty()) {
+            Detail(
+                stringResource(Res.string.users_label_works_under),
+                row.managers.joinToString("\n") { "${companyName(it.company)}: ${it.managerName}" },
+            )
+        } else if (row.managerName != null) Detail(stringResource(Res.string.users_label_works_under), row.managerName)
         if (state.isMe) {
             Say(stringResource(Res.string.user_detail_this_is_you))
         } else if (state.canManage) {
@@ -158,7 +165,9 @@ private fun Detail(label: String, value: String) {
     }
 }
 
-private val sampleUser = UserRow(1, "Chisomo Phiri", "+265991234567", "salesman", listOf("LV", "ZT"), 7, "Banda Phiri")
+private val sampleUser = UserRow(1, "Chisomo Phiri", "0991234567", "salesman", listOf("LV", "ZT"), 7, "Banda Phiri",
+    managers = listOf(UserManager("LV", 7, "Banda Phiri"), UserManager("ZT", 8, "Mr Abbas")),
+)
 
 @Preview
 @Composable

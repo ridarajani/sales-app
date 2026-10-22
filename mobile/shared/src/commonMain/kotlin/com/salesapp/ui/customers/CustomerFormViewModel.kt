@@ -2,6 +2,7 @@ package com.salesapp.ui.customers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.salesapp.core.isValidPhone
 import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.AppState
 import com.salesapp.data.Customer
@@ -36,6 +37,10 @@ data class CustomerFormState(
     val name: String = "",
     val area: String = "",
     val phone: String = "",
+    val address: String = "",
+    val city: String = "",
+    val tpin: String = "",
+    val regNo: String = "",
     val channel: String = "",
     // Company codes the person may pick, and the ones picked.
     val availableCompanies: List<String> = emptyList(),
@@ -54,6 +59,10 @@ sealed interface CustomerFormEvent {
     data class NameChanged(val value: String) : CustomerFormEvent
     data class AreaChanged(val value: String) : CustomerFormEvent
     data class PhoneChanged(val value: String) : CustomerFormEvent
+    data class AddressChanged(val value: String) : CustomerFormEvent
+    data class CityChanged(val value: String) : CustomerFormEvent
+    data class TpinChanged(val value: String) : CustomerFormEvent
+    data class RegNoChanged(val value: String) : CustomerFormEvent
     data class ChannelPicked(val code: String) : CustomerFormEvent
     data class CompanyToggled(val code: String) : CustomerFormEvent
     data class DaysChanged(val code: String, val value: String) : CustomerFormEvent
@@ -90,6 +99,10 @@ class CustomerFormViewModel(
             is CustomerFormEvent.NameChanged -> edit { it.copy(name = event.value) }
             is CustomerFormEvent.AreaChanged -> edit { it.copy(area = event.value) }
             is CustomerFormEvent.PhoneChanged -> edit { it.copy(phone = event.value) }
+            is CustomerFormEvent.AddressChanged -> edit { it.copy(address = event.value.take(200)) }
+            is CustomerFormEvent.CityChanged -> edit { it.copy(city = event.value.take(60)) }
+            is CustomerFormEvent.TpinChanged -> edit { it.copy(tpin = event.value.filter(Char::isDigit).take(12)) }
+            is CustomerFormEvent.RegNoChanged -> edit { it.copy(regNo = event.value.take(30)) }
             is CustomerFormEvent.ChannelPicked -> edit { it.copy(channel = event.code) }
             is CustomerFormEvent.CompanyToggled -> edit {
                 it.copy(selected = if (event.code in it.selected) it.selected - event.code else it.selected + event.code)
@@ -137,6 +150,10 @@ class CustomerFormViewModel(
                             name = customer.name,
                             area = customer.area,
                             phone = customer.phone.orEmpty(),
+                            address = customer.address,
+                            city = customer.city,
+                            tpin = customer.tpin,
+                            regNo = customer.regNo,
                             channel = customer.channel,
                             selected = customer.companies.map { c -> c.code }.filter { c -> c in available }.toSet(),
                             days = days,
@@ -169,7 +186,7 @@ class CustomerFormViewModel(
                 s.channel.isEmpty() -> getString(Res.string.form_err_type)
                 chosen.isEmpty() -> getString(Res.string.form_err_company)
                 !s.cashOnly && dayValues.any { it == null || it !in 0..365 } -> getString(Res.string.form_err_days)
-                phone.isNotEmpty() && !(phone.length == 10 && phone.startsWith("0")) -> getString(Res.string.form_err_phone)
+                phone.isNotEmpty() && !isValidPhone(phone) -> getString(Res.string.form_err_phone)
                 else -> null
             }
             if (problem != null) {
@@ -186,6 +203,10 @@ class CustomerFormViewModel(
                             channel = s.channel,
                             area = s.area.trim(),
                             phone = phone.ifEmpty { null },
+                            address = s.address.trim(),
+                            city = s.city.trim(),
+                            tpin = s.tpin.trim(),
+                            regNo = s.regNo.trim(),
                             needsLpo = s.needsLpo,
                             cashOnly = s.cashOnly,
                             companies = companies,
@@ -205,6 +226,10 @@ class CustomerFormViewModel(
                             channel = s.channel,
                             area = s.area.trim(),
                             phone = phone,
+                            address = s.address.trim(),
+                            city = s.city.trim(),
+                            tpin = s.tpin.trim(),
+                            regNo = s.regNo.trim(),
                             needsLpo = s.needsLpo,
                             cashOnly = s.cashOnly,
                             companies = if (changed) companies + hidden else null,

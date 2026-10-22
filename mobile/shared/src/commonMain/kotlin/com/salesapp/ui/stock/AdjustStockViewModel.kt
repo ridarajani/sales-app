@@ -13,6 +13,7 @@ import com.salesapp.resources.adjust_changed
 import com.salesapp.resources.adjust_err_direction
 import com.salesapp.resources.adjust_err_note
 import com.salesapp.resources.adjust_err_reason
+import com.salesapp.resources.adjust_sent_for_approval
 import com.salesapp.resources.number_err_quantity
 import com.salesapp.ui.catalog.FormEffect
 import kotlinx.coroutines.CancellationException
@@ -34,6 +35,8 @@ data class AdjustStockState(
     val batch: StockBatch? = null,
     // "damaged", "expired", "lost", "found" or "other".
     val reason: String? = null,
+    // True when the chosen reason needs a yes from Admin or Management before stock changes.
+    val needsApproval: Boolean = false,
     // "add" or "remove"; only used for "other".
     val direction: String? = null,
     val note: String = "",
@@ -70,7 +73,7 @@ class AdjustStockViewModel(
 
     fun onEvent(event: AdjustStockEvent) {
         when (event) {
-            is AdjustStockEvent.Reason -> _state.update { it.copy(reason = event.value, error = null) }
+            is AdjustStockEvent.Reason -> _state.update { it.copy(reason = event.value, needsApproval = event.value == "damaged" && app.user?.role != "admin", error = null) }
             is AdjustStockEvent.Direction -> _state.update { it.copy(direction = event.value, error = null) }
             is AdjustStockEvent.Note -> _state.update { it.copy(note = event.value, error = null) }
             is AdjustStockEvent.Cartons -> _state.update { it.copy(cartons = event.value, error = null) }
@@ -123,7 +126,11 @@ class AdjustStockViewModel(
                         note = s.note.trim(),
                     ),
                 )
-                app.message = getString(Res.string.adjust_changed, result.cartons.toString(), result.loosePieces.toString())
+                app.message = if (result.waitingForApproval) {
+                    getString(Res.string.adjust_sent_for_approval)
+                } else {
+                    getString(Res.string.adjust_changed, result.cartons.toString(), result.loosePieces.toString())
+                }
                 _effects.tryEmit(FormEffect.Done)
             } catch (e: CancellationException) {
                 throw e

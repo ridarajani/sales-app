@@ -61,6 +61,16 @@ class StockRepository(private val api: Api, app: AppState) {
         return result
     }
 
+    suspend fun pendingAdjustments(): List<PendingAdjustment> = api.pendingAdjustments()
+
+    suspend fun approve(requestId: Int): AdjustmentDecision {
+        val result = api.approveAdjustment(requestId)
+        clear()
+        return result
+    }
+
+    suspend fun reject(requestId: Int): AdjustmentDecision = api.rejectAdjustment(requestId)
+
     suspend fun count(request: CountRequest): CountResult {
         val result = api.countStock(request)
         clear()

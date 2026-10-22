@@ -2,6 +2,7 @@ package com.salesapp.ui.catalog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.salesapp.core.isValidPhone
 import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.AppState
 import com.salesapp.data.CompanyDetails
@@ -78,7 +79,7 @@ class CompanyFormViewModel(
             is CompanyFormEvent.Name -> _state.update { it.copy(name = event.value, error = null) }
             is CompanyFormEvent.Tpin -> _state.update { it.copy(tpin = event.value.filter { c -> c.isDigit() }.take(12), error = null) }
             is CompanyFormEvent.Vat -> _state.update { it.copy(vat = event.value.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(6), error = null) }
-            is CompanyFormEvent.Phone -> _state.update { it.copy(phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' }, error = null) }
+            is CompanyFormEvent.Phone -> _state.update { it.copy(phone = event.value.filter { c -> c.isDigit() || c == '+' || c == ' ' || c == '-' }, error = null) }
             is CompanyFormEvent.Email -> _state.update { it.copy(email = event.value.trim(), error = null) }
             is CompanyFormEvent.Address -> _state.update { it.copy(address = event.value, error = null) }
             CompanyFormEvent.Save -> save()
@@ -125,7 +126,7 @@ class CompanyFormViewModel(
                 s.tpin.isNotEmpty() && s.tpin.length !in 6..12 -> getString(Res.string.company_err_tpin)
                 s.vat.isNotBlank() && (vat == null || vat < 0.0 || vat > 100.0) -> getString(Res.string.company_err_vat)
                 s.email.isNotEmpty() && !Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$").matches(s.email) -> getString(Res.string.company_err_email)
-                phone.isNotEmpty() && phone.length != 10 -> getString(Res.string.company_err_phone)
+                phone.isNotEmpty() && !isValidPhone(phone) -> getString(Res.string.company_err_phone)
                 else -> null
             }
             if (problem != null) {

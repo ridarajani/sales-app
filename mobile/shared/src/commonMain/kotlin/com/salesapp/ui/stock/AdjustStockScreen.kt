@@ -29,6 +29,7 @@ import com.salesapp.resources.adjust_damaged
 import com.salesapp.resources.adjust_direction
 import com.salesapp.resources.adjust_expired
 import com.salesapp.resources.adjust_found
+import com.salesapp.resources.adjust_needs_approval
 import com.salesapp.resources.adjust_how_much
 import com.salesapp.resources.adjust_in_stock
 import com.salesapp.resources.adjust_lost
@@ -126,7 +127,7 @@ fun AdjustStockScreen(state: AdjustStockState, onEvent: (AdjustStockEvent) -> Un
                         }
                         when (state.reason) {
                             "damaged", "expired", "lost" -> Text(
-                                stringResource(Res.string.adjust_takes_off),
+                                stringResource(if (state.needsApproval) Res.string.adjust_needs_approval else Res.string.adjust_takes_off),
                                 color = scheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                             )
