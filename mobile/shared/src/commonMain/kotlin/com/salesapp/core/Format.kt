@@ -47,3 +47,9 @@ fun channelLabel(code: String): String = when (code) {
     "upcountry" -> stringResource(Res.string.channel_upcountry)
     else -> code
 }
+
+// 25 pieces in cartons of 12 -> (2, 1): cartons and loose pieces.
+fun splitPieces(total: Int, piecesPerCarton: Int): Pair<Int, Int> {
+    if (piecesPerCarton <= 0) return 0 to total
+    return total / piecesPerCarton to total % piecesPerCarton
+}

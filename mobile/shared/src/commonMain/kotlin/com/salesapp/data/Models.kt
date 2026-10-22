@@ -255,3 +255,158 @@ data class OpeningBalance(
 
 @Serializable
 data class OpeningBalanceRequest(val companyCode: String, val amount: Long, val asOf: String)
+
+// Stock: what is on the shelves, by product and by batch. Quantities are in pieces; cartons and loosePieces are the same amount split up.
+@Serializable
+data class StockBatch(
+    val id: Int,
+    val batchNo: String,
+    val expiryDate: String,
+    val onHand: Int = 0,
+    val pieces: Int = 0,
+    val cartons: Int = 0,
+    val loosePieces: Int = 0,
+)
+
+@Serializable
+data class StockProduct(
+    val productId: Int,
+    val code: String = "",
+    val companyCode: String,
+    val brand: String = "",
+    val name: String,
+    val packSize: String = "",
+    val piecesPerCarton: Int = 1,
+    val onHand: Int = 0,
+    val pieces: Int = 0,
+    val cartons: Int = 0,
+    val loosePieces: Int = 0,
+    val nearestExpiry: String? = null,
+    val batches: List<StockBatch> = emptyList(),
+)
+
+// daysLeft below zero means the batch has expired.
+@Serializable
+data class ShortDatedBatch(
+    val id: Int,
+    val productId: Int,
+    val companyCode: String,
+    val batchNo: String,
+    val expiryDate: String,
+    val onHand: Int = 0,
+    val piecesPerCarton: Int = 1,
+    val code: String = "",
+    val name: String,
+    val packSize: String = "",
+    val daysLeft: Int = 0,
+    val expired: Boolean = false,
+    val pieces: Int = 0,
+    val cartons: Int = 0,
+    val loosePieces: Int = 0,
+)
+
+// kind is "received", "adjusted" or "counted"; reason is set when adjusted.
+@Serializable
+data class StockMovement(
+    val id: Int,
+    val change: Int,
+    val kind: String,
+    val reason: String? = null,
+    val note: String = "",
+    val userName: String = "",
+    val createdAt: String = "",
+    val documentNumber: String? = null,
+)
+
+@Serializable
+data class ReceiptLineRequest(
+    val productId: Int,
+    val batchNo: String,
+    val expiryDate: String,
+    val cartons: Int = 0,
+    val pieces: Int = 0,
+)
+
+@Serializable
+data class ReceiptRequest(
+    val companyCode: String,
+    val supplier: String = "",
+    val reference: String = "",
+    val receivedOn: String,
+    val note: String = "",
+    val lines: List<ReceiptLineRequest>,
+)
+
+@Serializable
+data class ReceiptLine(
+    val productId: Int,
+    val productCode: String = "",
+    val productName: String = "",
+    val packSize: String = "",
+    val batchNo: String = "",
+    val expiryDate: String = "",
+    val pieces: Int = 0,
+    val piecesPerCarton: Int = 1,
+)
+
+@Serializable
+data class ReceiptDetail(
+    val id: Int,
+    val number: String,
+    val companyCode: String,
+    val supplier: String = "",
+    val reference: String = "",
+    val receivedOn: String = "",
+    val note: String = "",
+    val receivedBy: String = "",
+    val createdAt: String = "",
+    val lines: List<ReceiptLine> = emptyList(),
+)
+
+// reason: damaged, expired, lost, found or other. direction ("add" or "remove") is only sent for other.
+@Serializable
+data class AdjustRequest(
+    val batchId: Int,
+    val reason: String,
+    val direction: String? = null,
+    val cartons: Int = 0,
+    val pieces: Int = 0,
+    val note: String = "",
+)
+
+// The new amount on hand after the change.
+@Serializable
+data class AdjustResult(
+    val batchId: Int,
+    val change: Int = 0,
+    val pieces: Int = 0,
+    val cartons: Int = 0,
+    val loosePieces: Int = 0,
+)
+
+@Serializable
+data class CountLineRequest(val batchId: Int, val cartons: Int = 0, val pieces: Int = 0)
+
+@Serializable
+data class CountRequest(
+    val companyCode: String,
+    val note: String = "",
+    val lines: List<CountLineRequest>,
+)
+
+@Serializable
+data class CountDifference(
+    val batchId: Int,
+    val batchNo: String = "",
+    val before: Int = 0,
+    val counted: Int = 0,
+    val change: Int = 0,
+)
+
+@Serializable
+data class CountResult(
+    val id: Int,
+    val number: String,
+    val differences: List<CountDifference> = emptyList(),
+    val linesCounted: Int = 0,
+)
