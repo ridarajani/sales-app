@@ -14,11 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.data.Vehicle
@@ -104,16 +102,16 @@ private fun VehicleRow(vehicle: Vehicle, canEdit: Boolean, onClick: () -> Unit) 
     }
     ListCard(onClick = if (canEdit) onClick else null) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(vehicle.plate, color = scheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(vehicle.plate, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 vehicle.description.ifBlank { stringResource(Res.string.vehicle_no_description) },
                 color = scheme.onSurfaceVariant,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodySmall,
             )
             Text(
                 if (vehicle.facilityCode == null) driver else stringResource(Res.string.vehicle_line, facilityLabel(vehicle.facilityCode), driver),
                 color = scheme.onSurfaceVariant,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
         if (!vehicle.active) {

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="users_title">Users</string>
+    <string name="users_title_sales_manager">My salesmen</string>
+    <string name="users_empty">No one here yet.</string>
+    <string name="users_add">Add a user</string>
+    <string name="users_add_salesman">Add a salesman</string>
+    <string name="users_label_phone">Phone number</string>
+    <string name="users_label_companies">Companies</string>
+    <string name="users_label_works_under">Works under</string>
+
+    <string name="user_add_name">Name</string>
+    <string name="user_add_job">Job</string>
+    <string name="user_add_no_manager">There is no active sales manager yet. Add a sales manager first.</string>
+    <string name="user_add_all_companies">Sees all four companies</string>
+    <string name="user_add_pin">PIN</string>
+    <string name="user_add_pin_note">The user types this to sign in. They can\'t change it; the admin resets it.</string>
+    <string name="user_add_submit">Add user</string>
+    <string name="user_add_added">%1$s added.</string>
+    <string name="user_add_err_name">Type the person\'s name.</string>
+    <string name="user_add_err_phone">Type the phone number.</string>
+    <string name="user_add_err_job">Choose what job the person does.</string>
+    <string name="user_add_err_manager">Choose who the salesman works under.</string>
+    <string name="user_add_err_company">Choose at least one company.</string>
+    <string name="user_add_err_pin">The PIN must be %1$d numbers.</string>
+
+    <string name="user_detail_title_fallback">Person</string>
+    <string name="user_detail_not_found">This person is not in the list. Go back and open the list again.</string>
+    <string name="user_detail_can_sign_in">Can sign in</string>
+    <string name="user_detail_this_is_you">This is you.</string>
+    <string name="user_detail_reset_pin">Reset PIN</string>
+    <string name="user_detail_switch_off">Switch off</string>
+    <string name="user_detail_switch_on">Switch on</string>
+    <string name="user_detail_confirm_title">Switch off %1$s?</string>
+    <string name="user_detail_confirm_text">They can\'t sign in until you switch them on.</string>
+    <string name="user_detail_switched_on">%1$s switched on.</string>
+    <string name="user_detail_switched_off">%1$s switched off.</string>
+
+    <string name="reset_pin_title">Reset PIN</string>
+    <string name="reset_pin_this_person">this person</string>
+    <string name="reset_pin_new_for">New PIN for %1$s</string>
+    <string name="reset_pin_confirm">Confirm PIN</string>
+    <string name="reset_pin_type_new">Type the new PIN</string>
+    <string name="reset_pin_type_again">Type it again</string>
+    <string name="reset_pin_mismatch">PINs don\'t match. Try again.</string>
+    <string name="reset_pin_changed">PIN changed.</string>
+</resources>

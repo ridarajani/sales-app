@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_title">A new version is ready</string>
+    <string name="update_text">Version %1$s. Download it now, then tap Install.</string>
+    <string name="update_download">Download</string>
+    <string name="update_later">Later</string>
+
+    <string name="login_title">Sales App</string>
+    <string name="login_type_phone">Type your phone number.</string>
+    <string name="login_phone_label">Phone number</string>
+    <string name="login_next">Next</string>
+    <string name="login_server_address">Server address</string>
+    <string name="login_server_line">Server: %1$s</string>
+
+    <string name="pin_title">Sign in</string>
+    <string name="pin_hello">Hello, %1$s</string>
+    <string name="pin_type">Type your PIN.</string>
+    <string name="pin_not_you">Not you? Go back and change the number.</string>
+
+    <string name="server_title">Server address</string>
+    <string name="server_testing_only">Only for testing. Ask the person who set up the app.</string>
+    <string name="server_label">Server address</string>
+    <string name="server_save">Save</string>
+    <string name="server_use_default">Use default</string>
+    <string name="server_must_start_http">The address must start with http:// or https://</string>
+    <string name="server_saved">Server address saved.</string>
+    <string name="server_using_default">Using the default address.</string>
+
+    <string name="home_good_morning">Good morning</string>
+    <string name="home_good_afternoon">Good afternoon</string>
+    <string name="home_good_evening">Good evening</string>
+    <string name="home_greeting">%1$s,</string>
+    <string name="home_what_to_do">What do you want to do?</string>
+    <string name="home_coming_soon">This is coming soon.</string>
+    <string name="home_your_account">Your account</string>
+    <string name="home_sign_out">Sign out</string>
+
+    <string name="tile_users">Users</string>
+    <string name="tile_users_admin_sub">Add, switch off, reset PIN</string>
+    <string name="tile_users_manage_sub">Who can sign in</string>
+    <string name="tile_audit">Audit trail</string>
+    <string name="tile_audit_sub">Who did what</string>
+    <string name="tile_reports">Reports</string>
+    <string name="tile_reports_sales_sub">Sales and money owed</string>
+    <string name="tile_reports_export_sub">Excel, PDF, print</string>
+    <string name="tile_reports_stock_sub">Stock and deliveries</string>
+    <string name="tile_more">More</string>
+    <string name="tile_more_sub">Everything else</string>
+    <string name="tile_nothing_waiting">Nothing waiting</string>
+    <string name="tile_today">Today\'s numbers</string>
+    <string name="tile_today_sub">Sales, money owed, cash</string>
+    <string name="tile_approve">Approve</string>
+    <string name="tile_loading_plans">Loading plans</string>
+    <string name="tile_loading_plan">Loading plan</string>
+    <string name="tile_airtel">Airtel Money</string>
+    <string name="tile_airtel_both">Both wallets</string>
+    <string name="tile_airtel_ledger">Wallet ledger</string>
+    <string name="tile_stock">Stock</string>
+    <string name="tile_stock_sub">Free, reserved, on the road</string>
+    <string name="tile_invoices">Invoices</string>
+    <string name="tile_invoices_register">Register</string>
+    <string name="tile_invoices_share">Print or share</string>
+    <string name="tile_invoices_register_print">Register and print</string>
+    <string name="tile_new_order">New order</string>
+    <string name="tile_new_order_sub">Take an order</string>
+    <string name="tile_collect_money">Collect money</string>
+    <string name="tile_collect_money_sub">Customer pays you</string>
+    <string name="tile_hand_over_cash">Hand over cash</string>
+    <string name="tile_hand_over_cash_sub">Nothing to hand over</string>
+    <string name="tile_my_salesmen">My salesmen</string>
+    <string name="tile_my_salesmen_sub">Add or switch off</string>
+    <string name="tile_my_orders">My orders</string>
+    <string name="tile_my_orders_sub">Balances and status</string>
+    <string name="tile_jobs">Jobs to do</string>
+    <string name="tile_load_van">Load a trip van</string>
+    <string name="tile_receive_stock">Receive stock</string>
+    <string name="tile_receive_stock_sub">New cartons arrived</string>
+    <string name="tile_check_stock">Check stock</string>
+    <string name="tile_report_damage">Report damage</string>
+    <string name="tile_report_damage_sub">Or a count difference</string>
+    <string name="tile_deliveries">Your deliveries</string>
+    <string name="tile_hand_over_goods">Hand over goods</string>
+    <string name="tile_hand_over_goods_sub">Signature and photo</string>
+    <string name="tile_report_shortage">Report a shortage</string>
+    <string name="tile_report_shortage_sub">Goods missing or damaged</string>
+    <string name="tile_count_cash">Count cash</string>
+    <string name="tile_record_payment">Record a payment</string>
+    <string name="tile_record_payment_sub">Bank transfer or cash</string>
+    <string name="tile_credit_notes">Credit and debit notes</string>
+    <string name="tile_credit_notes_sub">Fix an invoice</string>
+    <string name="tile_ledger">Customer ledger</string>
+    <string name="tile_ledger_sub">Invoices, payments, tax</string>
+</resources>

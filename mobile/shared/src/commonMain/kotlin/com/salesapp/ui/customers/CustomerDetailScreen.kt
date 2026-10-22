@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.core.formatIsoDate
@@ -190,7 +189,7 @@ private fun Header(customer: Customer) {
         Avatar(customer.name, size = 56.dp)
         Column(modifier = Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             CustomerBadges(customer, offLabelLong = true)
-            Text(customer.name, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(customer.name, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -216,9 +215,7 @@ private fun SectionTitle(text: String) {
     Text(
         text.uppercase(),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.5.sp,
+        style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -226,8 +223,8 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun DetailRow(label: String, value: String) {
     Column {
-        Text(label.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp)
-        Text(value.ifBlank { stringResource(Res.string.none_placeholder) }, color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp)
+        Text(label.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        Text(value.ifBlank { stringResource(Res.string.none_placeholder) }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -237,13 +234,13 @@ private fun CompanyTerms(company: CustomerCompany, cashOnly: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(companyColor(company.code)))
-        Text(companyName(company.code), color = scheme.onSurface, fontSize = 15.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
+        Text(companyName(company.code), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(start = 8.dp))
         val terms = when {
             cashOnly || company.paymentTermsDays == 0 -> stringResource(Res.string.customer_pays_cash)
             company.paymentTermsDays == 1 -> stringResource(Res.string.customer_pays_in_one_day)
             else -> stringResource(Res.string.customer_pays_in_days, company.paymentTermsDays)
         }
-        Text(terms, color = scheme.onSurfaceVariant, fontSize = 15.sp)
+        Text(terms, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -253,27 +250,27 @@ private fun BalanceCard(company: CustomerCompany, balance: OpeningBalance?, user
     Section {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(companyColor(company.code)))
-            Text(companyName(company.code), color = scheme.onSurfaceVariant, fontSize = 15.sp, modifier = Modifier.padding(start = 8.dp))
+            Text(companyName(company.code), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
         }
         if (balance == null) {
-            Text(stringResource(Res.string.customer_balance_not_entered), color = scheme.onSurface, fontSize = 15.sp)
+            Text(stringResource(Res.string.customer_balance_not_entered), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
             if (user.canEnterOpeningBalance()) {
                 SecondaryButton(stringResource(Res.string.customer_enter_balance), onClick = onOpen)
             }
         } else {
             Column {
-                Text(formatMwk(balance.amount), color = scheme.onSurface, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(formatMwk(balance.amount), color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
                 val by = if (balance.enteredBy.isBlank()) "" else ", " + stringResource(Res.string.customer_balance_entered_by, balance.enteredBy)
                 Text(
                     stringResource(Res.string.customer_balance_as_of, formatIsoDate(balance.asOf)) + by,
                     color = scheme.onSurfaceVariant,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             if (user.canCorrectOpeningBalance()) {
                 SecondaryButton(stringResource(Res.string.customer_correct_balance), onClick = onOpen)
             } else {
-                Text(stringResource(Res.string.customer_balance_admin_only), color = scheme.onSurfaceVariant, fontSize = 13.sp)
+                Text(stringResource(Res.string.customer_balance_admin_only), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal))
             }
         }
     }

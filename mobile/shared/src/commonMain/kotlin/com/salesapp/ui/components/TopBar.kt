@@ -22,11 +22,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.salesapp.resources.Res
+import com.salesapp.resources.back
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.Canvas
 
 // The bar at the top of every screen except Home: round "<" back button, centred title, thin line below.
@@ -38,6 +39,7 @@ fun TopBar(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val backLabel = stringResource(Res.string.back)
     Column(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp)) {
             if (onBack != null) {
@@ -46,7 +48,7 @@ fun TopBar(
                         .align(Alignment.CenterStart)
                         .size(44.dp)
                         .clip(CircleShape)
-                        .semantics { contentDescription = "Back" }
+                        .semantics { contentDescription = backLabel }
                         .clickable(role = Role.Button, onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -66,8 +68,7 @@ fun TopBar(
             Text(
                 title,
                 color = scheme.onSurface,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,

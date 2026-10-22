@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.salesapp.resources.Res
 import com.salesapp.resources.cancel
 import com.salesapp.resources.try_again
@@ -26,7 +25,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun EmptyState(text: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, textAlign = TextAlign.Center)
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
     }
 }
 
@@ -64,15 +63,15 @@ fun ConfirmDialog(
         onDismissRequest = onDismiss,
         containerColor = scheme.surface,
         title = { Text(title) },
-        text = { Text(text, fontSize = 16.sp) },
+        text = { Text(text, style = MaterialTheme.typography.bodyLarge) },
         confirmButton = {
             TextButton(onClick = onConfirm, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(confirmLabel, fontSize = 16.sp, color = if (danger) scheme.error else scheme.primary)
+                Text(confirmLabel, style = MaterialTheme.typography.labelLarge, color = if (danger) scheme.error else scheme.primary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(Res.string.cancel), fontSize = 16.sp)
+                Text(stringResource(Res.string.cancel), style = MaterialTheme.typography.labelLarge)
             }
         },
     )

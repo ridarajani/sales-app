@@ -16,7 +16,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.core.formatIsoDate
 import com.salesapp.core.localIsoDateFromUtcTimestamp
@@ -89,7 +88,7 @@ fun OpeningBalanceScreen(state: OpeningBalanceState, onEvent: (OpeningBalanceEve
                         Text(
                             stringResource(Res.string.balance_entered, existing.enteredBy, formatIsoDate(localIsoDateFromUtcTimestamp(existing.enteredAt))),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }

@@ -68,22 +68,22 @@ class SessionStore(private val store: KeyValueStore) {
     }
 }
 
-// Everything the screens share: who is signed in, where we are, and messages.
+// Everything the screens share: who is signed in and messages.
 class AppState(val store: KeyValueStore, val session: SessionStore) {
 
     var user by mutableStateOf(session.loadUser().takeIf { session.token != null })
     var apiUrl by mutableStateOf(store.get(AppConfig.API_URL_KEY) ?: AppConfig.DEFAULT_API_URL)
         private set
-    var userRows by mutableStateOf<List<UserRow>>(emptyList())
     var message by mutableStateOf<String?>(null)
+
+    private val sessionListeners = mutableListOf<() -> Unit>()
+
+    fun onSessionChanged(listener: () -> Unit) {
+        sessionListeners += listener
+    }
 
     // Text shown in a red box on the login screen, e.g. after being signed out.
     var loginNotice by mutableStateOf<String?>(null)
-
-    // True while the lists area can still go back inside itself (it handles Back, not the app).
-    var listsCanPop by mutableStateOf(false)
-
-    val nav = Navigator(if (user != null) Screen.Home else Screen.Phone)
 
     // Used for work that must outlive the screen, such as telling the server we signed out.
     val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -103,18 +103,16 @@ class AppState(val store: KeyValueStore, val session: SessionStore) {
     fun signedIn(token: String, user: User) {
         session.save(token, user)
         this.user = user
-        userRows = emptyList()
         message = null
-        nav.replaceAll(Screen.Home)
+        sessionListeners.toList().forEach { it() }
     }
 
     fun signedOut(notice: String? = null) {
         session.onSignedOut()
         user = null
-        userRows = emptyList()
         message = null
         loginNotice = notice
-        nav.replaceAll(Screen.Phone)
+        sessionListeners.toList().forEach { it() }
     }
 
     // Sign out if the server says the sign-in is no longer good; otherwise return the message to show.

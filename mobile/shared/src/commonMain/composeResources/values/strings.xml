@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="back">Back</string>
+    <string name="pin_keyboard_hint">Tap the dots if the keyboard is hidden.</string>
     <string name="search_clear">Clear</string>
     <string name="all">All</string>
     <string name="try_again">Try again</string>

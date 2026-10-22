@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.salesapp.resources.Res
 import com.salesapp.resources.all
 import com.salesapp.ui.theme.sales
@@ -67,9 +66,7 @@ fun GroupHeader(
         Text(
             text.uppercase(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.5.sp,
+            style = MaterialTheme.typography.labelMedium,
         )
     }
 }
@@ -112,7 +109,7 @@ private fun Chip(label: String, isSelected: Boolean, onClick: () -> Unit) {
             Text(
                 label,
                 color = if (isSelected) scheme.primary else scheme.onSurface,
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
             )

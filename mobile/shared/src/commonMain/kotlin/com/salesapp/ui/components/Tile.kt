@@ -1,5 +1,6 @@
 package com.salesapp.ui.components
 
+import com.salesapp.ui.theme.caption
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,10 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.salesapp.ui.theme.sales
 
 // A card on the home screen: an icon chip, a name and a short line under it.
@@ -61,14 +60,13 @@ fun Tile(
             Text(
                 label,
                 color = if (primary) scheme.onPrimary else scheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(top = 10.dp),
             )
             Text(
                 sub,
                 color = if (primary) scheme.onPrimary.copy(alpha = 0.85f) else scheme.onSurfaceVariant,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.caption,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),

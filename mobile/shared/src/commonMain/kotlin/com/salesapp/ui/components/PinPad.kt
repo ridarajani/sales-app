@@ -28,7 +28,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import com.salesapp.resources.Res
+import com.salesapp.resources.pin_keyboard_hint
+import org.jetbrains.compose.resources.stringResource
 
 const val PIN_LENGTH = 4
 
@@ -78,7 +81,7 @@ fun PinEntry(
                 }
             },
         )
-        Text("Tap the dots if the keyboard is hidden.", color = scheme.onSurfaceVariant, fontSize = 13.sp)
+        Text(stringResource(Res.string.pin_keyboard_hint), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal))
         belowDots()
     }
 }

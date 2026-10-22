@@ -11,106 +11,95 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.salesapp.data.ApiException
-import com.salesapp.data.AppState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.resources.Res
+import com.salesapp.resources.pin_hello
+import com.salesapp.resources.pin_not_you
+import com.salesapp.resources.pin_title
+import com.salesapp.resources.pin_type
 import com.salesapp.ui.components.Avatar
 import com.salesapp.ui.components.PIN_LENGTH
 import com.salesapp.ui.components.PinEntry
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.TopBar
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Ink
-import com.salesapp.ui.theme.Muted
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import com.salesapp.ui.theme.SalesTheme
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+
+@Composable
+fun PinPage(
+    phone: String,
+    name: String,
+    onBack: () -> Unit,
+    viewModel: PinViewModel = koinViewModel { parametersOf(phone, name) },
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    PinScreen(state, viewModel::onEvent, onBack)
+}
 
 // Sign in, step two: greet the person by name and take the four-digit PIN.
 @Composable
-fun PinScreen(state: AppState, phone: String, name: String) {
-    val scope = rememberCoroutineScope()
-    var pin by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    fun tryLogin(enteredPin: String) {
-        if (busy) return
-        busy = true
-        error = null
-        scope.launch {
-            try {
-                val reply = state.api.login(phone, enteredPin)
-                state.loginNotice = null
-                state.signedIn(reply.token, reply.user)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ApiException) {
-                error = e.message
-                pin = ""
-            } finally {
-                busy = false
-            }
-        }
-    }
-
+fun PinScreen(state: PinState, onEvent: (PinEvent) -> Unit, onBack: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar("Sign in", onBack = { state.nav.pop() })
+        TopBar(stringResource(Res.string.pin_title), onBack = onBack)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(name, size = 56.dp)
+                Avatar(state.name, size = 56.dp)
                 Text(
-                    "Hello, ${name.trim().substringBefore(' ')}",
-                    color = Ink,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    stringResource(Res.string.pin_hello, state.name.trim().substringBefore(' ')),
+                    color = scheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(top = 10.dp),
                 )
-                Text("Type your PIN.", color = Muted, fontSize = 14.sp)
+                Text(stringResource(Res.string.pin_type), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             PinEntry(
-                pin = pin,
-                enabled = !busy,
+                pin = state.pin,
+                enabled = !state.busy,
                 belowDots = {
                     // Always reserve room for the message so the keys never move.
                     Box(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), contentAlignment = Alignment.Center) {
-                        error?.let { Say(it, error = true) }
+                        state.error?.let { Say(it, error = true) }
                     }
                 },
-                onChange = {
-                    pin = it
-                    if (it.length == PIN_LENGTH) tryLogin(it)
-                },
+                onChange = { onEvent(PinEvent.PinChanged(it)) },
             )
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp), contentAlignment = Alignment.Center) {
-                if (busy) CircularProgressIndicator(color = Burgundy)
+                if (state.busy) CircularProgressIndicator(color = scheme.primary)
             }
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    "Not you? Go back and change the number.",
-                    color = Muted,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal,
+                    stringResource(Res.string.pin_not_you),
+                    color = scheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
                         .heightIn(min = 48.dp)
-                        .clickable(enabled = !busy, role = Role.Button) { state.nav.pop() }
+                        .clickable(enabled = !state.busy, role = Role.Button, onClick = onBack)
                         .padding(12.dp),
                 )
             }
         }
+    }
+}
+
+@Preview
+@Composable
+private fun PinPreview() {
+    SalesTheme {
+        PinScreen(PinState(name = "Mary Banda", pin = "12"), onEvent = {}, onBack = {})
     }
 }
