@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { Db } from '../src/db/pool.js';
-import { normalisePhone } from '../src/users.js';
+import { isValidPhone, normalisePhone } from '../src/users.js';
 import { freshDb } from './helpers.js';
 import { bearer, get, login, post } from './session-helpers.js';
 
@@ -179,4 +179,20 @@ test('check-phone: switched off is 403 and locked is 423', async () => {
   const locked = await checkPhone('0994440010');
   expect(locked.statusCode).toBe(423);
   expect(locked.json().message).toMatch(/Try again in \d+ minutes/);
+});
+
+test('a Malawi mobile without the 0, and numbers from abroad, are accepted', () => {
+  expect(normalisePhone('991 234 567')).toBe('0991234567');
+  expect(normalisePhone('+971 50 954 4939')).toBe('+971509544939');
+  expect(normalisePhone('00971-50-954-4939')).toBe('+971509544939');
+  expect(isValidPhone('+971509544939')).toBe(true);
+  expect(isValidPhone('+12')).toBe(false);
+  expect(isValidPhone(normalisePhone('123456789'))).toBe(false);
+});
+
+test('a manager with a number from abroad can sign in', async () => {
+  await makeUser('+971 50 000 0001', '4321');
+  const { res } = await login(app, '00971500000001', '4321');
+  expect(res.statusCode).toBe(200);
+  expect(res.json().user.phone).toBe('+971500000001');
 });

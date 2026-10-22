@@ -13,6 +13,10 @@ export type Customer = {
   name: string;
   channel: string;
   area: string;
+  address: string;
+  city: string;
+  tpin: string;
+  regNo: string;
   phone: string | null;
   needsLpo: boolean;
   cashOnly: boolean;
@@ -30,6 +34,10 @@ const customerFields = z.object({
   name: z.string().trim().min(1, 'Please type the customer name.'),
   channel: z.enum(CHANNELS, 'Please pick a channel.'),
   area: z.string().trim(),
+  address: z.string().trim().max(200),
+  city: z.string().trim().max(60),
+  tpin: z.string().trim().max(30),
+  regNo: z.string().trim().max(30),
   phone: z.string().nullish(),
   needsLpo: z.boolean(),
   cashOnly: z.boolean(),
@@ -38,6 +46,10 @@ const customerFields = z.object({
 // Defaults apply only when creating. An update leaves out fields it does not send.
 const customerBody = customerFields.extend({
   area: z.string().trim().default(''),
+  address: z.string().trim().max(200).default(''),
+  city: z.string().trim().max(60).default(''),
+  tpin: z.string().trim().max(30).default(''),
+  regNo: z.string().trim().max(30).default(''),
   needsLpo: z.boolean().default(false),
   cashOnly: z.boolean().default(false),
 });
@@ -49,7 +61,7 @@ const listQuery = z.object({
 });
 
 // The user sees a customer if they share a company, and only those companies' terms.
-const customerSelect = `select c.id, c.name, c.channel, c.area, c.phone, c.needs_lpo as "needsLpo", c.cash_only as "cashOnly", c.active,
+const customerSelect = `select c.id, c.name, c.channel, c.area, c.address, c.city, c.tpin, c.reg_no as "regNo", c.phone, c.needs_lpo as "needsLpo", c.cash_only as "cashOnly", c.active,
     coalesce((select json_agg(json_build_object('code', cc.company_code, 'paymentTermsDays', cc.payment_terms_days) order by co.sort_order)
               from customer_companies cc join companies co on co.code = cc.company_code
               where cc.customer_id = c.id and cc.company_code = any($1)), '[]') as companies,
@@ -95,9 +107,10 @@ export async function cleanCustomer(db: Db, input: NewCustomer): Promise<CleanCu
 
 export async function insertCustomer(client: PoolClient, c: CleanCustomer): Promise<number | null> {
   const { rows } = await client.query<{ id: number }>(
-    `insert into customers (name, channel, area, phone, needs_lpo, cash_only) values ($1, $2, $3, $4, $5, $6)
+    `insert into customers (name, channel, area, address, city, tpin, reg_no, phone, needs_lpo, cash_only)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      on conflict ((lower(name))) do nothing returning id`,
-    [c.name, c.channel, c.area, c.phone, c.needsLpo, c.cashOnly],
+    [c.name, c.channel, c.area, c.address, c.city, c.tpin, c.regNo, c.phone, c.needsLpo, c.cashOnly],
   );
   const id = rows[0]?.id;
   if (id == null) return null;
@@ -125,7 +138,7 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
     if (!includeInactive) where += ' and c.active';
     if (q) {
       params.push(`%${q.replace(/[\\%_]/g, (m) => '\\' + m)}%`);
-      where += ` and (c.name ilike $${params.length} or c.area ilike $${params.length} or c.phone like $${params.length})`;
+      where += ` and (c.name ilike $${params.length} or c.area ilike $${params.length} or c.city ilike $${params.length} or c.phone like $${params.length})`;
     }
     const { rows } = await db.query<CustomerRow>(`${customerSelect}${where} order by lower(c.name) limit 500`, params);
     return rows.map((r) => withCanEdit(request.user, r));
@@ -171,6 +184,10 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       name: body.name ?? current.name,
       channel: body.channel ?? (current.channel as NewCustomer['channel']),
       area: body.area ?? current.area,
+      address: body.address ?? current.address,
+      city: body.city ?? current.city,
+      tpin: body.tpin ?? current.tpin,
+      regNo: body.regNo ?? current.regNo,
       phone: body.phone === undefined ? current.phone : body.phone,
       needsLpo: body.needsLpo ?? current.needsLpo,
       cashOnly: body.cashOnly ?? current.cashOnly,
@@ -183,9 +200,22 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       await client.query('begin');
       const updated = await client.query(
         `update customers set name = $2, channel = $3, area = $4, phone = $5, needs_lpo = $6, cash_only = $7,
-           active = coalesce($8, active), updated_at = now()
+           active = coalesce($8, active), address = $9, city = $10, tpin = $11, reg_no = $12, updated_at = now()
          where id = $1 and not exists (select 1 from customers o where lower(o.name) = lower($2) and o.id <> $1)`,
-        [id, merged.name, merged.channel, merged.area, merged.phone, merged.needsLpo, merged.cashOnly, body.active ?? null],
+        [
+          id,
+          merged.name,
+          merged.channel,
+          merged.area,
+          merged.phone,
+          merged.needsLpo,
+          merged.cashOnly,
+          body.active ?? null,
+          merged.address,
+          merged.city,
+          merged.tpin,
+          merged.regNo,
+        ],
       );
       if (updated.rowCount === 0) {
         await client.query('rollback');

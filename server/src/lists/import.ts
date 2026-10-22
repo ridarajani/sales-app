@@ -11,7 +11,8 @@ import { insertProduct, type NewProduct } from './products.js';
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const MAX_ROWS = 5000;
 
-type Column = { header: string; width: number; example: string };
+// Optional columns may be left out of the file, so files made from the older template still import.
+type Column = { header: string; width: number; example: string; optional?: boolean };
 type Kind = 'customers' | 'products';
 
 const COLUMNS: Record<Kind, Column[]> = {
@@ -24,6 +25,10 @@ const COLUMNS: Record<Kind, Column[]> = {
     { header: 'Payment terms (days)', width: 20, example: '30' },
     { header: 'Needs LPO', width: 12, example: 'Yes' },
     { header: 'Cash only', width: 12, example: 'No' },
+    { header: 'Address', width: 28, example: 'Plot 47/3/12, Area 47', optional: true },
+    { header: 'City', width: 16, example: 'Lilongwe', optional: true },
+    { header: 'TPIN', width: 14, example: '12345678', optional: true },
+    { header: 'Reg No', width: 14, example: '', optional: true },
   ],
   products: [
     { header: 'Code', width: 16, example: 'LV-KG-400T' },
@@ -42,6 +47,7 @@ const HELP: Record<Kind, string[]> = {
     'Companies: codes separated by commas. LV = Lucky Ventures, ZT = Zoona Trading, ZF = Zangafee, GL = Greenland.',
     'Payment terms: days to pay, used for every company on the row. Leave empty or 0 for cash customers.',
     'Needs LPO and Cash only: Yes or No.',
+    'Address, City, TPIN and Reg No: printed on VAT invoices. Fill them in for supermarkets and wholesalers.',
   ],
   products: [
     'One product per row, starting on row 3. Delete the example on row 2.',
@@ -90,10 +96,13 @@ async function readRows(kind: Kind, file: Buffer): Promise<{ row: number; values
   }
   const ws = wb.worksheets[0];
   if (!ws) throw new HttpError(400, 'invalid', 'The file has no sheets.');
-  const cols = COLUMNS[kind];
-  const headers = cols.map((_, i) => cellText(ws.getRow(1).getCell(i + 1).value).toLowerCase());
-  if (cols.some((c, i) => headers[i] !== c.header.toLowerCase())) {
-    throw new HttpError(400, 'invalid', `The columns do not match the template. Row 1 should be: ${cols.map((c) => c.header).join(', ')}.`);
+  const all = COLUMNS[kind];
+  const width = Math.max(ws.getRow(1).cellCount, all.filter((c) => !c.optional).length);
+  const headers = Array.from({ length: width }, (_, i) => cellText(ws.getRow(1).getCell(i + 1).value).toLowerCase());
+  const required = all.filter((c) => !c.optional);
+  const cols = all.filter((c, i) => !c.optional || headers[i] === c.header.toLowerCase());
+  if (required.some((c, i) => headers[i] !== c.header.toLowerCase()) || cols.some((c, i) => headers[i] !== c.header.toLowerCase())) {
+    throw new HttpError(400, 'invalid', `The columns do not match the template. Row 1 should be: ${all.map((c) => c.header).join(', ')}.`);
   }
   const example = cols.map((c) => c.example);
   const rows: { row: number; values: Record<string, string> }[] = [];
@@ -102,7 +111,7 @@ async function readRows(kind: Kind, file: Buffer): Promise<{ row: number; values
     const texts = cols.map((_, i) => cellText(r.getCell(i + 1).value));
     if (texts.every((t) => t === '')) return;
     if (texts.every((t, i) => t === example[i])) return;
-    rows.push({ row: n, values: Object.fromEntries(cols.map((c, i) => [c.header, texts[i]!])) });
+    rows.push({ row: n, values: Object.fromEntries(all.map((c) => [c.header, texts[cols.indexOf(c)] ?? ''])) });
   });
   if (rows.length === 0) throw new HttpError(400, 'invalid', 'The file has no rows to import.');
   if (rows.length > MAX_ROWS) throw new HttpError(400, 'invalid', `The file has more than ${MAX_ROWS} rows. Please split it.`);
@@ -180,6 +189,10 @@ async function checkCustomers(db: Db, rows: { row: number; values: Record<string
         name,
         channel: channel!,
         area: values['Area']!,
+        address: values['Address']!,
+        city: values['City']!,
+        tpin: values['TPIN']!,
+        regNo: values['Reg No']!,
         phone,
         needsLpo: needsLpo!,
         cashOnly: cashOnly!,

@@ -211,3 +211,39 @@ test('switch-on with a JSON content type and an empty body works', async () => {
   });
   expect(bad.statusCode).toBe(400);
 });
+
+test('a salesman can work under two sales managers, one per company', async () => {
+  const r = await post(app, admin, '/users', {
+    name: 'Rex Both',
+    phone: '0991000077',
+    role: 'salesman',
+    companyManagers: { LV: abbas.id, ZT: abbas.id, ZF: kashif.id, GL: kashif.id },
+    pin: '1111',
+  });
+  expect(r.statusCode).toBe(201);
+  expect(r.json()).toMatchObject({ companies: ['LV', 'ZT', 'ZF', 'GL'], managerId: abbas.id });
+  expect(r.json().managers).toEqual([
+    { company: 'LV', managerId: abbas.id, managerName: 'Manager A' },
+    { company: 'ZT', managerId: abbas.id, managerName: 'Manager A' },
+    { company: 'ZF', managerId: kashif.id, managerName: 'Manager B' },
+    { company: 'GL', managerId: kashif.id, managerName: 'Manager B' },
+  ]);
+  const id = r.json().id;
+  // Both managers see him and can reset his PIN.
+  for (const m of [abbas, kashif]) {
+    expect((await get(app, m.token, '/users')).json().map((u: { id: number }) => u.id)).toContain(id);
+    expect((await post(app, m.token, `/users/${id}/reset-pin`, { pin: '2222' })).statusCode).toBe(200);
+  }
+});
+
+test('per-company managers are checked', async () => {
+  const base = { name: 'X', role: 'salesman', pin: '1111' };
+  // Kashif does not run LV.
+  expect((await post(app, admin, '/users', { ...base, phone: '0991000078', companyManagers: { LV: kashif.id } })).json().message).toMatch(
+    /sales manager's companies/,
+  );
+  expect((await post(app, admin, '/users', { ...base, phone: '0991000079', companies: ['LV'], companyManagers: { ZF: kashif.id } })).statusCode).toBe(400);
+  expect((await post(app, admin, '/users', { ...base, role: 'driver', phone: '0991000080', companies: ['LV'], companyManagers: { LV: abbas.id } })).statusCode).toBe(400);
+  // A sales manager cannot put a salesman under someone else.
+  expect((await post(app, abbas.token, '/users', { ...base, phone: '0991000081', companyManagers: { LV: abbas.id, ZF: kashif.id } })).statusCode).toBe(403);
+});

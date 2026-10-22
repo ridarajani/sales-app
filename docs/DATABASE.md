@@ -31,6 +31,7 @@ erDiagram
     stock_batches ||--o{ stock_movements : "changed by"
     stock_receipts ||--o{ stock_movements : "adds"
     stock_counts ||--o{ stock_movements : "corrects"
+    stock_batches ||--o{ stock_adjustment_requests : "waits for approval"
     facilities {
         text code PK "F1, F2"
         text name
@@ -49,7 +50,7 @@ erDiagram
     users {
         int id PK
         text name
-        text phone UK "digits only"
+        text phone UK "0991234567, or +971... from abroad"
         text role "eight roles"
         text pin_hash "scrypt, never plain text"
         int manager_id FK "salesmen only"
@@ -60,6 +61,7 @@ erDiagram
     user_companies {
         int user_id PK, FK
         text company_code PK, FK
+        int manager_id FK "salesmen: sales manager for this company"
     }
     sessions {
         text token_hash PK "sha256 of the token"
@@ -71,6 +73,10 @@ erDiagram
         text name UK "unique, any case"
         text channel "supermarket, wholesaler, minibus, upcountry"
         text area
+        text address
+        text city
+        text tpin
+        text reg_no
         text phone
         boolean needs_lpo
         boolean cash_only
@@ -141,7 +147,17 @@ erDiagram
         text reason "damaged, expired, lost, found, other"
         int receipt_id FK
         int count_id FK
+        int request_id FK
         int user_id FK
+    }
+    stock_adjustment_requests {
+        int id PK
+        int batch_id FK
+        int change "pieces, + or -"
+        text reason
+        text status "pending, approved, rejected"
+        int requested_by FK
+        int decided_by FK
     }
 ```
 
@@ -165,6 +181,7 @@ erDiagram
 | `stock_receipts` | Phase 3 | Goods received into the warehouse |
 | `stock_counts` | Phase 3 | Stock counts |
 | `stock_movements` | Phase 3 | Every change to stock: received, adjusted or counted |
+| `stock_adjustment_requests` | 22 Oct answers | Damaged-stock write-offs waiting for a manager's approval |
 
 ## Phase 1 notes
 
@@ -196,3 +213,10 @@ erDiagram
 - **Stock count:** the counted amount replaces what the app had; each difference is a `counted` movement.
 - **Short-dated:** batches expiring within 90 days (changeable per request) or already expired. Dates use Malawi time.
 - **Audit actions:** `stock_received`, `stock_adjusted`, `stock_counted`.
+
+## Client answers of 22 October
+
+- **Phone:** Malawi numbers stay as `0991234567`. A number from abroad keeps its country code, for example `+971501234567` (a manager in the UAE). `991234567` without the 0 is also accepted.
+- **Salesmen under two managers:** `user_companies.manager_id` holds the sales manager for each company. Mr. Rajjab works for all four companies, under one manager for LV and ZT and another for ZF and GL. `users.manager_id` stays as the main manager. Either manager sees the salesman and can reset his PIN.
+- **Customer invoice details:** `customers.address`, `city`, `tpin` and `reg_no` print on the VAT invoice. They are optional columns at the end of the customer import, so older files still import.
+- **Damaged stock:** a warehouse write-off for `damaged` waits in `stock_adjustment_requests` until Admin or Management approves it; stock changes only on approval. An admin's own write-off applies at once. Audit actions: `stock_adjustment_requested`, `stock_adjustment_approved`, `stock_adjustment_rejected`.

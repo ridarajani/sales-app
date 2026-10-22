@@ -12,6 +12,9 @@ import { INT4_MAX, parse } from '../users.js';
 // The client asked that salesmen never see stock. Only these roles may.
 export const STOCK_VIEWERS = ['admin', 'management', 'warehouse'] as const;
 export const STOCK_KEEPERS = ['admin', 'warehouse'] as const;
+// Approve damaged-stock write-offs. An admin's own write-off needs no approval.
+export const STOCK_APPROVERS = ['admin', 'management'] as const;
+const NEEDS_APPROVAL = new Set(['damaged']);
 
 export const ADJUST_REASONS = ['damaged', 'expired', 'lost', 'found', 'other'] as const;
 const REMOVING = new Set(['damaged', 'expired', 'lost']);
@@ -52,6 +55,8 @@ const adjustBody = z.object({
   ...quantity,
   note: z.string().trim().max(1000).default(''),
 });
+
+const decisionBody = z.object({ note: z.string().trim().max(1000).default('') });
 
 const countBody = z.object({
   companyCode: z.string(),
@@ -104,6 +109,24 @@ async function lockBatch(client: PoolClient, user: { companies: string[] }, batc
   return rows[0];
 }
 
+const notEnough = (onHand: number) => new HttpError(409, 'not_enough_stock', `Only ${onHand} pieces of this batch are in stock.`);
+
+async function applyChange(
+  client: PoolClient,
+  batchId: number,
+  change: number,
+  reason: string,
+  note: string,
+  userId: number,
+  requestId: number | null,
+) {
+  await client.query('update stock_batches set on_hand = on_hand + $2 where id = $1', [batchId, change]);
+  await client.query(
+    `insert into stock_movements (batch_id, change, kind, reason, note, user_id, request_id) values ($1, $2, 'adjusted', $3, $4, $5, $6)`,
+    [batchId, change, reason, note, userId, requestId],
+  );
+}
+
 async function inTransaction<T>(db: Db, work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await db.connect();
   try {
@@ -139,6 +162,7 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
   const auth = requireAuth(db);
   const viewers = requireRole(...STOCK_VIEWERS);
   const keepers = requireRole(...STOCK_KEEPERS);
+  const approvers = requireRole(...STOCK_APPROVERS);
 
   // Stock per product, with its batches oldest expiry first.
   app.get('/stock', { onRequest: auth, preHandler: viewers }, async (request) => {
@@ -288,34 +312,94 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
   });
 
   // Damaged, expired, lost or found stock. Never takes a batch below 0.
-  app.post('/stock/adjustments', { onRequest: auth, preHandler: keepers }, async (request) => {
+  // Damaged stock waits for a manager's approval unless an admin writes it off.
+  app.post('/stock/adjustments', { onRequest: auth, preHandler: keepers }, async (request, reply) => {
     const body = parse(adjustBody, request.body);
     const direction = body.reason === 'other' ? body.direction : REMOVING.has(body.reason) ? 'remove' : 'add';
     if (!direction) throw invalid('Please say whether stock is added or taken off.');
     if (body.reason === 'other' && body.note === '') throw invalid('Please write what happened.');
+    const needsApproval = NEEDS_APPROVAL.has(body.reason) && request.user.role !== 'admin';
 
     const result = await inTransaction(db, async (client) => {
       const batch = await lockBatch(client, request.user, body.batchId);
       const pieces = totalPieces(body, batch.piecesPerCarton);
       if (pieces === 0) throw invalid('Please type how much.');
       const change = direction === 'remove' ? -pieces : pieces;
-      if (batch.onHand + change < 0) {
-        throw new HttpError(409, 'not_enough_stock', `Only ${batch.onHand} pieces of this batch are in stock.`);
+      if (batch.onHand + change < 0) throw notEnough(batch.onHand);
+      if (needsApproval) {
+        const { rows } = await client.query<{ id: number }>(
+          `insert into stock_adjustment_requests (batch_id, change, reason, note, requested_by) values ($1, $2, $3, $4, $5) returning id`,
+          [batch.id, change, body.reason, body.note, request.user.id],
+        );
+        return { requestId: rows[0]!.id, batchId: batch.id, change, onHand: batch.onHand, piecesPerCarton: batch.piecesPerCarton };
       }
-      await client.query('update stock_batches set on_hand = on_hand + $2 where id = $1', [batch.id, change]);
-      await client.query(
-        `insert into stock_movements (batch_id, change, kind, reason, note, user_id) values ($1, $2, 'adjusted', $3, $4, $5)`,
-        [batch.id, change, body.reason, body.note, request.user.id],
-      );
-      return { batchId: batch.id, change, onHand: batch.onHand + change, piecesPerCarton: batch.piecesPerCarton };
+      await applyChange(client, batch.id, change, body.reason, body.note, request.user.id, null);
+      return { requestId: null, batchId: batch.id, change, onHand: batch.onHand + change, piecesPerCarton: batch.piecesPerCarton };
     });
     await audit(db, {
       userId: request.user.id,
-      action: 'stock_adjusted',
-      details: { batchId: result.batchId, change: result.change, reason: body.reason },
+      action: result.requestId ? 'stock_adjustment_requested' : 'stock_adjusted',
+      details: { batchId: result.batchId, change: result.change, reason: body.reason, requestId: result.requestId },
     });
-    return { batchId: result.batchId, change: result.change, ...split(result.onHand, result.piecesPerCarton) };
+    const out = { batchId: result.batchId, change: result.change, ...split(result.onHand, result.piecesPerCarton) };
+    if (result.requestId) return reply.code(202).send({ ...out, waitingForApproval: true, requestId: result.requestId });
+    return { ...out, waitingForApproval: false };
   });
+
+  // Write-offs waiting for approval, oldest first.
+  app.get('/stock/adjustments/pending', { onRequest: auth, preHandler: viewers }, async (request) => {
+    const { rows } = await db.query(
+      `select r.id, r.batch_id as "batchId", b.batch_no as "batchNo", to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate",
+         p.id as "productId", p.code, p.name, p.pack_size as "packSize", p.company_code as "companyCode",
+         p.pieces_per_carton as "piecesPerCarton", r.change, r.reason, r.note, u.name as "requestedBy", r.requested_at as "requestedAt"
+       from stock_adjustment_requests r join stock_batches b on b.id = r.batch_id join products p on p.id = b.product_id
+         join users u on u.id = r.requested_by
+       where r.status = 'pending' and p.company_code = any($1) order by r.requested_at, r.id`,
+      [request.user.companies],
+    );
+    return rows;
+  });
+
+  for (const decision of ['approve', 'reject'] as const) {
+    app.post(`/stock/adjustments/:id/${decision}`, { onRequest: auth, preHandler: approvers }, async (request) => {
+      const { id } = parse(idParams, request.params);
+      const { note } = parse(decisionBody, request.body ?? {});
+      const result = await inTransaction(db, async (client) => {
+        const { rows } = await client.query<{ id: number; batchId: number; change: number; reason: string; note: string; status: string; requestedBy: number }>(
+          `select r.id, r.batch_id as "batchId", r.change, r.reason, r.note, r.status, r.requested_by as "requestedBy"
+           from stock_adjustment_requests r join stock_batches b on b.id = r.batch_id join products p on p.id = b.product_id
+           where r.id = $1 and p.company_code = any($2) for update of r`,
+          [id, request.user.companies],
+        );
+        const req = rows[0];
+        if (!req) throw notFound('request');
+        if (req.status !== 'pending') throw new HttpError(409, 'already_decided', 'This request has already been decided.');
+        const batch = await lockBatch(client, request.user, req.batchId);
+        if (decision === 'approve') {
+          if (batch.onHand + req.change < 0) throw notEnough(batch.onHand);
+          await applyChange(client, batch.id, req.change, req.reason, req.note, req.requestedBy, req.id);
+        }
+        await client.query(
+          `update stock_adjustment_requests set status = $2, decided_by = $3, decided_at = now(), decision_note = $4 where id = $1`,
+          [req.id, decision === 'approve' ? 'approved' : 'rejected', request.user.id, note],
+        );
+        const onHand = decision === 'approve' ? batch.onHand + req.change : batch.onHand;
+        return { requestId: req.id, batchId: batch.id, change: req.change, onHand, piecesPerCarton: batch.piecesPerCarton };
+      });
+      await audit(db, {
+        userId: request.user.id,
+        action: decision === 'approve' ? 'stock_adjustment_approved' : 'stock_adjustment_rejected',
+        details: { requestId: result.requestId, batchId: result.batchId, change: result.change },
+      });
+      return {
+        requestId: result.requestId,
+        status: decision === 'approve' ? 'approved' : 'rejected',
+        batchId: result.batchId,
+        change: result.change,
+        ...split(result.onHand, result.piecesPerCarton),
+      };
+    });
+  }
 
   // A stock count: the counted amount replaces what the app had, and each difference is recorded.
   app.post('/stock/counts', { onRequest: auth, preHandler: keepers }, async (request, reply) => {
