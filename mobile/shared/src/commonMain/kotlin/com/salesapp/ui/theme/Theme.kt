@@ -6,10 +6,13 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 // Brand colours, the same as the prototype: burgundy, gold and warm white.
 val Burgundy = Color(0xFF7A1F35)
@@ -129,6 +132,39 @@ private val DarkColors = darkColorScheme(
     onSurfaceVariant = Color(0xFFB9A5AA),
 )
 
+private val Base = Typography()
+
+private fun slot(size: Int, weight: FontWeight, line: Int, spacing: Double, base: TextStyle) =
+    base.copy(fontSize = size.sp, fontWeight = weight, lineHeight = line.sp, letterSpacing = spacing.sp)
+
+/**
+ * Every font size in the app lives here. Slots:
+ * headlineLarge login title; headlineSmall Home first name;
+ * titleLarge sheet name, PIN titles, large avatar initials; titleMedium top bar title, person name;
+ * titleSmall card titles, PrimaryButton text, small avatar initials;
+ * bodyLarge body and fields; bodyMedium body and chip text; bodySmall notes and sub lines;
+ * labelLarge Secondary/Danger button text, ChoiceButton, filter chips, tile name;
+ * labelMedium upper-case form labels, section and group headers; labelSmall pills and badges;
+ * Typography.caption tile sub-line and product code.
+ */
+val SalesTypography = Base.copy(
+    headlineLarge = slot(34, FontWeight.Bold, 40, 0.0, Base.headlineLarge),
+    headlineMedium = slot(28, FontWeight.Bold, 36, 0.0, Base.headlineMedium),
+    headlineSmall = slot(24, FontWeight.Bold, 32, 0.0, Base.headlineSmall),
+    titleLarge = slot(20, FontWeight.SemiBold, 28, 0.0, Base.titleLarge),
+    titleMedium = slot(18, FontWeight.SemiBold, 24, 0.0, Base.titleMedium),
+    titleSmall = slot(16, FontWeight.SemiBold, 22, 0.0, Base.titleSmall),
+    bodyLarge = slot(16, FontWeight.Normal, 24, 0.5, Base.bodyLarge),
+    bodyMedium = slot(15, FontWeight.Normal, 22, 0.25, Base.bodyMedium),
+    bodySmall = slot(14, FontWeight.Normal, 20, 0.25, Base.bodySmall),
+    labelLarge = slot(15, FontWeight.SemiBold, 20, 0.1, Base.labelLarge),
+    labelMedium = slot(13, FontWeight.Medium, 18, 0.5, Base.labelMedium),
+    labelSmall = slot(11, FontWeight.SemiBold, 14, 0.3, Base.labelSmall),
+)
+
+val Typography.caption: TextStyle
+    get() = labelMedium.copy(fontSize = 12.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.25.sp, lineHeight = 16.sp)
+
 /**
  * The phone's own colour scheme (Material You on Android 12 and later), or null where the
  * platform has none, in which case the brand colours are used.
@@ -136,31 +172,21 @@ private val DarkColors = darkColorScheme(
 @Composable
 internal expect fun platformColorScheme(darkTheme: Boolean): ColorScheme?
 
-// darkTheme stays false by default: the Phase 1 screens still use the light colours directly.
 /**
  * App theme. With [dynamicColor] on, Android 12+ phones use their wallpaper colours instead of
- * burgundy and gold; it is off by default to keep the brand look. Dark mode is ready in the
- * theme but stays off until the screens take all their colours from colorScheme (Phase 1
- * screens use the light brand colours directly).
+ * burgundy and gold; it is off by default to keep the brand look. [darkTheme] follows the
+ * phone's light or dark mode; screens take all their colours from colorScheme and [sales].
  */
 @Composable
 fun SalesTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = (if (dynamicColor) platformColorScheme(darkTheme) else null)
         ?: if (darkTheme) DarkColors else LightColors
-    val base = Typography()
-    val typography = base.copy(
-        headlineLarge = base.headlineLarge.copy(fontWeight = FontWeight.Bold),
-        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold),
-        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.Bold),
-        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.Bold),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.Bold),
-    )
     val sales = if (darkTheme) DarkSalesColors else LightSalesColors
     CompositionLocalProvider(LocalSalesColors provides sales) {
-        MaterialTheme(colorScheme = colors, typography = typography, content = content)
+        MaterialTheme(colorScheme = colors, typography = SalesTypography, content = content)
     }
 }

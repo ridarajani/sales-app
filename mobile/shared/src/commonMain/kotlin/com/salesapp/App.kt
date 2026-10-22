@@ -25,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.salesapp.core.Platform
 import com.salesapp.core.Updater
 import com.salesapp.data.ApiException
@@ -188,14 +187,14 @@ private fun UpdatePrompt(state: AppState) {
                         progress = null
                     },
                 )
-            }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Download", fontSize = 16.sp) }
+            }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Download", style = MaterialTheme.typography.bodyLarge) }
         },
         dismissButton = {
             TextButton(
                 enabled = progress == null,
                 onClick = { offer = null },
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text("Later", fontSize = 16.sp) }
+            ) { Text("Later", style = MaterialTheme.typography.bodyLarge) }
         },
     )
 }

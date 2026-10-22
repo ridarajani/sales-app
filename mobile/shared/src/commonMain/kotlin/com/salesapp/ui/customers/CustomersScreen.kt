@@ -20,10 +20,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.data.Customer
@@ -120,7 +118,7 @@ fun CustomersScreen(state: CustomersState, onEvent: (CustomersEvent) -> Unit, on
                 ) {
                     Text(
                         stringResource(if (state.includeInactive) Res.string.customers_hide_off else Res.string.customers_show_off),
-                        fontSize = 15.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -146,13 +144,12 @@ private fun CustomerRow(customer: Customer, onClick: () -> Unit) {
             Text(
                 customer.name,
                 color = scheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (customer.area.isNotBlank()) {
-                Text(customer.area, color = scheme.onSurfaceVariant, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(customer.area, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 customer.companies.forEach { CompanyDot(it.code) }

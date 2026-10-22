@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
 import com.salesapp.data.companyName
 import com.salesapp.ui.theme.companyColor
@@ -47,8 +46,7 @@ fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 44.dp, tone: 
         Text(
             initials,
             color = if (onPrimary) MaterialTheme.colorScheme.onPrimary else primary,
-            fontSize = if (size >= 56.dp) 20.sp else 16.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = if (size >= 56.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
         )
     }
 }
@@ -72,8 +70,7 @@ fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTo
     Text(
         text,
         color = ink,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.labelSmall,
         maxLines = 1,
         modifier = modifier.clip(RoundedCornerShape(10.dp)).background(fill).padding(horizontal = 8.dp, vertical = 2.dp),
     )
@@ -84,7 +81,7 @@ fun Badge(text: String, modifier: Modifier = Modifier, tone: BadgeTone = BadgeTo
 fun CompanyDot(code: String, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(companyColor(code)))
-        Text(companyName(code), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+        Text(companyName(code), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal), modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -95,7 +92,7 @@ fun Say(text: String, modifier: Modifier = Modifier, error: Boolean = false) {
     Text(
         text,
         color = if (error) sales.bad else MaterialTheme.colorScheme.onSurface,
-        fontSize = 15.sp,
+        style = MaterialTheme.typography.bodyMedium,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -118,7 +115,7 @@ fun Field(
 ) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(label.uppercase(), color = scheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+        Text(label.uppercase(), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 6.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -135,7 +132,7 @@ fun Field(
                 unfocusedContainerColor = scheme.surface,
             ),
         )
-        if (note != null) Text(note, color = scheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        if (note != null) Text(note, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -163,7 +160,7 @@ fun ChoiceButton(
         Text(
             text,
             color = if (selected) scheme.primary else scheme.onSurface,
-            fontSize = 15.sp,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
@@ -172,7 +169,7 @@ fun ChoiceButton(
 // A small upper-case heading above a group of fields or tiles.
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp, modifier = modifier.padding(bottom = 2.dp))
+    Text(text.uppercase(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium, modifier = modifier.padding(bottom = 2.dp))
 }
 
 // Choice buttons laid out one under another.

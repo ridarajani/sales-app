@@ -43,14 +43,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.salesapp.core.formatIsoDate
 import com.salesapp.core.isoFromUtcMillis
 import com.salesapp.core.utcMillisFromIso
@@ -68,9 +66,7 @@ private fun FieldLabel(label: String) {
     Text(
         label.uppercase(),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.5.sp,
+        style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(bottom = 6.dp),
     )
 }
@@ -78,7 +74,7 @@ private fun FieldLabel(label: String) {
 @Composable
 private fun FieldNote(note: String?) {
     if (note != null) {
-        Text(note, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        Text(note, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -122,7 +118,7 @@ fun SearchField(
             ) {
                 Icon(Icons.Outlined.Search, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 Box(modifier = Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(placeholder, color = scheme.onSurfaceVariant, fontSize = 16.sp, maxLines = 1)
+                    if (value.isEmpty()) Text(placeholder, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                     inner()
                 }
                 if (value.isNotEmpty()) {
@@ -160,8 +156,8 @@ fun ToggleRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
-            Text(label, color = scheme.onSurface, fontSize = 16.sp)
-            if (note != null) Text(note, color = scheme.onSurfaceVariant, fontSize = 14.sp)
+            Text(label, color = scheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+            if (note != null) Text(note, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Switch(
             checked = checked,
@@ -288,7 +284,7 @@ fun DateField(
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            Text(formatIsoDate(isoDate), color = scheme.onSurface, fontSize = 16.sp)
+            Text(formatIsoDate(isoDate), color = scheme.onSurface, style = MaterialTheme.typography.bodyLarge)
         }
     }
     if (open) {
@@ -305,11 +301,11 @@ fun DateField(
                         pickerState.selectedDateMillis?.let { onDateChange(isoFromUtcMillis(it)) }
                         open = false
                     },
-                ) { Text(stringResource(Res.string.ok), fontSize = 16.sp) }
+                ) { Text(stringResource(Res.string.ok), style = MaterialTheme.typography.bodyLarge) }
             },
             dismissButton = {
                 TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = { open = false }) {
-                    Text(stringResource(Res.string.cancel), fontSize = 16.sp)
+                    Text(stringResource(Res.string.cancel), style = MaterialTheme.typography.bodyLarge)
                 }
             },
         ) {

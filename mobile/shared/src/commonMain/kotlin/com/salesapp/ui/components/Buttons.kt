@@ -17,9 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 private val ButtonShape = RoundedCornerShape(12.dp)
 
@@ -42,7 +40,7 @@ fun PrimaryButton(
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = scheme.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = scheme.onPrimary, style = MaterialTheme.typography.titleSmall)
     }
 }
 
@@ -92,8 +90,7 @@ private fun OutlinedButtonBox(
         Text(
             text,
             color = if (enabled) textColor else textColor.copy(alpha = 0.4f),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelLarge,
         )
     }
 }

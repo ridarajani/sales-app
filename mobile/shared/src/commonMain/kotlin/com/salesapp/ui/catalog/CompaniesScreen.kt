@@ -17,10 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.data.Company
 import com.salesapp.resources.Res
@@ -76,8 +74,8 @@ private fun CompanyRow(company: Company, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     ListCard(onClick = onClick) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(company.name, color = scheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(facilityLabel(company.facilityCode), color = scheme.onSurfaceVariant, fontSize = 14.sp)
+            Text(company.name, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall)
+            Text(facilityLabel(company.facilityCode), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
     }

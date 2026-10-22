@@ -19,9 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.ui.theme.caption
 import com.salesapp.data.Product
 import com.salesapp.data.companyName
 import com.salesapp.resources.Res
@@ -126,8 +126,7 @@ fun ProductsScreen(state: ProductsState, onEvent: (ProductsEvent) -> Unit, onBac
                                     Text(
                                         product.brand,
                                         color = scheme.onSurface,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                         modifier = Modifier.padding(top = 8.dp),
                                     )
                                 }
@@ -146,7 +145,7 @@ fun ProductsScreen(state: ProductsState, onEvent: (ProductsEvent) -> Unit, onBac
                 ) {
                     Text(
                         stringResource(if (state.includeInactive) Res.string.products_hide_off else Res.string.products_show_off),
-                        fontSize = 15.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -166,13 +165,13 @@ private fun ProductRow(product: Product, canEdit: Boolean, onClick: () -> Unit) 
     val scheme = MaterialTheme.colorScheme
     ListCard(onClick = if (canEdit) onClick else null) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(product.name, color = scheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(product.name, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(Res.string.products_pack_line, product.packSize, product.piecesPerCarton.toString()),
                 color = scheme.onSurfaceVariant,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodySmall,
             )
-            Text(product.code, color = scheme.onSurfaceVariant, fontSize = 12.sp)
+            Text(product.code, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
         }
         if (!product.active) {
             Badge(stringResource(Res.string.catalog_off), tone = BadgeTone.Off, modifier = Modifier.padding(start = 8.dp))

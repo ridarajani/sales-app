@@ -18,7 +18,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.core.formatPhone
 import com.salesapp.core.normalisePhoneInput
@@ -129,7 +128,7 @@ fun VehicleFormScreen(state: VehicleFormState, onEvent: (VehicleFormEvent) -> Un
                         }
                     }
                     if (state.drivers.isEmpty()) {
-                        Text(stringResource(Res.string.vehicle_no_drivers), color = scheme.onSurfaceVariant, fontSize = 14.sp)
+                        Text(stringResource(Res.string.vehicle_no_drivers), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 if (state.isEdit) {
