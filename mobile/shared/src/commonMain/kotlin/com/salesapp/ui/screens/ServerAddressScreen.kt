@@ -8,57 +8,71 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.salesapp.core.AppConfig
-import com.salesapp.data.AppState
-import com.salesapp.ui.components.PrimaryButton
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.resources.Res
+import com.salesapp.resources.server_label
+import com.salesapp.resources.server_save
+import com.salesapp.resources.server_testing_only
+import com.salesapp.resources.server_title
+import com.salesapp.resources.server_use_default
 import com.salesapp.ui.components.Field
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.theme.SalesTheme
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+
+@Composable
+fun ServerAddressPage(
+    onBack: () -> Unit,
+    viewModel: ServerAddressViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                ServerAddressEffect.Done -> onBack()
+            }
+        }
+    }
+    ServerAddressScreen(state, viewModel::onEvent, onBack)
+}
 
 // Lets a tester point the app at a different server.
 @Composable
-fun ServerAddressScreen(state: AppState) {
-    var url by remember { mutableStateOf(state.apiUrl) }
-    var error by remember { mutableStateOf<String?>(null) }
-
+fun ServerAddressScreen(state: ServerAddressState, onEvent: (ServerAddressEvent) -> Unit, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar("Server address", onBack = { state.nav.pop() })
+        TopBar(stringResource(Res.string.server_title), onBack = onBack)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Say("Only for testing. Ask the person who set up the app.")
-            error?.let { Say(it, error = true) }
+            Say(stringResource(Res.string.server_testing_only))
+            state.error?.let { Say(it, error = true) }
             Field(
-                label = "Server address",
-                value = url,
-                onValueChange = { url = it },
+                label = stringResource(Res.string.server_label),
+                value = state.url,
+                onValueChange = { onEvent(ServerAddressEvent.UrlChanged(it)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
-            PrimaryButton("Save", onClick = {
-                val clean = url.trim().trimEnd('/')
-                if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-                    error = "The address must start with http:// or https://"
-                } else {
-                    state.changeApiUrl(clean)
-                    state.message = "Server address saved."
-                    state.nav.pop()
-                }
-            })
-            SecondaryButton("Use default", onClick = {
-                state.changeApiUrl(null)
-                url = AppConfig.DEFAULT_API_URL
-                state.message = "Using the default address."
-                state.nav.pop()
-            })
+            PrimaryButton(stringResource(Res.string.server_save), onClick = { onEvent(ServerAddressEvent.Save) })
+            SecondaryButton(stringResource(Res.string.server_use_default), onClick = { onEvent(ServerAddressEvent.UseDefault) })
         }
+    }
+}
+
+@Preview
+@Composable
+private fun ServerAddressPreview() {
+    SalesTheme {
+        ServerAddressScreen(ServerAddressState(url = "http://192.168.1.10:8000"), onEvent = {}, onBack = {})
     }
 }

@@ -7,108 +7,83 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.salesapp.data.ApiException
-import com.salesapp.data.AppState
-import com.salesapp.ui.components.PIN_LENGTH
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.resources.Res
+import com.salesapp.resources.reset_pin_confirm
+import com.salesapp.resources.reset_pin_new_for
+import com.salesapp.resources.reset_pin_this_person
+import com.salesapp.resources.reset_pin_title
+import com.salesapp.resources.reset_pin_type_again
+import com.salesapp.resources.reset_pin_type_new
 import com.salesapp.ui.components.PinEntry
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.TopBar
-import com.salesapp.ui.theme.Burgundy
-import com.salesapp.ui.theme.Ink
-import com.salesapp.ui.theme.Muted
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.salesapp.ui.theme.SalesTheme
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 // Type a new PIN twice for someone, then save it.
 @Composable
-fun ResetPinScreen(state: AppState, id: Int) {
-    val name = state.userRows.firstOrNull { it.id == id }?.name ?: "this person"
-    val scope = rememberCoroutineScope()
-    var first by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
-    var confirming by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var stepping by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    fun save(newPin: String) {
-        if (busy) return
-        busy = true
-        error = null
-        scope.launch {
-            try {
-                state.api.resetPin(id, newPin)
-                state.message = "PIN changed."
-                state.nav.pop()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ApiException) {
-                if (e.isSignedOut) state.signedOut("You were signed out. Sign in again.") else error = e.message
-                pin = ""
-            } finally {
-                busy = false
+fun ResetPinPage(
+    id: Int,
+    onBack: () -> Unit,
+    onDone: () -> Unit,
+    viewModel: ResetPinViewModel = koinViewModel { parametersOf(id) },
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                ResetPinEffect.Done -> onDone()
             }
         }
     }
+    ResetPinScreen(state, viewModel::onEvent, onBack)
+}
 
-    fun onPin(value: String) {
-        if (busy || stepping) return
-        pin = value
-        if (value.length < PIN_LENGTH) return
-        if (!confirming) {
-            // Let the fourth dot show before moving on.
-            stepping = true
-            scope.launch {
-                delay(150)
-                first = value
-                pin = ""
-                confirming = true
-                error = null
-                stepping = false
-            }
-        } else if (value == first) {
-            save(value)
-        } else {
-            stepping = true
-            scope.launch {
-                delay(150)
-                error = "PINs don't match. Try again."
-                first = ""
-                pin = ""
-                confirming = false
-                stepping = false
-            }
-        }
-    }
-
+@Composable
+fun ResetPinScreen(state: ResetPinState, onEvent: (ResetPinEvent) -> Unit, onBack: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar("Reset PIN", onBack = { state.nav.pop() })
+        TopBar(stringResource(Res.string.reset_pin_title), onBack = onBack)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                if (confirming) "Confirm PIN" else "New PIN for $name",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Ink,
+                if (state.confirming) {
+                    stringResource(Res.string.reset_pin_confirm)
+                } else {
+                    stringResource(Res.string.reset_pin_new_for, state.userName ?: stringResource(Res.string.reset_pin_this_person))
+                },
+                style = MaterialTheme.typography.titleLarge,
+                color = scheme.onSurface,
             )
-            Text(if (confirming) "Type it again" else "Type the new PIN", fontSize = 15.sp, color = Muted)
-            error?.let { Say(it, error = true) }
-            PinEntry(pin = pin, onChange = ::onPin, enabled = !busy)
-            if (busy) CircularProgressIndicator(color = Burgundy)
+            Text(
+                stringResource(if (state.confirming) Res.string.reset_pin_type_again else Res.string.reset_pin_type_new),
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+            )
+            state.error?.let { Say(it, error = true) }
+            PinEntry(pin = state.pin, onChange = { onEvent(ResetPinEvent.PinChanged(it)) }, enabled = !state.busy)
+            if (state.busy) CircularProgressIndicator(color = scheme.primary)
         }
+    }
+}
+
+@Preview
+@Composable
+private fun ResetPinPreview() {
+    SalesTheme {
+        ResetPinScreen(ResetPinState(userName = "Chisomo Phiri", pin = "12"), onEvent = {}, onBack = {})
     }
 }

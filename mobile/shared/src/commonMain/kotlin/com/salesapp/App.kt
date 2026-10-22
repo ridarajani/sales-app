@@ -23,36 +23,41 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.toRoute
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.salesapp.core.Platform
 import com.salesapp.core.Updater
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.AppVersion
-import com.salesapp.data.ListsStart
-import com.salesapp.data.Screen
 import com.salesapp.di.appModule
 import com.salesapp.resources.Res
 import com.salesapp.resources.err_signed_out
-import com.salesapp.ui.navigation.CompaniesRoute
-import com.salesapp.ui.navigation.CustomersRoute
-import com.salesapp.ui.navigation.ListsHost
-import com.salesapp.ui.navigation.ProductsRoute
-import com.salesapp.ui.navigation.VehiclesRoute
-import com.salesapp.ui.screens.AddUserScreen
-import com.salesapp.ui.screens.HomeScreen
-import com.salesapp.ui.screens.PhoneScreen
-import com.salesapp.ui.screens.PinScreen
-import com.salesapp.ui.screens.ResetPinScreen
-import com.salesapp.ui.screens.ServerAddressScreen
-import com.salesapp.ui.screens.UserDetailScreen
-import com.salesapp.ui.screens.UsersScreen
+import com.salesapp.resources.update_download
+import com.salesapp.resources.update_later
+import com.salesapp.resources.update_text
+import com.salesapp.resources.update_title
+import com.salesapp.ui.customers.customersGraph
+import com.salesapp.ui.navigation.HomeRoute
+import com.salesapp.ui.navigation.PhoneRoute
+import com.salesapp.ui.navigation.PinRoute
+import com.salesapp.ui.navigation.ServerAddressRoute
+import com.salesapp.ui.navigation.catalogGraph
+import com.salesapp.ui.navigation.open
+import com.salesapp.ui.screens.HomePage
+import com.salesapp.ui.screens.PhonePage
+import com.salesapp.ui.screens.PinPage
+import com.salesapp.ui.screens.ServerAddressPage
+import com.salesapp.ui.screens.usersGraph
 import com.salesapp.ui.theme.SalesTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import org.koin.dsl.koinConfiguration
@@ -65,15 +70,13 @@ fun App() {
     }
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun AppContent() {
     val state = koinInject<AppState>()
     val snackbar = remember { SnackbarHostState() }
 
-    // Phone Back button (Android) goes to the previous screen. Inside the lists area its own
-    // navigation handles Back first; this one steps in once that is at its first screen.
-    BackHandler(enabled = state.nav.canGoBack && !state.listsCanPop) { state.nav.pop() }
+    val nav = rememberNavController()
+    val start = remember { if (state.user != null) HomeRoute else PhoneRoute }
 
     // Show short messages at the bottom, one at a time.
     LaunchedEffect(Unit) {
@@ -103,28 +106,39 @@ private fun AppContent() {
         }
     }
 
+    // Signing in opens Home; signing out (or being signed out) opens the phone screen. Nothing to go back to.
+    LaunchedEffect(nav) {
+        var showingHome = start == HomeRoute
+        snapshotFlow { state.user != null }.collect { signedIn ->
+            if (signedIn != showingHome) {
+                showingHome = signedIn
+                nav.navigate(if (signedIn) HomeRoute else PhoneRoute) {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
     SalesTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-                when (val screen = state.nav.current) {
-                    Screen.Phone -> PhoneScreen(state)
-                    is Screen.Pin -> PinScreen(state, screen.phone, screen.name)
-                    Screen.Home -> HomeScreen(state)
-                    Screen.Users -> UsersScreen(state)
-                    Screen.AddUser -> AddUserScreen(state)
-                    is Screen.UserDetail -> UserDetailScreen(state, screen.id)
-                    is Screen.ResetPin -> ResetPinScreen(state, screen.id)
-                    Screen.ServerAddress -> ServerAddressScreen(state)
-                    is Screen.Lists -> ListsHost(
-                        start = when (screen.start) {
-                            ListsStart.Customers -> CustomersRoute
-                            ListsStart.Products -> ProductsRoute
-                            ListsStart.Vehicles -> VehiclesRoute
-                            ListsStart.Companies -> CompaniesRoute
-                        },
-                        onExit = { state.nav.pop() },
-                        onCanPopInner = { state.listsCanPop = it },
-                    )
+                NavHost(nav, startDestination = start) {
+                    composable<PhoneRoute> {
+                        PhonePage(
+                            onNext = { phone, name -> nav.open(PinRoute(phone, name)) },
+                            onServerAddress = { nav.open(ServerAddressRoute) },
+                        )
+                    }
+                    composable<PinRoute> { entry ->
+                        val route = entry.toRoute<PinRoute>()
+                        PinPage(route.phone, route.name, onBack = { nav.popBackStack() })
+                    }
+                    composable<HomeRoute> { HomePage(onOpen = { nav.open(it) }) }
+                    composable<ServerAddressRoute> { ServerAddressPage(onBack = { nav.popBackStack() }) }
+                    usersGraph(nav)
+                    customersGraph(nav, onExit = { nav.popBackStack() })
+                    catalogGraph(nav, onExit = { nav.popBackStack() })
                 }
                 SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
                 UpdatePrompt(state)
@@ -159,10 +173,10 @@ private fun UpdatePrompt(state: AppState) {
     val latest = offer ?: return
     AlertDialog(
         onDismissRequest = { if (progress == null) offer = null },
-        title = { Text("A new version is ready") },
+        title = { Text(stringResource(Res.string.update_title)) },
         text = {
             androidx.compose.foundation.layout.Column {
-                Text("Version ${latest.versionName}. Download it now, then tap Install.")
+                Text(stringResource(Res.string.update_text, latest.versionName))
                 progress?.let {
                     LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
                 }
@@ -187,14 +201,14 @@ private fun UpdatePrompt(state: AppState) {
                         progress = null
                     },
                 )
-            }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Download", style = MaterialTheme.typography.bodyLarge) }
+            }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(Res.string.update_download), style = MaterialTheme.typography.bodyLarge) }
         },
         dismissButton = {
             TextButton(
                 enabled = progress == null,
                 onClick = { offer = null },
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text("Later", style = MaterialTheme.typography.bodyLarge) }
+            ) { Text(stringResource(Res.string.update_later), style = MaterialTheme.typography.bodyLarge) }
         },
     )
 }

@@ -9,134 +9,86 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.salesapp.data.ApiException
-import com.salesapp.data.AppState
-import com.salesapp.data.NewUserRequest
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.data.Role
-import com.salesapp.data.companyCodes
+import com.salesapp.data.UserRow
 import com.salesapp.data.companyName
-import com.salesapp.ui.components.PrimaryButton
+import com.salesapp.resources.Res
+import com.salesapp.resources.user_add_all_companies
+import com.salesapp.resources.user_add_job
+import com.salesapp.resources.user_add_name
+import com.salesapp.resources.user_add_no_manager
+import com.salesapp.resources.user_add_pin
+import com.salesapp.resources.user_add_pin_note
+import com.salesapp.resources.user_add_submit
+import com.salesapp.resources.users_add
+import com.salesapp.resources.users_add_salesman
+import com.salesapp.resources.users_label_companies
+import com.salesapp.resources.users_label_phone
+import com.salesapp.resources.users_label_works_under
 import com.salesapp.ui.components.ChoiceButton
 import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.Field
-import com.salesapp.ui.components.PIN_LENGTH
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SectionLabel
+import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.TopBar
-import com.salesapp.ui.theme.Burgundy
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import com.salesapp.ui.theme.SalesTheme
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.viewmodel.koinViewModel
 
 // A form to add one person: name, phone, job, who they work under, companies and a PIN.
 @Composable
-fun AddUserScreen(state: AppState) {
-    val me = state.user ?: return
-    val isSalesManager = me.role == "sales_manager"
-    val scope = rememberCoroutineScope()
-
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf(if (isSalesManager) Role.Salesman else null) }
-    var managerId by remember { mutableStateOf(if (isSalesManager) me.id else null) }
-    var companies by remember { mutableStateOf(emptySet<String>()) }
-    var pin by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var loadingList by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    // The list of sales managers comes from the server.
-    LaunchedEffect(Unit) {
-        try {
-            refreshUsers(state)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: ApiException) {
-            error = e.message
-        } finally {
-            loadingList = false
-        }
-    }
-
-    val managers = state.userRows.filter { it.role == "sales_manager" && it.active }
-    val managerCompanies: List<String> = when {
-        isSalesManager -> me.companies
-        else -> managers.firstOrNull { it.id == managerId }?.companies ?: emptyList()
-    }
-    val chosenRole = role
-    val allCompanies = chosenRole?.seesAllCompanies == true
-    val pickableCompanies = if (chosenRole == Role.Salesman) {
-        companyCodes.filter { it in managerCompanies }
-    } else {
-        companyCodes
-    }
-
-    fun submit() {
-        if (busy) return
-        val r = chosenRole
-        error = when {
-            name.isBlank() -> "Type the person's name."
-            phone.isBlank() -> "Type the phone number."
-            r == null -> "Choose what job the person does."
-            r == Role.Salesman && managerId == null -> "Choose who the salesman works under."
-            !r.seesAllCompanies && companies.isEmpty() -> "Choose at least one company."
-            pin.length != PIN_LENGTH -> "The PIN must be $PIN_LENGTH numbers."
-            else -> null
-        }
-        if (error != null || r == null) return
-        busy = true
-        scope.launch {
-            try {
-                val request = NewUserRequest(
-                    name = name.trim(),
-                    phone = phone.trim(),
-                    role = r.code,
-                    companies = if (r.seesAllCompanies) companyCodes else companyCodes.filter { it in companies },
-                    managerId = if (r == Role.Salesman) managerId else null,
-                    pin = pin,
-                )
-                val added = state.api.createUser(request)
-                state.userRows = state.userRows + added
-                state.message = "${added.name} added."
-                state.nav.pop()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ApiException) {
-                if (e.isSignedOut) state.signedOut("You were signed out. Sign in again.") else error = e.message
-            } finally {
-                busy = false
+fun AddUserPage(
+    onBack: () -> Unit,
+    onDone: () -> Unit,
+    viewModel: AddUserViewModel = koinViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                AddUserEffect.Done -> onDone()
             }
         }
     }
+    AddUserScreen(state, viewModel::onEvent, onBack)
+}
 
+@Composable
+fun AddUserScreen(state: AddUserState, onEvent: (AddUserEvent) -> Unit, onBack: () -> Unit) {
+    val role = state.role
+    val busy = state.busy
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(if (isSalesManager) "Add a salesman" else "Add a user", onBack = { state.nav.pop() })
+        TopBar(
+            stringResource(if (state.isSalesManager) Res.string.users_add_salesman else Res.string.users_add),
+            onBack = onBack,
+        )
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            error?.let { Say(it, error = true) }
-            Field("Name", name, { name = it }, enabled = !busy)
+            state.error?.let { Say(it, error = true) }
+            Field(stringResource(Res.string.user_add_name), state.name, { onEvent(AddUserEvent.Name(it)) }, enabled = !busy)
             Field(
-                "Phone number",
-                phone,
-                { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
+                stringResource(Res.string.users_label_phone),
+                state.phone,
+                { onEvent(AddUserEvent.Phone(it)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 enabled = !busy,
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Job")
-                if (isSalesManager) {
+                SectionLabel(stringResource(Res.string.user_add_job))
+                if (state.isSalesManager) {
                     ChoiceButton(Role.Salesman.label, selected = true, onClick = {}, modifier = Modifier.fillMaxWidth())
                 } else {
                     ChoiceColumn {
@@ -146,36 +98,29 @@ fun AddUserScreen(state: AppState) {
                                 selected = role == option,
                                 enabled = !busy,
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = {
-                                    role = option
-                                    companies = emptySet()
-                                    if (option != Role.Salesman) managerId = null
-                                },
+                                onClick = { onEvent(AddUserEvent.RoleChosen(option)) },
                             )
                         }
                     }
                 }
             }
 
-            if (chosenRole == Role.Salesman && !isSalesManager) {
+            if (role == Role.Salesman && !state.isSalesManager) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel("Works under")
-                    if (managers.isEmpty() && loadingList) {
-                        CircularProgressIndicator(color = Burgundy)
-                    } else if (managers.isEmpty()) {
-                        Say("There is no active sales manager yet. Add a sales manager first.")
+                    SectionLabel(stringResource(Res.string.users_label_works_under))
+                    if (state.managers.isEmpty() && state.loadingList) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    } else if (state.managers.isEmpty()) {
+                        Say(stringResource(Res.string.user_add_no_manager))
                     } else {
                         ChoiceColumn {
-                            managers.forEach { manager ->
+                            state.managers.forEach { manager ->
                                 ChoiceButton(
                                     manager.name,
-                                    selected = managerId == manager.id,
+                                    selected = state.managerId == manager.id,
                                     enabled = !busy,
                                     modifier = Modifier.fillMaxWidth(),
-                                    onClick = {
-                                        managerId = manager.id
-                                        companies = emptySet()
-                                    },
+                                    onClick = { onEvent(AddUserEvent.ManagerChosen(manager.id)) },
                                 )
                             }
                         }
@@ -183,19 +128,19 @@ fun AddUserScreen(state: AppState) {
                 }
             }
 
-            if (allCompanies) {
-                Say("Sees all four companies")
-            } else if (chosenRole != null && (chosenRole != Role.Salesman || managerId != null)) {
+            if (role?.seesAllCompanies == true) {
+                Say(stringResource(Res.string.user_add_all_companies))
+            } else if (role != null && (role != Role.Salesman || state.managerId != null)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel("Companies")
+                    SectionLabel(stringResource(Res.string.users_label_companies))
                     ChoiceColumn {
-                        pickableCompanies.forEach { code ->
+                        state.pickableCompanies.forEach { code ->
                             ChoiceButton(
                                 companyName(code),
-                                selected = code in companies,
+                                selected = code in state.companies,
                                 enabled = !busy,
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = { companies = if (code in companies) companies - code else companies + code },
+                                onClick = { onEvent(AddUserEvent.CompanyToggled(code)) },
                             )
                         }
                     }
@@ -203,14 +148,39 @@ fun AddUserScreen(state: AppState) {
             }
 
             Field(
-                "PIN",
-                pin,
-                { pin = it.filter { c -> c.isDigit() }.take(PIN_LENGTH) },
+                stringResource(Res.string.user_add_pin),
+                state.pin,
+                { onEvent(AddUserEvent.Pin(it)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 enabled = !busy,
-                note = "The user types this to sign in. They can't change it; the admin resets it.",
+                note = stringResource(Res.string.user_add_pin_note),
             )
-            PrimaryButton("Add user", enabled = !busy, onClick = ::submit)
+            PrimaryButton(stringResource(Res.string.user_add_submit), enabled = !busy, onClick = { onEvent(AddUserEvent.Submit) })
         }
+    }
+}
+
+private val sampleManagers = listOf(
+    UserRow(7, "Banda Phiri", "+265881234567", "sales_manager", listOf("LV", "ZT")),
+    UserRow(8, "Thoko Banda", "+265999876543", "sales_manager", listOf("ZF")),
+)
+
+@Preview
+@Composable
+private fun AddUserPreview() {
+    SalesTheme {
+        AddUserScreen(
+            AddUserState(
+                users = sampleManagers,
+                name = "Chisomo Phiri",
+                phone = "+265991234567",
+                role = Role.Salesman,
+                managerId = 7,
+                companies = setOf("LV"),
+                loadingList = false,
+            ),
+            onEvent = {},
+            onBack = {},
+        )
     }
 }

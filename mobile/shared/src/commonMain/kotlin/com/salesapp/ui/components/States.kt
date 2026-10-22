@@ -66,12 +66,12 @@ fun ConfirmDialog(
         text = { Text(text, style = MaterialTheme.typography.bodyLarge) },
         confirmButton = {
             TextButton(onClick = onConfirm, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(confirmLabel, style = MaterialTheme.typography.bodyLarge, color = if (danger) scheme.error else scheme.primary)
+                Text(confirmLabel, style = MaterialTheme.typography.labelLarge, color = if (danger) scheme.error else scheme.primary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(Res.string.cancel), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(Res.string.cancel), style = MaterialTheme.typography.labelLarge)
             }
         },
     )
