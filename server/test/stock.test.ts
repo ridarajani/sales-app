@@ -116,8 +116,8 @@ test('only warehouse and admin change stock; salesmen and accounts never see it'
 
 test('adjustments: damaged takes off, found adds, never below 0, other needs a note', async () => {
   const batch = (await get(app, store1, '/stock?q=lv-milk')).json()[0].batches.find((b: { batchNo: string }) => b.batchNo === 'B-200');
-  const damaged = await post(app, store1, '/stock/adjustments', { batchId: batch.id, reason: 'damaged', pieces: 3 });
-  expect(damaged.json()).toMatchObject({ change: -3, pieces: 21, cartons: 1, loosePieces: 9 });
+  const damaged = await post(app, admin, '/stock/adjustments', { batchId: batch.id, reason: 'damaged', pieces: 3 });
+  expect(damaged.json()).toMatchObject({ change: -3, pieces: 21, cartons: 1, loosePieces: 9, waitingForApproval: false });
   expect((await post(app, store1, '/stock/adjustments', { batchId: batch.id, reason: 'found', cartons: 1 })).json().pieces).toBe(33);
 
   const tooMuch = await post(app, store1, '/stock/adjustments', { batchId: batch.id, reason: 'lost', cartons: 3 });
@@ -145,7 +145,7 @@ test('two adjustments at once cannot take a batch below 0', async () => {
   const batchId = (await get(app, store2, '/stock')).json()[0].batches[0].id;
   expect(r.statusCode).toBe(201);
   const results = await Promise.all(
-    Array.from({ length: 4 }, () => post(app, store2, '/stock/adjustments', { batchId, reason: 'damaged', pieces: 2 })),
+    Array.from({ length: 4 }, () => post(app, store2, '/stock/adjustments', { batchId, reason: 'lost', pieces: 2 })),
   );
   expect(results.map((x) => x.statusCode).sort()).toEqual([200, 200, 409, 409]);
   expect((await get(app, store2, '/stock')).json()[0].onHand).toBe(1);
@@ -186,4 +186,46 @@ test('short-dated list shows batches expiring soon, oldest first', async () => {
   // A batch that has passed its date shows as expired.
   await db.query(`update stock_batches set expiry_date = current_date - 3 where batch_no = 'T-SOON'`);
   expect((await get(app, manager, '/stock/short-dated')).json()[0]).toMatchObject({ batchNo: 'T-SOON', expired: true });
+});
+
+test('damaged stock waits for a manager to approve it', async () => {
+  const r = await receive(store2, 'GL', [{ productId: cookies, batchNo: 'C-DMG', expiryDate: day(200), cartons: 2 }]);
+  expect(r.statusCode).toBe(201);
+  const batch = (await get(app, store2, '/stock')).json()[0].batches.find((b: { batchNo: string }) => b.batchNo === 'C-DMG');
+  const ask = await post(app, store2, '/stock/adjustments', { batchId: batch.id, reason: 'damaged', pieces: 4, note: 'Wet boxes' });
+  expect(ask.statusCode).toBe(202);
+  expect(ask.json()).toMatchObject({ waitingForApproval: true, change: -4, pieces: 20 });
+  const stockNow = () => get(app, store2, '/stock').then((x) => x.json()[0].batches.find((b: { batchNo: string }) => b.batchNo === 'C-DMG').onHand);
+  expect(await stockNow()).toBe(20);
+
+  const pending = (await get(app, manager, '/stock/adjustments/pending')).json();
+  expect(pending).toEqual([expect.objectContaining({ id: ask.json().requestId, batchNo: 'C-DMG', change: -4, reason: 'damaged', note: 'Wet boxes', requestedBy: 'Store Two' })]);
+  expect((await get(app, store1, '/stock/adjustments/pending')).json()).toEqual([]);
+
+  // The warehouse cannot approve its own request.
+  expect((await post(app, store2, `/stock/adjustments/${ask.json().requestId}/approve`, {})).statusCode).toBe(403);
+  const ok = await post(app, manager, `/stock/adjustments/${ask.json().requestId}/approve`, {});
+  expect(ok.json()).toMatchObject({ status: 'approved', pieces: 16 });
+  expect(await stockNow()).toBe(16);
+  expect((await post(app, manager, `/stock/adjustments/${ask.json().requestId}/reject`, {})).statusCode).toBe(409);
+
+  const second = (await post(app, store2, '/stock/adjustments', { batchId: batch.id, reason: 'damaged', pieces: 1 })).json();
+  expect((await post(app, admin, `/stock/adjustments/${second.requestId}/reject`, { note: 'Not damaged' })).json().status).toBe('rejected');
+  expect(await stockNow()).toBe(16);
+  expect((await get(app, manager, '/stock/adjustments/pending')).json()).toEqual([]);
+
+  const history = (await get(app, manager, `/stock/batches/${batch.id}/movements`)).json();
+  expect(history.map((h: { kind: string; change: number }) => [h.kind, h.change])).toEqual([['adjusted', -4], ['received', 20]]);
+  const log = (await get(app, admin, '/audit')).json().map((a: { action: string }) => a.action);
+  expect(log).toEqual(expect.arrayContaining(['stock_adjustment_requested', 'stock_adjustment_approved', 'stock_adjustment_rejected']));
+});
+
+test('approving fails if the stock has gone below what the request takes off', async () => {
+  await receive(store2, 'GL', [{ productId: cookies, batchNo: 'C-RACE', expiryDate: day(200), pieces: 5 }]);
+  const batch = (await get(app, store2, '/stock')).json()[0].batches.find((b: { batchNo: string }) => b.batchNo === 'C-RACE');
+  const ask = (await post(app, store2, '/stock/adjustments', { batchId: batch.id, reason: 'damaged', pieces: 4 })).json();
+  await post(app, store2, '/stock/adjustments', { batchId: batch.id, reason: 'lost', pieces: 3 });
+  const r = await post(app, manager, `/stock/adjustments/${ask.requestId}/approve`, {});
+  expect(r.statusCode).toBe(409);
+  expect((await get(app, manager, '/stock/adjustments/pending')).json().map((p: { id: number }) => p.id)).toContain(ask.requestId);
 });

@@ -310,3 +310,35 @@ test('canEdit says whether the caller may change the customer', async () => {
   expect((await get(app, accounts, `/customers/${mixed.json().id}`)).json().canEdit).toBe(true);
   expect((await get(app, salesman, '/customers')).json().every((c: { canEdit: boolean }) => c.canEdit === false)).toBe(true);
 });
+
+test('customers keep the details printed on VAT invoices', async () => {
+  const c = await post(app, admin, '/customers', {
+    name: 'Invoice Details Mart',
+    channel: 'supermarket',
+    address: 'Plot 12, Area 3',
+    city: 'Lilongwe',
+    tpin: '11112222',
+    regNo: 'R-77',
+    companies: [{ code: 'LV', paymentTermsDays: 30 }],
+  });
+  expect(c.statusCode).toBe(201);
+  expect(c.json()).toMatchObject({ address: 'Plot 12, Area 3', city: 'Lilongwe', tpin: '11112222', regNo: 'R-77' });
+  const edited = await put(admin, `/customers/${c.json().id}`, { city: 'Blantyre' });
+  expect(edited.json()).toMatchObject({ address: 'Plot 12, Area 3', city: 'Blantyre', tpin: '11112222' });
+  expect((await get(app, admin, '/customers?q=blantyre')).json().map((x: { name: string }) => x.name)).toEqual(['Invoice Details Mart']);
+});
+
+test('customer import reads the new invoice columns, and older files without them', async () => {
+  const withDetails = await workbook('customers', [['Detail Shop', 'Wholesaler', 'Area 2', '', 'LV', 30, 'No', 'No', 'Box 5', 'Mzuzu', '33334444', 'R-1']]);
+  expect((await upload(admin, '/import/customers/save', withDetails)).json()).toEqual({ saved: 1 });
+  expect((await get(app, admin, '/customers?q=detail shop')).json()[0]).toMatchObject({ address: 'Box 5', city: 'Mzuzu', tpin: '33334444', regNo: 'R-1' });
+
+  // An older file: only the first 8 columns, plus a column of our own notes.
+  const old = new ExcelJS.Workbook();
+  const ws = old.addWorksheet('Customers');
+  ws.addRow(['Name', 'Channel', 'Area', 'Phone', 'Companies', 'Payment terms (days)', 'Needs LPO', 'Cash only', 'Check']);
+  ws.addRow(['Old Format Shop', 'Upcountry', 'Salima', '991 234 500', 'GL', '', 'No', 'Yes', 'fill Channel']);
+  const r = await upload(admin, '/import/customers/save', Buffer.from(await old.xlsx.writeBuffer()));
+  expect(r.json()).toEqual({ saved: 1 });
+  expect((await get(app, admin, '/customers?q=old format')).json()[0]).toMatchObject({ phone: '0991234500', address: '', city: '' });
+});
