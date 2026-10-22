@@ -19,7 +19,7 @@ class StockRepository(private val api: Api, app: AppState) {
 
     suspend fun stock(company: String? = null, q: String? = null): List<StockProduct> {
         val list = api.stock(company, q, includeEmpty = false)
-        _products.value = list
+        if (company == null && q == null) _products.value = list
         return list
     }
 

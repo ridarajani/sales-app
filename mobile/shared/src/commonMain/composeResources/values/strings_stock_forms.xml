@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="number_cartons">Cartons</string>
+    <string name="number_pieces">Pieces</string>
+    <string name="number_ctn_pcs">%1$s cartons %2$s pieces</string>
+    <string name="number_ctn_pcs_dot">%1$s cartons · %2$s pieces</string>
+    <string name="number_batch_line">Batch %1$s · expires %2$s</string>
+    <string name="number_no_access">You cannot do this.</string>
+    <string name="number_done">Done</string>
+    <string name="number_company">Company</string>
+    <string name="number_err_quantity">Type how many cartons or pieces.</string>
+
+    <string name="receive_title">Receive stock</string>
+    <string name="receive_help">New cartons arrived. Copy the batch number and expiry date from the carton.</string>
+    <string name="receive_supplier">Supplier</string>
+    <string name="receive_delivery_note">Delivery note number</string>
+    <string name="receive_date">Date received</string>
+    <string name="receive_products">Products</string>
+    <string name="receive_remove">Remove</string>
+    <string name="receive_add_product">Add a product</string>
+    <string name="receive_save">Save</string>
+    <string name="receive_search">Search a product</string>
+    <string name="receive_per_carton">%1$s pieces per carton</string>
+    <string name="receive_change">Change</string>
+    <string name="receive_no_products">No products found.</string>
+    <string name="receive_batch">Batch number on the carton</string>
+    <string name="receive_batch_hint">e.g. KG025-2610A</string>
+    <string name="receive_expiry">Expiry date on the carton</string>
+    <string name="receive_add_to_list">Add to the list</string>
+    <string name="receive_err_product">Choose a product.</string>
+    <string name="receive_err_batch">Type the batch number.</string>
+    <string name="receive_err_expiry">Pick the expiry date.</string>
+    <string name="receive_err_expired">This batch has already expired.</string>
+    <string name="receive_err_duplicate">This product and batch is already on the list.</string>
+    <string name="receive_done_title">Stock received</string>
+    <string name="receive_grn">GRN %1$s</string>
+    <string name="receive_added_to">%1$s products added to %2$s</string>
+    <string name="receive_done_line">%1$s %2$s · batch %3$s · %4$s cartons %5$s pieces</string>
+
+    <string name="adjust_title">Adjust stock</string>
+    <string name="adjust_in_stock">In stock: %1$s cartons · %2$s pieces</string>
+    <string name="adjust_what_happened">What happened?</string>
+    <string name="adjust_damaged">Damaged</string>
+    <string name="adjust_expired">Expired</string>
+    <string name="adjust_lost">Lost</string>
+    <string name="adjust_found">Found</string>
+    <string name="adjust_other">Other</string>
+    <string name="adjust_takes_off">This takes stock off.</string>
+    <string name="adjust_adds">This adds stock.</string>
+    <string name="adjust_direction">Add or take off?</string>
+    <string name="adjust_add">Add</string>
+    <string name="adjust_take_off">Take off</string>
+    <string name="adjust_how_much">How much?</string>
+    <string name="adjust_save">Save</string>
+    <string name="adjust_err_reason">Pick a reason.</string>
+    <string name="adjust_err_direction">Say whether stock is added or taken off.</string>
+    <string name="adjust_err_note">Write what happened.</string>
+    <string name="adjust_changed">Stock changed. Now %1$s cartons · %2$s pieces in this batch.</string>
+
+    <string name="count_title">Stock count</string>
+    <string name="count_help">Type what you counted. Leave a batch blank to skip it.</string>
+    <string name="count_system">System: %1$s cartons · %2$s pieces</string>
+    <string name="count_empty">No stock for this company.</string>
+    <string name="count_save">Save count</string>
+    <string name="count_done_title">Count saved</string>
+    <string name="count_batches_counted">%1$s batches counted</string>
+    <string name="count_matched">Everything matched the system.</string>
+    <string name="count_differences">Differences</string>
+    <string name="count_diff_title">%1$s · batch %2$s</string>
+    <string name="count_diff_system">System: %1$s cartons %2$s pieces</string>
+    <string name="count_diff_counted">Counted: %1$s cartons %2$s pieces</string>
+    <string name="count_diff_plus">+%1$s cartons %2$s pieces</string>
+    <string name="count_diff_minus">−%1$s cartons %2$s pieces</string>
+</resources>

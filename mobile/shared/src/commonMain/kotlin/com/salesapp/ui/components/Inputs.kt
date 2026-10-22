@@ -232,6 +232,37 @@ fun MwkField(
     }
 }
 
+// A whole number (a quantity), typed with the number keyboard. Blank is null.
+@Composable
+fun NumberField(
+    label: String,
+    value: Int?,
+    onValueChange: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    enabled: Boolean = true,
+    note: String? = null,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        FieldLabel(label)
+        OutlinedTextField(
+            value = value?.toString() ?: "",
+            onValueChange = { raw ->
+                val digits = raw.filter { it.isDigit() }.take(7)
+                onValueChange(digits.toIntOrNull())
+            },
+            enabled = enabled,
+            singleLine = true,
+            placeholder = if (placeholder.isEmpty()) null else ({ Text(placeholder) }),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = fieldColors(),
+        )
+        FieldNote(note)
+    }
+}
+
 // A text box for longer text, a few lines tall.
 @Composable
 fun MultilineField(
