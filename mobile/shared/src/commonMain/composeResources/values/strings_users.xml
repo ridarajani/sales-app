@@ -11,7 +11,8 @@
 
     <string name="user_add_name">Name</string>
     <string name="user_add_job">Job</string>
-    <string name="user_add_no_manager">There is no active sales manager yet. Add a sales manager first.</string>
+    <string name="user_add_manager_for">Sales manager for %1$s</string>
+    <string name="user_add_no_manager_for">There is no active sales manager for %1$s yet.</string>
     <string name="user_add_all_companies">Sees all four companies</string>
     <string name="user_add_pin">PIN</string>
     <string name="user_add_pin_note">The user types this to sign in. They can\'t change it; the admin resets it.</string>
@@ -19,8 +20,9 @@
     <string name="user_add_added">%1$s added.</string>
     <string name="user_add_err_name">Type the person\'s name.</string>
     <string name="user_add_err_phone">Type the phone number.</string>
+    <string name="user_add_err_phone_bad">That phone number does not look right.</string>
     <string name="user_add_err_job">Choose what job the person does.</string>
-    <string name="user_add_err_manager">Choose who the salesman works under.</string>
+    <string name="user_add_err_manager">Choose a sales manager for %1$s.</string>
     <string name="user_add_err_company">Choose at least one company.</string>
     <string name="user_add_err_pin">The PIN must be %1$d numbers.</string>
 

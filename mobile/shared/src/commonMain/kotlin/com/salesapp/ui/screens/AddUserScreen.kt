@@ -25,7 +25,8 @@ import com.salesapp.resources.Res
 import com.salesapp.resources.user_add_all_companies
 import com.salesapp.resources.user_add_job
 import com.salesapp.resources.user_add_name
-import com.salesapp.resources.user_add_no_manager
+import com.salesapp.resources.user_add_manager_for
+import com.salesapp.resources.user_add_no_manager_for
 import com.salesapp.resources.user_add_pin
 import com.salesapp.resources.user_add_pin_note
 import com.salesapp.resources.user_add_submit
@@ -33,7 +34,6 @@ import com.salesapp.resources.users_add
 import com.salesapp.resources.users_add_salesman
 import com.salesapp.resources.users_label_companies
 import com.salesapp.resources.users_label_phone
-import com.salesapp.resources.users_label_works_under
 import com.salesapp.ui.components.ChoiceButton
 import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.Field
@@ -45,7 +45,7 @@ import com.salesapp.ui.theme.SalesTheme
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-// A form to add one person: name, phone, job, who they work under, companies and a PIN.
+// A form to add one person: name, phone, job, companies, a sales manager for each,  and a PIN.
 @Composable
 fun AddUserPage(
     onBack: () -> Unit,
@@ -105,32 +105,9 @@ fun AddUserScreen(state: AddUserState, onEvent: (AddUserEvent) -> Unit, onBack: 
                 }
             }
 
-            if (role == Role.Salesman && !state.isSalesManager) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel(stringResource(Res.string.users_label_works_under))
-                    if (state.managers.isEmpty() && state.loadingList) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    } else if (state.managers.isEmpty()) {
-                        Say(stringResource(Res.string.user_add_no_manager))
-                    } else {
-                        ChoiceColumn {
-                            state.managers.forEach { manager ->
-                                ChoiceButton(
-                                    manager.name,
-                                    selected = state.managerId == manager.id,
-                                    enabled = !busy,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { onEvent(AddUserEvent.ManagerChosen(manager.id)) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             if (role?.seesAllCompanies == true) {
                 Say(stringResource(Res.string.user_add_all_companies))
-            } else if (role != null && (role != Role.Salesman || state.managerId != null)) {
+            } else if (role != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionLabel(stringResource(Res.string.users_label_companies))
                     ChoiceColumn {
@@ -142,6 +119,32 @@ fun AddUserScreen(state: AddUserState, onEvent: (AddUserEvent) -> Unit, onBack: 
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { onEvent(AddUserEvent.CompanyToggled(code)) },
                             )
+                        }
+                    }
+                }
+            }
+
+            if (role == Role.Salesman && !state.isSalesManager) {
+                state.chosenCompanies.forEach { code ->
+                    val managers = state.managersFor(code)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionLabel(stringResource(Res.string.user_add_manager_for, companyName(code)))
+                        if (managers.isEmpty() && state.loadingList) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        } else if (managers.isEmpty()) {
+                            Say(stringResource(Res.string.user_add_no_manager_for, companyName(code)))
+                        } else {
+                            ChoiceColumn {
+                                managers.forEach { manager ->
+                                    ChoiceButton(
+                                        manager.name,
+                                        selected = state.companyManagers[code] == manager.id,
+                                        enabled = !busy,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = { onEvent(AddUserEvent.ManagerChosen(code, manager.id)) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -161,8 +164,8 @@ fun AddUserScreen(state: AddUserState, onEvent: (AddUserEvent) -> Unit, onBack: 
 }
 
 private val sampleManagers = listOf(
-    UserRow(7, "Banda Phiri", "+265881234567", "sales_manager", listOf("LV", "ZT")),
-    UserRow(8, "Thoko Banda", "+265999876543", "sales_manager", listOf("ZF")),
+    UserRow(7, "Banda Phiri", "0881234567", "sales_manager", listOf("LV", "ZT")),
+    UserRow(8, "Thoko Banda", "+971501234567", "sales_manager", listOf("ZF")),
 )
 
 @Preview
@@ -173,10 +176,10 @@ private fun AddUserPreview() {
             AddUserState(
                 users = sampleManagers,
                 name = "Chisomo Phiri",
-                phone = "+265991234567",
+                phone = "0991234567",
                 role = Role.Salesman,
-                managerId = 7,
-                companies = setOf("LV"),
+                companies = setOf("LV", "ZF"),
+                companyManagers = mapOf("LV" to 7),
                 loadingList = false,
             ),
             onEvent = {},

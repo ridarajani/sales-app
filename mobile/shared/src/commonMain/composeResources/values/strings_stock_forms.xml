@@ -71,4 +71,6 @@
     <string name="count_diff_counted">Counted: %1$s cartons %2$s pieces</string>
     <string name="count_diff_plus">+%1$s cartons %2$s pieces</string>
     <string name="count_diff_minus">−%1$s cartons %2$s pieces</string>
+    <string name="adjust_sent_for_approval">Sent for approval. Admin or Management must say yes before the stock changes.</string>
+    <string name="adjust_needs_approval">Management must say yes before the stock changes.</string>
 </resources>

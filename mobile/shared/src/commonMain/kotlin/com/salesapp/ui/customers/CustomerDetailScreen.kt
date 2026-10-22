@@ -53,7 +53,11 @@ import com.salesapp.resources.customer_opening_balance
 import com.salesapp.resources.customer_pays_cash
 import com.salesapp.resources.customer_pays_in_days
 import com.salesapp.resources.customer_pays_in_one_day
+import com.salesapp.resources.customer_address
+import com.salesapp.resources.customer_city
 import com.salesapp.resources.customer_phone
+import com.salesapp.resources.customer_reg_no
+import com.salesapp.resources.customer_tpin
 import com.salesapp.resources.customer_switch_off
 import com.salesapp.resources.customer_switch_off_text
 import com.salesapp.resources.customer_switch_off_title
@@ -119,6 +123,10 @@ fun CustomerDetailScreen(state: CustomerDetailState, onEvent: (CustomerDetailEve
                     Section {
                         DetailRow(stringResource(Res.string.customer_area), customer.area)
                         DetailRow(stringResource(Res.string.customer_phone), formatPhone(customer.phone))
+                        DetailRow(stringResource(Res.string.customer_address), customer.address)
+                        DetailRow(stringResource(Res.string.customer_city), customer.city)
+                        DetailRow(stringResource(Res.string.customer_tpin), customer.tpin)
+                        DetailRow(stringResource(Res.string.customer_reg_no), customer.regNo)
                     }
                     SectionTitle(stringResource(Res.string.customer_companies))
                     Section {
@@ -289,6 +297,10 @@ private fun CustomerDetailPreview() {
                     channel = "supermarket",
                     area = "Area 47, Lilongwe",
                     phone = "0991234567",
+                    address = "Shop 4, Area 47 market",
+                    city = "Lilongwe",
+                    tpin = "20123456",
+                    regNo = "BN12345",
                     needsLpo = true,
                     companies = listOf(CustomerCompany("LV", 30), CustomerCompany("ZT", 14)),
                 ),

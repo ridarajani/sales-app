@@ -24,3 +24,6 @@ data object StockCountRoute
 
 @Serializable
 data object ExpiringRoute
+
+@Serializable
+data object ApprovalsRoute

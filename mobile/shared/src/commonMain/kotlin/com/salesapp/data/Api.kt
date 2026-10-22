@@ -197,5 +197,13 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun adjustStock(request: AdjustRequest): AdjustResult = post<AdjustResult, AdjustRequest>("/stock/adjustments", request)
 
+    suspend fun pendingAdjustments(): List<PendingAdjustment> = get("/stock/adjustments/pending")
+
+    suspend fun approveAdjustment(id: Int, note: String = ""): AdjustmentDecision =
+        post<AdjustmentDecision, DecisionRequest>("/stock/adjustments/$id/approve", DecisionRequest(note))
+
+    suspend fun rejectAdjustment(id: Int, note: String = ""): AdjustmentDecision =
+        post<AdjustmentDecision, DecisionRequest>("/stock/adjustments/$id/reject", DecisionRequest(note))
+
     suspend fun countStock(request: CountRequest): CountResult = post<CountResult, CountRequest>("/stock/counts", request)
 }

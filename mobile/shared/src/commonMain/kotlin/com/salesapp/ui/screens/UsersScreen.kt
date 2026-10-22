@@ -131,8 +131,8 @@ private fun UserCard(row: UserRow, onClick: () -> Unit) {
 }
 
 private val sampleUsers = listOf(
-    UserRow(1, "Chisomo Phiri", "+265991234567", "salesman", listOf("LV", "ZT"), 7, "Banda Phiri"),
-    UserRow(2, "Thoko Banda", "+265881234567", "sales_manager", listOf("LV")),
+    UserRow(1, "Chisomo Phiri", "0991234567", "salesman", listOf("LV", "ZT"), 7, "Banda Phiri"),
+    UserRow(2, "Thoko Banda", "+971501234567", "sales_manager", listOf("LV")),
     UserRow(3, "Mphatso Kamanga", "+265999876543", "driver", listOf("ZF"), active = false),
 )
 

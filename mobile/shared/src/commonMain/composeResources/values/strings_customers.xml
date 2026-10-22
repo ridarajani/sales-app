@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="customers_title">Customers</string>
-    <string name="customers_search_hint">Search by name, area or phone</string>
+    <string name="customers_search_hint">Search by name, area, city or phone</string>
     <string name="customers_empty">No customers yet.</string>
     <string name="customers_show_off">Show switched off</string>
     <string name="customers_hide_off">Hide switched off</string>
     <string name="customers_add">Add a customer</string>
     <string name="customer_area">Area</string>
     <string name="customer_phone">Phone</string>
+    <string name="customer_address">Address</string>
+    <string name="customer_city">City</string>
+    <string name="customer_tpin">TPIN</string>
+    <string name="customer_reg_no">Reg No</string>
     <string name="customer_companies">Companies</string>
     <string name="customer_pays_in_days">Pays in %1$d days</string>
     <string name="customer_pays_in_one_day">Pays in 1 day</string>
@@ -34,6 +38,12 @@
     <string name="form_area">Area / where the shop is</string>
     <string name="form_area_hint">Area 47, Lilongwe</string>
     <string name="form_phone">Phone number</string>
+    <string name="form_address">Address</string>
+    <string name="form_address_hint">Shop 4, Area 47 market</string>
+    <string name="form_city">City</string>
+    <string name="form_city_hint">Lilongwe</string>
+    <string name="form_tpin">TPIN</string>
+    <string name="form_reg_no">Reg No</string>
     <string name="form_type">Type of customer</string>
     <string name="form_companies">Companies</string>
     <string name="form_days">Days to pay</string>

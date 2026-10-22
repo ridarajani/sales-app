@@ -57,8 +57,13 @@ data class UserRow(
     val companies: List<String> = emptyList(),
     val managerId: Int? = null,
     val managerName: String? = null,
+    // The sales manager for each company (salesmen only); empty for everyone else.
+    val managers: List<UserManager> = emptyList(),
     val active: Boolean = true,
 )
+
+@Serializable
+data class UserManager(val company: String, val managerId: Int, val managerName: String = "")
 
 @Serializable
 data class LoginResponse(val token: String, val user: User)
@@ -95,6 +100,8 @@ data class NewUserRequest(
     val role: String,
     val companies: List<String>,
     val managerId: Int? = null,
+    // Salesmen under more than one sales manager: company code to manager id, e.g. {"LV": 5, "ZF": 8}.
+    val companyManagers: Map<String, Int>? = null,
     val pin: String,
 )
 
@@ -110,6 +117,10 @@ data class Customer(
     val name: String,
     val channel: String = "",
     val area: String = "",
+    val address: String = "",
+    val city: String = "",
+    val tpin: String = "",
+    val regNo: String = "",
     val phone: String? = null,
     val needsLpo: Boolean = false,
     val cashOnly: Boolean = false,
@@ -125,6 +136,10 @@ data class CustomerRequest(
     val name: String? = null,
     val channel: String? = null,
     val area: String? = null,
+    val address: String? = null,
+    val city: String? = null,
+    val tpin: String? = null,
+    val regNo: String? = null,
     val phone: String? = null,
     val needsLpo: Boolean? = null,
     val cashOnly: Boolean? = null,
@@ -374,10 +389,48 @@ data class AdjustRequest(
     val note: String = "",
 )
 
-// The new amount on hand after the change.
+// The amount on hand after the change. When waitingForApproval is true (a warehouse write-off of
+// damaged stock) nothing has changed yet: Admin or Management must approve it first.
 @Serializable
 data class AdjustResult(
     val batchId: Int,
+    val change: Int = 0,
+    val pieces: Int = 0,
+    val cartons: Int = 0,
+    val loosePieces: Int = 0,
+    val waitingForApproval: Boolean = false,
+    val requestId: Int? = null,
+)
+
+// A damaged-stock write-off waiting for Admin or Management. change is signed pieces (negative).
+@Serializable
+data class PendingAdjustment(
+    val id: Int,
+    val batchId: Int,
+    val batchNo: String = "",
+    val expiryDate: String = "",
+    val productId: Int = 0,
+    val code: String = "",
+    val name: String = "",
+    val packSize: String = "",
+    val companyCode: String = "",
+    val piecesPerCarton: Int = 1,
+    val change: Int = 0,
+    val reason: String = "",
+    val note: String = "",
+    val requestedBy: String = "",
+    val requestedAt: String = "",
+)
+
+@Serializable
+data class DecisionRequest(val note: String = "")
+
+// The batch on hand after Admin or Management decided; status is "approved" or "rejected".
+@Serializable
+data class AdjustmentDecision(
+    val requestId: Int,
+    val status: String = "",
+    val batchId: Int = 0,
     val change: Int = 0,
     val pieces: Int = 0,
     val cartons: Int = 0,
