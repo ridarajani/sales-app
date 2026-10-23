@@ -206,6 +206,13 @@ erDiagram
     loading_plan_items ||--o{ loading_plan_item_batches : "loaded from"
     loading_plans ||--o{ loading_plan_changes : "log"
     vehicles ||--o{ loading_plans : "drives"
+    loading_plans ||--o{ invoices : "invoiced"
+    customers ||--o{ invoices : "billed"
+    invoices ||--o{ invoice_lines : "lists"
+    loading_plan_items ||--o| invoice_lines : "billed as"
+    loading_plans ||--o{ deliveries : "drops"
+    deliveries ||--o{ loading_plan_items : "confirms"
+    deliveries ||--o{ stock_movements : "deducts"
     loading_plans {
         int id PK
         text number "LP-000123"
@@ -223,6 +230,9 @@ erDiagram
         int order_line_id FK
         int pieces "planned"
         int loaded
+        int delivered
+        text short_reason
+        int delivery_id FK
     }
     loading_plan_item_batches {
         int item_id PK
@@ -238,6 +248,42 @@ erDiagram
         int after
         text reason
         bool seen
+    }
+    invoices {
+        int id PK
+        text number UK
+        text company_code FK
+        int customer_id FK
+        text invoice_type
+        int plan_id FK
+        text lpo_no
+        date invoice_date
+        date due_date
+        bigint subtotal
+        numeric vat_rate
+        bigint vat
+        bigint total
+        int salesman_id FK
+    }
+    invoice_lines {
+        int id PK
+        int invoice_id FK
+        int order_line_id FK
+        int plan_item_id FK
+        int product_id FK
+        int pieces
+        int price_per_carton
+        bigint amount
+    }
+    deliveries {
+        int id PK
+        int plan_id FK
+        int customer_id FK
+        text received_by
+        text signature_file
+        text photo_file
+        int confirmed_by FK
+        timestamptz confirmed_at
     }
 ```
 
@@ -272,6 +318,9 @@ erDiagram
 | `loading_plan_items` | Phase 5 | Order lines on a plan: pieces planned and pieces loaded |
 | `loading_plan_item_batches` | Phase 5 | Which batches each loaded item came from |
 | `loading_plan_changes` | Phase 5 | Every quantity change on a plan, with the warehouse's reason |
+| `invoices` | Phase 6 | Invoices made for a loaded vehicle: one per customer, company, LPO and invoice type |
+| `invoice_lines` | Phase 6 | The products on each invoice, with the loaded quantity and typed price |
+| `deliveries` | Phase 6 | The driver's confirmation of each drop: who received it, signature and photo |
 
 ## Phase 1 notes
 
@@ -336,3 +385,18 @@ erDiagram
 - **`order_lines.on_vehicle`** counts pieces on a vehicle and not yet delivered; the order's reservation is worked out again for what is left.
 - **Order stage:** orders now show a `stage` worked out from their lines: `open`, `planned`, `on_vehicle` or `part_delivered` (or the order's status when it is on hold, done or cancelled). An order cannot drop below what is planned, loaded or delivered, and cannot be cancelled or closed while part of it is on a vehicle.
 - **Audit actions:** `loading_plan_started`, `loading_plan_changed`, `loading_plan_sent`, `loading_plan_changed_by_warehouse`, `loading_plan_loaded`, `loading_plan_out`, `loading_plan_deleted`.
+
+## Phase 6 notes
+
+- **Invoices are made after loading, before delivery** (client, 16 Oct), by Admin, sales managers or Accounts, from the plan (`POST /loading-plans/:id/invoices`). There is one invoice per customer, company, LPO number and invoice type, for what actually went on the vehicle, at the prices typed on the order. Each user makes the invoices of their own companies.
+- **Numbers** run per company: `LV-INV-000001`. VAT and plain invoices share the series.
+- **VAT** is the company's `vat_rate` (17.5% when not set) on the prices typed without VAT, rounded to whole kwacha. A plain invoice has VAT 0.
+- **Due date** is the invoice date plus the customer's payment terms for that company; cash-only customers are due the same day.
+- **Printing:** `GET /invoices/:id/pdf`. The VAT invoice follows the client's sample: logo, company name, address, phone and TPIN on top, then the customer with Reg No and TPIN, LPO, vehicle and delivery note, the lines, Sub Total, VAT and Total. The plain invoice leaves out the company name, logo and TPINs. Logos are read from the `branding` folder (`BRANDING_DIR`), named by company code (`LV.jpg`); they are kept out of the repo.
+- **Delivery note and gate pass:** `GET /loading-plans/:id/delivery-note.pdf` and `/gate-pass.pdf` show the warehouse, vehicle, driver and products only, never company or customer names.
+- **Invoice register:** `GET /invoices`, filtered by company, customer, plan, type, dates or a search. Salesmen see their own invoices, drivers those of their vehicles, Warehouse none.
+- **Delivery:** once the vehicle is out and the customer's invoices are made, the driver (or Admin) confirms each drop: every product with what was handed over, the receiver's name and their signature, and a photo if wanted. Less than loaded needs a reason. A drop refused completely needs a reason but no signature. Signatures and photos are saved in the `uploads` folder (`UPLOAD_DIR`), never in the database or the repo.
+- **Stock on delivery:** what was handed over leaves `on_hand` (oldest batch on the vehicle first, movement kind `delivered`); everything loaded leaves `in_transit`, so what came back is on the shelf again. On the order, `on_vehicle` goes down by what was loaded and `delivered` up by what was handed over; what was not taken is open again and stock is set aside for it. An order is `done` once all of it is delivered, and the plan is `done` once every drop is confirmed.
+- **Shortages** do not change the invoice. The shortfall is credited with a sales return in Phase 8.
+- **What a customer owes**, shown when booking, is now the opening balance plus their invoices. Payments come off in Phase 7.
+- **Audit actions:** `invoices_made`, `delivery_confirmed`.

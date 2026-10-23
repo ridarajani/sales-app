@@ -244,9 +244,10 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
     if (!batch[0]) throw notFound('batch');
     const { rows } = await db.query(
       `select m.id, m.change, m.kind, m.reason, m.note, u.name as "userName", m.created_at as "createdAt",
-         coalesce(r.number, c.number) as "documentNumber"
+         coalesce(r.number, c.number, dp.delivery_note_no) as "documentNumber"
        from stock_movements m join users u on u.id = m.user_id
          left join stock_receipts r on r.id = m.receipt_id left join stock_counts c on c.id = m.count_id
+         left join deliveries d on d.id = m.delivery_id left join loading_plans dp on dp.id = d.plan_id
        where m.batch_id = $1 order by m.id desc limit 500`,
       [id],
     );

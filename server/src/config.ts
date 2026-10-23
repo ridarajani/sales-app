@@ -15,6 +15,10 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/+$/, ''),
   apkDir: fileURLToPath(new URL(process.env.APK_DIR ?? 'apk', envFile)),
+  // Delivery signatures and photos. Kept out of the repo.
+  uploadDir: fileURLToPath(new URL(process.env.UPLOAD_DIR ?? 'uploads', envFile)),
+  // Company logos for invoices, named by company code: LV.jpg, ZT.png and so on. Kept out of the repo.
+  brandingDir: fileURLToPath(new URL(process.env.BRANDING_DIR ?? 'branding', envFile)),
   // Placeholders for the first admin login. Change before go-live.
   bootstrapAdminPhone: process.env.BOOTSTRAP_ADMIN_PHONE ?? '0990000000',
   bootstrapAdminPin: process.env.BOOTSTRAP_ADMIN_PIN ?? '1234',
