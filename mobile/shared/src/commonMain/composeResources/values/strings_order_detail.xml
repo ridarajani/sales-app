@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="order_detail_no_access">You cannot see orders.</string>
+    <string name="order_detail_salesman">Salesman: %1$s</string>
+    <string name="order_detail_booked_by">Booked by %1$s</string>
+    <string name="order_detail_deliver_on">%1$s · deliver on %2$s</string>
+    <string name="order_detail_no_date">no date</string>
+    <string name="order_detail_lpo">LPO %1$s</string>
+    <string name="order_detail_no_lpo">No LPO</string>
+    <string name="order_detail_line_amount">%1$d cartons + %2$d pieces × %3$s = %4$s</string>
+    <string name="order_detail_line_amount_cartons">%1$d cartons × %2$s = %3$s</string>
+    <string name="order_detail_not_in_stock">%1$d cartons + %2$d pieces not in stock yet</string>
+    <string name="order_detail_before_vat">Before VAT</string>
+    <string name="order_detail_vat">VAT %1$s%</string>
+    <string name="order_detail_total">Total</string>
+    <string name="order_detail_order_total">Order total</string>
+    <string name="order_detail_history">History</string>
+    <string name="order_detail_by_at">%1$s · %2$s</string>
+    <string name="order_detail_change">Change</string>
+    <string name="order_detail_cancel">Cancel order</string>
+    <string name="order_detail_cancel_title">Cancel this order?</string>
+    <string name="order_detail_cancel_text">The order is stopped and nothing will be delivered.</string>
+    <string name="order_detail_cancel_yes">Yes, cancel it</string>
+    <string name="order_detail_hold">Hold</string>
+    <string name="order_detail_release">Release</string>
+    <string name="order_detail_close">Close</string>
+    <string name="order_detail_close_title">Close this order?</string>
+    <string name="order_detail_close_text">The rest of the order will not be delivered.</string>
+    <string name="order_detail_close_yes">Yes, close it</string>
+    <string name="order_detail_reserve">Reserve again</string>
+    <string name="order_detail_held">Order put on hold.</string>
+    <string name="order_detail_released">Hold released.</string>
+    <string name="order_detail_closed">Order closed.</string>
+    <string name="order_detail_cancelled">Order cancelled.</string>
+    <string name="order_detail_reserved">Stock reserved again.</string>
+</resources>

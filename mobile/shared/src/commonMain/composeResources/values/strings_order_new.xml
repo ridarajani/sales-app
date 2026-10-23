@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Step 1: find the shop -->
+    <string name="order_new_title">New order</string>
+    <string name="order_new_help">Find the shop, then add the products.</string>
+    <string name="order_new_search">Search a shop name or place</string>
+    <string name="order_new_needs_lpo">needs LPO</string>
+    <string name="order_new_empty">No shop found</string>
+    <string name="order_new_no_access">Only sales staff can book orders.</string>
+
+    <!-- Step 2: the booking -->
+    <string name="order_book_owes">%1$s: owes %2$s</string>
+    <string name="order_book_owes_nothing">%1$s: owes nothing</string>
+    <string name="order_book_no_companies">This shop does not buy from any of your companies.</string>
+    <string name="order_book_warehouse">Which warehouse?</string>
+    <string name="order_book_invoice">Invoice</string>
+    <string name="order_book_products">Products</string>
+    <string name="order_book_cartons">Cartons</string>
+    <string name="order_book_pieces">Pieces</string>
+    <string name="order_book_price">Price per carton</string>
+    <string name="order_book_amount">Amount %1$s</string>
+    <string name="order_book_remove">Remove</string>
+    <string name="order_book_add_product">Add a product</string>
+    <string name="order_book_search_product">Search a product</string>
+    <string name="order_book_no_products">No product found</string>
+    <string name="order_book_per_carton">%1$s pieces per carton</string>
+    <string name="order_book_lpo">LPO number for %1$s</string>
+    <string name="order_book_lpo_needed">Needed for this shop</string>
+    <string name="order_book_lpo_optional">If the shop gave one</string>
+    <string name="order_book_date">Delivery date</string>
+    <string name="order_book_note">Note for the warehouse</string>
+    <string name="order_book_note_hint">e.g. deliver before 2 pm</string>
+    <string name="order_book_totals">Totals</string>
+    <string name="order_book_before_vat">Before VAT</string>
+    <string name="order_book_vat">VAT %1$s%</string>
+    <string name="order_book_no_vat">No VAT</string>
+    <string name="order_book_total">Total</string>
+    <string name="order_book_two_invoices">%1$s invoices: one per company</string>
+    <string name="order_book_overall">Order total</string>
+    <string name="order_book_salesman">Salesman</string>
+    <string name="order_book_no_salesman">No salesman sells for these companies yet. The order is booked under your name.</string>
+    <string name="order_book_submit">Book order</string>
+
+    <!-- Problems found before sending -->
+    <string name="order_book_err_lines">Add at least one product.</string>
+    <string name="order_book_err_qty">Type the cartons or pieces for %1$s.</string>
+    <string name="order_book_err_price">Type the price for %1$s.</string>
+    <string name="order_book_err_lpo">Type the LPO number for %1$s.</string>
+    <string name="order_book_err_salesman">Choose the salesman.</string>
+    <string name="order_book_booked">Order %1$s booked.</string>
+</resources>

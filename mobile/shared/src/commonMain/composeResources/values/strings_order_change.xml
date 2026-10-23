@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="order_change_title">Change order</string>
+    <string name="order_change_help">Change the cartons, pieces or price. Products cannot be added here.</string>
+    <string name="order_change_cannot">This order cannot be changed now.</string>
+    <string name="order_change_number">%1$s · %2$s</string>
+    <string name="order_change_invoice">Invoice</string>
+    <string name="order_change_products">Products</string>
+    <string name="order_change_cartons">Cartons</string>
+    <string name="order_change_pieces">Pieces</string>
+    <string name="order_change_price">Price per carton</string>
+    <string name="order_change_per_carton">%1$s pieces in a carton</string>
+    <string name="order_change_amount">Amount %1$s</string>
+    <string name="order_change_lpo">LPO number for %1$s</string>
+    <string name="order_change_delivery_date">Delivery date</string>
+    <string name="order_change_note">Note for the warehouse</string>
+    <string name="order_change_totals">Totals</string>
+    <string name="order_change_subtotal">Subtotal</string>
+    <string name="order_change_vat">VAT %1$s%</string>
+    <string name="order_change_no_vat">No VAT</string>
+    <string name="order_change_total">Total</string>
+    <string name="order_change_order_total">Order total</string>
+    <string name="order_change_save">Save</string>
+    <string name="order_change_err_price">Type the price for %1$s.</string>
+    <string name="order_change_err_empty">An order needs at least one product. To stop the whole order, cancel it.</string>
+    <string name="order_change_nothing">Nothing changed.</string>
+    <string name="order_change_done">Order changed.</string>
+</resources>
