@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Planner plan screen: pick the vehicle and driver, tick open order lines, send to the warehouse -->
+    <string name="loading_pl_no_access">You cannot plan loading.</string>
+    <string name="loading_pl_not_sent_help">Not sent yet. Tick what goes on this vehicle, then send it to the warehouse.</string>
+    <string name="loading_pl_sent_help">Sent to the warehouse. You can still change it until they make the delivery note. They will be told about any change.</string>
+    <string name="loading_pl_sent_at">Sent %1$s</string>
+
+    <!-- Vehicle and driver -->
+    <string name="loading_pl_vehicle">Vehicle</string>
+    <string name="loading_pl_driver">Driver</string>
+    <string name="loading_pl_vehicle_with">%1$s · %2$s</string>
+    <string name="loading_pl_no_vehicle">No vehicle chosen yet</string>
+    <string name="loading_pl_no_driver">No driver chosen yet</string>
+
+    <!-- What is on the vehicle now -->
+    <string name="loading_pl_on_vehicle">On this vehicle</string>
+    <string name="loading_pl_nothing_on">Nothing on this vehicle yet. Tick cartons below.</string>
+    <string name="loading_pl_total_one_shop">%1$s for 1 shop</string>
+    <string name="loading_pl_total_shops">%1$s for %2$d shops</string>
+
+    <!-- Open orders, product by product -->
+    <string name="loading_pl_open_orders">Open orders, product by product</string>
+    <string name="loading_pl_open_help">Put all of a shop\'s open cartons on, or type a smaller number.</string>
+    <string name="loading_pl_no_open">No open orders for these companies.</string>
+    <string name="loading_pl_can_go">%1$s can go</string>
+    <string name="loading_pl_order_shop">%1$s · %2$s</string>
+    <string name="loading_pl_lpo">LPO %1$s</string>
+    <string name="loading_pl_all_on">Put all of it on</string>
+    <string name="loading_pl_cartons">Cartons</string>
+    <string name="loading_pl_pieces">Pieces</string>
+
+    <!-- Lines that dropped off because their order is no longer open -->
+    <string name="loading_pl_left_out">Left out</string>
+    <string name="loading_pl_left_out_help">These are still on the plan, but their order is not open any more. Take them off before you send it.</string>
+    <string name="loading_pl_left_out_row">%1$s · %2$s</string>
+    <string name="loading_pl_take_off">Take it off</string>
+
+    <!-- The warehouse own changes, with their reasons -->
+    <string name="loading_pl_wh_changes">Changes by the warehouse</string>
+
+    <!-- Saving, sending and deleting -->
+    <string name="loading_pl_save">Save</string>
+    <string name="loading_pl_save_changes">Save changes</string>
+    <string name="loading_pl_saving">Saving...</string>
+    <string name="loading_pl_saved">Saved.</string>
+    <string name="loading_pl_send">Send to the warehouse</string>
+    <string name="loading_pl_send_title">Send this plan to the warehouse?</string>
+    <string name="loading_pl_send_text">The warehouse will pick and load these products. You can still change the plan until they make the delivery note.</string>
+    <string name="loading_pl_send_yes">Yes, send it</string>
+    <string name="loading_pl_sent_ok">Sent to the warehouse.</string>
+    <string name="loading_pl_need_vehicle">Choose the vehicle and the driver first.</string>
+    <string name="loading_pl_need_orders">Tick what goes on this vehicle first.</string>
+    <string name="loading_pl_delete">Delete plan</string>
+    <string name="loading_pl_delete_title">Delete this plan?</string>
+    <string name="loading_pl_delete_text">The orders go back to waiting for a vehicle. This cannot be undone.</string>
+    <string name="loading_pl_delete_yes">Yes, delete it</string>
+    <string name="loading_pl_deleted">Plan deleted.</string>
+</resources>
