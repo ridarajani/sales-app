@@ -201,6 +201,44 @@ erDiagram
         text title
         text detail
     }
+    loading_plans ||--o{ loading_plan_items : "carries"
+    order_lines ||--o{ loading_plan_items : "planned on"
+    loading_plan_items ||--o{ loading_plan_item_batches : "loaded from"
+    loading_plans ||--o{ loading_plan_changes : "log"
+    vehicles ||--o{ loading_plans : "drives"
+    loading_plans {
+        int id PK
+        text number "LP-000123"
+        text facility_code FK
+        int vehicle_id FK
+        int driver_id FK
+        text status "planned, loaded, out, done"
+        timestamptz sent_at
+        text delivery_note_no "DN-000123"
+        text gate_pass_no "GP-000123"
+    }
+    loading_plan_items {
+        int id PK
+        int plan_id FK
+        int order_line_id FK
+        int pieces "planned"
+        int loaded
+    }
+    loading_plan_item_batches {
+        int item_id PK
+        int batch_id PK
+        int pieces
+    }
+    loading_plan_changes {
+        bigint id PK
+        int plan_id FK
+        bool by_warehouse
+        int product_id FK
+        int before
+        int after
+        text reason
+        bool seen
+    }
 ```
 
 | Table | Added in | What it holds |
@@ -230,6 +268,10 @@ erDiagram
 | `order_lines` | Phase 4 | Products on an order: quantity, typed price and how much was delivered |
 | `order_allocations` | Phase 4 | Stock set aside for each order line, per batch |
 | `order_events` | Phase 4 | The history of each order |
+| `loading_plans` | Phase 5 | One vehicle trip from one warehouse, with its delivery note and gate pass numbers |
+| `loading_plan_items` | Phase 5 | Order lines on a plan: pieces planned and pieces loaded |
+| `loading_plan_item_batches` | Phase 5 | Which batches each loaded item came from |
+| `loading_plan_changes` | Phase 5 | Every quantity change on a plan, with the warehouse's reason |
 
 ## Phase 1 notes
 
@@ -281,3 +323,14 @@ erDiagram
 - **Who:** a salesman books and sees only their own orders, and can change or cancel them while open. A sales manager or admin books for their companies, can name the salesman, and can change, hold, release, cancel and close any order of their companies. Management, warehouse, cashier and accounts see orders of their companies. Drivers do not see orders.
 - **Owes:** the booking screen shows what the customer owes each company. Until invoices and payments exist (Phase 6) this is the opening balance. There is no credit check (client, 7 Oct).
 - **Audit actions:** `order_booked`, `order_changed`, `order_held`, `order_released`, `order_cancelled`, `order_closed`.
+
+## Phase 5 notes
+
+- **A loading plan** is one vehicle from one warehouse. It can carry many customers' orders from both companies of that warehouse. Plans are numbered `LP-000001`; loading makes one delivery note `DN-000001` and one gate pass `GP-000001` per plan.
+- **Statuses:** `planned` (being made; `sent_at` is set once it goes to the warehouse), `loaded` (stock has left the shelves), `out` (the vehicle left the gate), `done` (every drop confirmed, Phase 6).
+- **Who:** Admin, Management and sales managers make and send plans for their warehouse. Admin and Warehouse change quantities, load and let the vehicle out. A driver sees only their own plans once loaded. Salesmen never see plans. Accounts and Cashier can look.
+- **Quantities** are pieces. A plan never carries more of an order line than is still open: ordered − delivered − on a vehicle − on other plans. Orders on hold cannot be added. Putting an order on hold, or cancelling or closing it, takes it off plans that are not loaded yet.
+- **Warehouse changes** are per product and need a reason. Less comes off the last orders first. More fills the plan's orders up to what they still have open; anything that does not fit is reported back. Changes after sending show as new to the other side until seen (`loading_plan_changes.seen`).
+- **Loading** takes stock off the shelves (`stock_movements.kind = 'loaded'`): first from the batches set aside for that order, then from free stock with enough shelf life. What is not on the shelves is not loaded and stays open on the order. `order_lines.on_vehicle` counts pieces on a vehicle and not yet delivered; the order's reservation is worked out again for what is left.
+- **Order stage:** orders now show a `stage` worked out from their lines: `open`, `planned`, `on_vehicle` or `part_delivered` (or the order's status when it is on hold, done or cancelled). An order cannot drop below what is planned, loaded or delivered, and cannot be cancelled or closed while part of it is on a vehicle.
+- **Audit actions:** `loading_plan_started`, `loading_plan_changed`, `loading_plan_sent`, `loading_plan_changed_by_warehouse`, `loading_plan_loaded`, `loading_plan_out`, `loading_plan_deleted`.

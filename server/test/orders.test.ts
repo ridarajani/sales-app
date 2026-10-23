@@ -58,11 +58,11 @@ beforeAll(async () => {
   await addUser({ name: 'Store', phone: '0994000005', role: 'warehouse', companies: ['LV', 'ZT'] });
   await addUser({ name: 'Books', phone: '0994000006', role: 'accounts', companies: ['LV', 'ZT', 'ZF', 'GL'] });
   await addUser({ name: 'Driver', phone: '0994000007', role: 'driver', companies: ['LV', 'ZT', 'ZF', 'GL'] });
-  [manager, manager2, seller, seller2, store, accounts, driver] = await Promise.all(
+  [manager, manager2, seller, seller2, store, accounts, driver] = (await Promise.all(
     ['0994000001', '0994000002', '0994000003', '0994000004', '0994000005', '0994000006', '0994000007'].map(
       async (phone) => (await login(app, phone, '1111')).token,
     ),
-  );
+  )) as [string, string, string, string, string, string, string];
   milk = await addProduct('LV-MILK', 'LV', 12);
   tea = await addProduct('ZT-TEA', 'ZT', 40);
   cookies = await addProduct('GL-COOK', 'GL', 10);

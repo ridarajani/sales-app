@@ -122,7 +122,7 @@ function assertCanChange(user: AuthUser, order: OrderHead) {
 const notLive = (status: string) =>
   new HttpError(409, 'order_closed', status === 'cancelled' ? 'This order was cancelled.' : 'This order is already closed.');
 
-async function addEvent(client: PoolClient, orderId: number, userId: number, title: string, detail = '') {
+export async function addEvent(client: PoolClient, orderId: number, userId: number, title: string, detail = '') {
   await client.query('insert into order_events (order_id, user_id, title, detail) values ($1, $2, $3, $4)', [orderId, userId, title, detail]);
   await client.query('update orders set updated_at = now() where id = $1', [orderId]);
 }
@@ -131,13 +131,49 @@ async function releaseStock(client: PoolClient, orderId: number) {
   await client.query('delete from order_allocations where line_id in (select id from order_lines where order_id = $1)', [orderId]);
 }
 
+// Pieces of each line on loading plans that have not been loaded yet.
+export const PLANNED_SQL = (line: string) =>
+  `coalesce((select sum(i.pieces) from loading_plan_items i join loading_plans lp on lp.id = i.plan_id
+     where i.order_line_id = ${line} and lp.status = 'planned'), 0)::int`;
+
+// Takes an order off every loading plan that is not loaded yet (on hold, cancel or close).
+// A plan already sent to the warehouse shows the change as new. The caller holds the order's lock; plan code
+// takes order locks too before changing items, so plans and orders never wait on each other the other way round.
+export async function dropFromPlans(client: PoolClient, orderId: number, userId: number) {
+  const { rows } = await client.query<{ itemId: number; planId: number; lineId: number; productId: number; pieces: number; sent: boolean }>(
+    `select i.id as "itemId", i.plan_id as "planId", l.id as "lineId", l.product_id as "productId", i.pieces, lp.sent_at is not null as sent
+     from loading_plan_items i join loading_plans lp on lp.id = i.plan_id join order_lines l on l.id = i.order_line_id
+     where l.order_id = $1 and lp.status = 'planned' order by i.plan_id`,
+    [orderId],
+  );
+  for (const r of rows) {
+    await client.query('delete from loading_plan_items where id = $1', [r.itemId]);
+    await client.query(
+      `insert into loading_plan_changes (plan_id, user_id, product_id, order_line_id, before, after, reason, seen)
+       values ($1, $2, $3, $4, $5, 0, 'Order taken off the plan', $6)`,
+      [r.planId, userId, r.productId, r.lineId, r.pieces, !r.sent],
+    );
+  }
+  return rows.length > 0;
+}
+
+// Where an open order stands, worked out from its lines.
+export function stageOf(status: string, t: { onVehicle: number; planned: number; delivered: number }) {
+  if (status !== 'open') return status;
+  if (t.onVehicle > 0) return 'on_vehicle';
+  if (t.planned > 0) return 'planned';
+  if (t.delivered > 0) return 'part_delivered';
+  return 'open';
+}
+
 // Sets stock aside for every line still to deliver, oldest expiry first, skipping batches with too little shelf life left.
 // Starts again from nothing each time, so a line that was short picks up stock received since.
 // Returns how many pieces could not be reserved.
-async function reserveStock(client: PoolClient, orderId: number, channel: Channel): Promise<number> {
+export async function reserveStock(client: PoolClient, orderId: number, channel: Channel): Promise<number> {
   await releaseStock(client, orderId);
   const { rows: lines } = await client.query<{ id: number; productId: number; need: number }>(
-    `select id, product_id as "productId", pieces - delivered as need from order_lines where order_id = $1 and pieces > delivered order by id`,
+    `select id, product_id as "productId", pieces - delivered - on_vehicle as need from order_lines
+     where order_id = $1 and pieces > delivered + on_vehicle order by id`,
     [orderId],
   );
   if (lines.length === 0) return 0;
@@ -179,6 +215,8 @@ type LineRow = {
   pieces: number;
   pricePerCarton: number;
   delivered: number;
+  onVehicle: number;
+  planned: number;
   reserved: number;
 };
 type CompanyRow = { code: string; name: string; lpoNo: string; vatRate: number };
@@ -196,7 +234,7 @@ export async function orderDetail(db: Db | PoolClient, user: AuthUser, orderId: 
          where oc.order_id = o.id and oc.company_code = any($1)), '[]') as companies,
        coalesce((select json_agg(json_build_object('id', l.id, 'productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
            'packSize', p.pack_size, 'companyCode', p.company_code, 'piecesPerCarton', p.pieces_per_carton, 'pieces', l.pieces,
-           'pricePerCarton', l.price_per_carton, 'delivered', l.delivered,
+           'pricePerCarton', l.price_per_carton, 'delivered', l.delivered, 'onVehicle', l.on_vehicle, 'planned', ${PLANNED_SQL('l.id')},
            'reserved', coalesce((select sum(a.pieces) from order_allocations a where a.line_id = l.id), 0)) order by l.id)
          from order_lines l join products p on p.id = l.product_id
          where l.order_id = o.id and p.company_code = any($1)), '[]') as lines,
@@ -213,8 +251,8 @@ export async function orderDetail(db: Db | PoolClient, user: AuthUser, orderId: 
     ...l,
     ...split(l.pieces, l.piecesPerCarton),
     amount: lineAmount(l.pieces, l.pricePerCarton, l.piecesPerCarton),
-    // Pieces still to deliver that have no stock set aside yet.
-    shortPieces: live ? Math.max(0, l.pieces - l.delivered - l.reserved) : 0,
+    // Pieces still to deliver that are neither on a vehicle nor set aside in the warehouse.
+    shortPieces: live ? Math.max(0, l.pieces - l.delivered - l.onVehicle - l.reserved) : 0,
   }));
   const companies = (o.companies as CompanyRow[]).map((c) => {
     const subtotal = lines.filter((l) => l.companyCode === c.code).reduce((t, l) => t + l.amount, 0);
@@ -230,8 +268,10 @@ export async function orderDetail(db: Db | PoolClient, user: AuthUser, orderId: 
       return false;
     }
   })();
+  const total = (k: 'onVehicle' | 'planned' | 'delivered') => lines.reduce((t, l) => t + l[k], 0);
   return {
     ...o,
+    stage: stageOf(o.status, { onVehicle: total('onVehicle'), planned: total('planned'), delivered: total('delivered') }),
     companies,
     lines,
     subtotal: sum('subtotal'),
@@ -417,6 +457,9 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
       invoiceType: string;
       companies: { code: string; vatRate: number; lpoNo: string; subtotal: number }[];
       shortPieces: number;
+      onVehicle: number;
+      planned: number;
+      delivered: number;
     }>(
       `select o.id, o.number, o.status, o.invoice_type as "invoiceType", to_char(o.wanted_on, 'YYYY-MM-DD') as "wantedOn",
          o.created_at as "createdAt", o.customer_id as "customerId", c.name as "customerName", c.area, s.name as "salesmanName",
@@ -428,20 +471,23 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
            from order_companies oc join companies co on co.code = oc.company_code
            where oc.order_id = o.id and oc.company_code = any($1)), '[]') as companies,
          case when o.status in ('open', 'hold') then
-           (select coalesce(sum(l.pieces - l.delivered), 0) from order_lines l where l.order_id = o.id)
+           (select coalesce(sum(l.pieces - l.delivered - l.on_vehicle), 0) from order_lines l where l.order_id = o.id)
            - (select coalesce(sum(a.pieces), 0) from order_allocations a join order_lines l on l.id = a.line_id where l.order_id = o.id)
-         else 0 end::int as "shortPieces"
+         else 0 end::int as "shortPieces",
+         (select coalesce(sum(l.on_vehicle), 0) from order_lines l where l.order_id = o.id)::int as "onVehicle",
+         (select coalesce(sum(l.delivered), 0) from order_lines l where l.order_id = o.id)::int as delivered,
+         (select coalesce(sum(${PLANNED_SQL('l.id')}), 0) from order_lines l where l.order_id = o.id)::int as planned
        from orders o join customers c on c.id = o.customer_id left join users s on s.id = o.salesman_id
        where ${where}
        order by o.id desc limit 300`,
       params,
     );
-    return rows.map(({ companies, ...o }) => {
+    return rows.map(({ companies, onVehicle, planned, delivered, ...o }) => {
       const total = companies.reduce((t, c) => {
         const subtotal = Number(c.subtotal);
         return t + subtotal + (o.invoiceType === 'vat' ? Math.round((subtotal * Number(c.vatRate)) / 100) : 0);
       }, 0);
-      return { ...o, companies: companies.map((c) => ({ code: c.code, lpoNo: c.lpoNo })), total };
+      return { ...o, stage: stageOf(o.status, { onVehicle, planned, delivered }), companies: companies.map((c) => ({ code: c.code, lpoNo: c.lpoNo })), total };
     });
   });
 
@@ -468,12 +514,13 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
           id: number;
           pieces: number;
           delivered: number;
+          taken: number;
           pricePerCarton: number;
           piecesPerCarton: number;
           companyCode: string;
           label: string;
         }>(
-          `select l.id, l.pieces, l.delivered, l.price_per_carton as "pricePerCarton", p.pieces_per_carton as "piecesPerCarton",
+          `select l.id, l.pieces, l.delivered, l.delivered + l.on_vehicle + ${PLANNED_SQL('l.id')} as taken, l.price_per_carton as "pricePerCarton", p.pieces_per_carton as "piecesPerCarton",
              p.company_code as "companyCode", p.brand || ' ' || p.name || ' ' || p.pack_size as label
            from order_lines l join products p on p.id = l.product_id where l.order_id = $1`,
           [order.id],
@@ -487,6 +534,9 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
           const pieces = totalPieces(e, line.piecesPerCarton);
           if (pieces < line.delivered) {
             throw invalid(`${line.label}: ${qtyText(line.delivered, line.piecesPerCarton)} has already been delivered. The order cannot be less.`);
+          }
+          if (pieces < line.taken) {
+            throw invalid(`${line.label}: ${qtyText(line.taken, line.piecesPerCarton)} is already on a loading plan or vehicle. The order cannot be less.`);
           }
           after.set(line.id, pieces);
           if (pieces !== line.pieces) {
@@ -570,11 +620,13 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
         const order = await lockOrder(client, user, id);
         if (!LIVE.includes(order.status)) throw notLive(order.status);
         assertCanChange(user, order);
-        const { rows } = await client.query<{ delivered: number; left: number }>(
-          `select coalesce(sum(delivered), 0)::int as delivered, coalesce(sum(pieces - delivered), 0)::int as left from order_lines where order_id = $1`,
+        const { rows } = await client.query<{ delivered: number; onVehicle: number }>(
+          `select coalesce(sum(delivered), 0)::int as delivered, coalesce(sum(on_vehicle), 0)::int as "onVehicle" from order_lines where order_id = $1`,
           [order.id],
         );
-        const { delivered } = rows[0]!;
+        const { delivered, onVehicle } = rows[0]!;
+        const onVehicleError = () =>
+          new HttpError(409, 'on_vehicle', 'Part of this order is on a vehicle. Wait until the delivery is confirmed.');
         let status = order.status;
         let title: string;
         let detail: string;
@@ -582,7 +634,10 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
           if (order.status === 'hold') throw new HttpError(409, 'already_on_hold', 'This order is already on hold.');
           status = 'hold';
           title = 'Put on hold';
-          detail = 'Cannot be loaded until released. Stock stays reserved.';
+          const offPlans = await dropFromPlans(client, order.id, user.id);
+          detail = offPlans
+            ? 'Taken off the loading plan. Cannot be loaded until released. Stock stays reserved.'
+            : 'Cannot be loaded until released. Stock stays reserved.';
         } else if (action === 'release') {
           if (order.status !== 'hold') throw new HttpError(409, 'not_on_hold', 'This order is not on hold.');
           status = 'open';
@@ -591,14 +646,18 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
           detail = short ? 'Can be loaded again. Not all of it is in stock.' : 'Can be loaded again.';
         } else if (action === 'cancel') {
           if (delivered > 0) throw new HttpError(409, 'part_delivered', 'Part of this order has been delivered. Close it instead of cancelling.');
+          if (onVehicle > 0) throw onVehicleError();
           status = 'cancelled';
           title = 'Cancelled';
+          await dropFromPlans(client, order.id, user.id);
           await releaseStock(client, order.id);
           detail = 'Reserved stock released.';
         } else {
           if (delivered === 0) throw new HttpError(409, 'nothing_delivered', 'Nothing has been delivered yet. Cancel the order instead.');
+          if (onVehicle > 0) throw onVehicleError();
           status = 'done';
           title = 'Closed';
+          await dropFromPlans(client, order.id, user.id);
           await releaseStock(client, order.id);
           detail = 'The rest of the order will not be delivered. Its reserved stock was released.';
         }
