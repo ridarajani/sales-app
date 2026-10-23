@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home tiles -->
+    <string name="tile_loading">Loading</string>
+    <string name="tile_loading_sub">Vehicles and what goes on them</string>
+    <string name="tile_my_trips">My trips</string>
+    <string name="tile_my_trips_sub">Vehicles you drive</string>
+
+    <!-- Plan status pills -->
+    <string name="loading_status_planned">Planned</string>
+    <string name="loading_status_loaded">Loaded</string>
+    <string name="loading_status_out">On the road</string>
+    <string name="loading_status_done">Done</string>
+    <string name="loading_sent">Sent</string>
+    <string name="loading_not_sent">Not sent</string>
+    <string name="loading_new_changes">New changes</string>
+
+    <!-- Quantities -->
+    <string name="loading_carton_one">1 carton</string>
+    <string name="loading_cartons">%1$d cartons</string>
+    <string name="loading_piece_one">1 piece</string>
+    <string name="loading_pieces">%1$d pieces</string>
+    <string name="loading_cartons_and_pieces">%1$s + %2$s</string>
+
+    <!-- Changes banner -->
+    <string name="loading_changes_from_warehouse">New changes from the warehouse</string>
+    <string name="loading_changes_from_planner">New changes from the planner</string>
+    <string name="loading_change_amount">%1$s: %2$s → %3$s</string>
+    <string name="loading_change_by">%1$s · %2$s</string>
+    <string name="loading_change_reason">Reason: “%1$s”</string>
+    <string name="loading_seen">OK, seen</string>
+</resources>

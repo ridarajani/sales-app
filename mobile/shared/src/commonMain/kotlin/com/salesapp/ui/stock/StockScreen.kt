@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,8 @@ import com.salesapp.resources.stock_qty
 import com.salesapp.resources.stock_receive
 import com.salesapp.resources.stock_search_hint
 import com.salesapp.resources.stock_title
+import com.salesapp.resources.stock_transit_free
+import com.salesapp.resources.stock_transit_in_transit
 import com.salesapp.ui.components.CompanyDot
 import com.salesapp.ui.components.EmptyState
 import com.salesapp.ui.components.ErrorState
@@ -42,6 +45,7 @@ import com.salesapp.ui.components.SearchField
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.loading.splitText
 import com.salesapp.ui.theme.SalesTheme
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -147,15 +151,34 @@ private fun StockRow(product: StockProduct, onClick: () -> Unit) {
                 color = scheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
+            TransitLines(product.inTransit, product.free, product.piecesPerCarton)
             product.nearestExpiry?.let { ExpiryLine(it) }
         }
     }
 }
 
+// "In transit 2 cartons" when some is loaded on a vehicle, then "Free 8 cartons" (what is on the shelf and not set aside).
+@Composable
+internal fun TransitLines(inTransit: Int, free: Int, piecesPerCarton: Int) {
+    val scheme = MaterialTheme.colorScheme
+    if (inTransit > 0) {
+        Text(
+            stringResource(Res.string.stock_transit_in_transit, splitText(inTransit, piecesPerCarton)),
+            color = scheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Text(
+        stringResource(Res.string.stock_transit_free, splitText(free, piecesPerCarton)),
+        color = scheme.onSurface,
+        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+    )
+}
+
 private val sampleStock = listOf(
-    StockProduct(1, "LV-KG-400", "LV", "Kerrygold", "Milk powder tin", "400g tin", 24, 250, 250, 10, 10, "2026-12-01", listOf(StockBatch(1, "B1", "2026-12-01", 250, 250, 10, 10))),
-    StockProduct(2, "LV-KG-075", "LV", "Kerrygold", "Milk powder sachet", "7.5g x 400", 400, 800, 800, 2, 0, "2020-01-01"),
-    StockProduct(3, "ZF-SU-001", "ZF", "Sunrise", "Cooking oil", "2 litre bottle", 6, 60, 60, 10, 0, "2099-01-01"),
+    StockProduct(1, "LV-KG-400", "LV", "Kerrygold", "Milk powder tin", "400g tin", 24, 250, 250, 10, 10, "2026-12-01", listOf(StockBatch(1, "B1", "2026-12-01", 250, 250, 10, 10, inTransit = 48, reserved = 60, free = 142)), inTransit = 48, reserved = 60, free = 142),
+    StockProduct(2, "LV-KG-075", "LV", "Kerrygold", "Milk powder sachet", "7.5g x 400", 400, 800, 800, 2, 0, "2020-01-01", free = 800),
+    StockProduct(3, "ZF-SU-001", "ZF", "Sunrise", "Cooking oil", "2 litre bottle", 6, 60, 60, 10, 0, "2099-01-01", inTransit = 12, reserved = 10, free = 38),
 )
 
 @Preview

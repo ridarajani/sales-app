@@ -115,6 +115,7 @@ fun HomeScreen(state: HomeState, onEvent: (HomeEvent) -> Unit) {
                             sub = tile.subText ?: stringResource(tile.subRes),
                             icon = tile.icon,
                             primary = rowIndex == 0 && colIndex == 0,
+                            count = tile.count,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             onClick = { onEvent(HomeEvent.OpenTile(tile)) },
                         )

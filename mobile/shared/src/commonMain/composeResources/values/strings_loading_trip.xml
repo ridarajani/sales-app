@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Trip view: one loading plan as the driver and read-only viewers see it -->
+    <string name="loading_trip_driver">Driver %1$s</string>
+    <string name="loading_trip_delivery_note">Delivery note %1$s</string>
+    <string name="loading_trip_gate_pass">Gate pass %1$s</string>
+    <string name="loading_trip_left_at">Left at %1$s</string>
+    <string name="loading_trip_drops">Drops</string>
+    <string name="loading_trip_products">Products</string>
+    <string name="loading_trip_orders">Orders %1$s</string>
+    <string name="loading_trip_line_lpo">%1$s · LPO %2$s</string>
+    <string name="loading_trip_shop_total">Total %1$s</string>
+    <string name="loading_trip_no_drops">Nothing is on this vehicle yet.</string>
+    <string name="loading_trip_later">Delivery confirmation comes later.</string>
+</resources>

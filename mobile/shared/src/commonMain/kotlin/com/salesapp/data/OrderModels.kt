@@ -20,6 +20,8 @@ data class OrderListItem(
     val companies: List<OrderCompanyRef> = emptyList(),
     val shortPieces: Int = 0,
     val total: Long = 0,
+    // open, planned, on_vehicle, part_delivered; or the status itself (hold, done, cancelled) when not open.
+    val stage: String = "open",
 )
 
 @Serializable
@@ -112,6 +114,8 @@ data class OrderDetail(
     val shortPieces: Int = 0,
     val canChange: Boolean = false,
     val canManage: Boolean = false,
+    // open, planned, on_vehicle, part_delivered; or the status itself (hold, done, cancelled) when not open.
+    val stage: String = "open",
 )
 
 // vatRate is 0 on a plain invoice.
@@ -145,6 +149,9 @@ data class OrderLine(
     val loosePieces: Int = 0,
     val amount: Long = 0,
     val shortPieces: Int = 0,
+    // Pieces loaded on a vehicle and not yet delivered, and pieces on a plan not yet loaded.
+    val onVehicle: Int = 0,
+    val planned: Int = 0,
 )
 
 @Serializable

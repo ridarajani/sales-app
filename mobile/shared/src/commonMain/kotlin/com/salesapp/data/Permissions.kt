@@ -43,3 +43,23 @@ fun User.picksSalesman(): Boolean = role == "admin" || role == "sales_manager"
 
 // Salesmen never see stock: no Short pill, no "not in stock yet", no Reserve again.
 fun User.seesOrderStock(): Boolean = role != "salesman"
+
+// Loading plans. These mirror PLAN_VIEWERS, PLANNERS and LOADERS on the server. Salesmen never see plans.
+fun User.canSeePlans(): Boolean = role in setOf("admin", "management", "sales_manager", "warehouse", "driver", "accounts", "cashier")
+
+fun User.canPlanLoading(): Boolean = role == "admin" || role == "management" || role == "sales_manager"
+
+fun User.canLoadVehicles(): Boolean = role == "admin" || role == "warehouse"
+
+// Who is told about changes from the other side and may say "OK, seen".
+fun User.seesPlanChanges(): Boolean = role == "admin" || role == "management" || role == "sales_manager" || role == "warehouse"
+
+// Whether a plan change counts as new for this user: the warehouse hears about planner changes,
+// admin about every change, everyone else about warehouse changes. Same rule as the server.
+fun User.isNewFor(byWarehouse: Boolean): Boolean = when (role) {
+    "warehouse" -> !byWarehouse
+    "admin" -> true
+    else -> byWarehouse
+}
+
+fun User.isDriver(): Boolean = role == "driver"
