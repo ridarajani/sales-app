@@ -595,6 +595,7 @@ export function loadingRoutes(app: FastifyInstance, db: Db) {
 
   // Loading: stock leaves the shelves, oldest expiry first, from what each order had set aside, and the
   // delivery note and gate pass get their numbers. What cannot be found on the shelves stays on the order.
+  // The client wants stock reduced only on delivery (7 Oct), so loaded stock moves to in transit; Phase 6 deducts it.
   app.post('/loading-plans/:id/load', { onRequest: auth, preHandler: loaders }, async (request) => {
     const { id: planId } = parse(idParams, request.params);
     const user = request.user;
@@ -628,11 +629,11 @@ export function loadingRoutes(app: FastifyInstance, db: Db) {
       if (items.length === 0) throw invalid('Nothing to load. The plan is empty.');
 
       // Lock every batch of these products in id order, like reserving does.
-      const { rows: batches } = await client.query<{ id: number; productId: number; expiryDate: string; onHand: number; daysLeft: number; reserved: number }>(
-        `select b.id, b.product_id as "productId", to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate", b.on_hand as "onHand",
+      const { rows: batches } = await client.query<{ id: number; productId: number; expiryDate: string; shelf: number; daysLeft: number; reserved: number }>(
+        `select b.id, b.product_id as "productId", to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate", b.on_hand - b.in_transit as shelf,
            (b.expiry_date - ${TODAY}) as "daysLeft",
            coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0)::int as reserved
-         from stock_batches b where b.product_id = any($1) and b.on_hand > 0 order by b.id for update of b`,
+         from stock_batches b where b.product_id = any($1) and b.on_hand > b.in_transit order by b.id for update of b`,
         [[...new Set(items.map((i) => i.productId))]],
       );
       const byBatch = new Map(batches.map((b) => [b.id, b]));
@@ -653,13 +654,13 @@ export function loadingRoutes(app: FastifyInstance, db: Db) {
           if (need === 0) break;
           const b = byBatch.get(a.batchId);
           if (!b) continue;
-          const take = Math.min(need, a.pieces, b.onHand);
+          const take = Math.min(need, a.pieces, b.shelf);
           if (take <= 0) continue;
           if (take === a.pieces) await client.query('delete from order_allocations where line_id = $1 and batch_id = $2', [it.lineId, a.batchId]);
           else {
             await client.query('update order_allocations set pieces = pieces - $3 where line_id = $1 and batch_id = $2', [it.lineId, a.batchId, take]);
           }
-          b.onHand -= take;
+          b.shelf -= take;
           b.reserved -= take;
           taken.set(b.id, (taken.get(b.id) ?? 0) + take);
           need -= take;
@@ -668,19 +669,15 @@ export function loadingRoutes(app: FastifyInstance, db: Db) {
         for (const b of oldestFirst) {
           if (need === 0) break;
           if (b.productId !== it.productId || b.daysLeft < MIN_SHELF_DAYS[it.channel]) continue;
-          const take = Math.min(need, b.onHand - Math.max(0, b.reserved));
+          const take = Math.min(need, b.shelf - Math.max(0, b.reserved));
           if (take <= 0) continue;
-          b.onHand -= take;
+          b.shelf -= take;
           taken.set(b.id, (taken.get(b.id) ?? 0) + take);
           need -= take;
         }
         const loaded = it.pieces - need;
         for (const [batchId, pieces] of taken) {
-          await client.query('update stock_batches set on_hand = on_hand - $2 where id = $1', [batchId, pieces]);
-          await client.query(
-            `insert into stock_movements (batch_id, change, kind, plan_id, user_id) values ($1, $2, 'loaded', $3, $4)`,
-            [batchId, -pieces, plan.id, user.id],
-          );
+          await client.query('update stock_batches set in_transit = in_transit + $2 where id = $1', [batchId, pieces]);
           await client.query('insert into loading_plan_item_batches (item_id, batch_id, pieces) values ($1, $2, $3)', [it.itemId, batchId, pieces]);
         }
         if (loaded === 0) await client.query('delete from loading_plan_items where id = $1', [it.itemId]);

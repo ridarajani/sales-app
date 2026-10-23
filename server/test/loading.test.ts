@@ -198,7 +198,7 @@ test('putting an order on hold takes it off the plan', async () => {
   await post(app, manager, `/orders/${orderB}/release`);
 });
 
-test('loading takes stock off the shelves, oldest first, and makes the delivery note and gate pass', async () => {
+test('loading takes stock off the shelves into transit, oldest first, and makes the delivery note and gate pass', async () => {
   expect((await post(app, manager, `/loading-plans/${planId}/load`)).statusCode).toBe(403);
   const r = await post(app, store, `/loading-plans/${planId}/load`);
   expect(r.statusCode).toBe(200);
@@ -208,14 +208,20 @@ test('loading takes stock off the shelves, oldest first, and makes the delivery 
   expect(p.products[0]).toMatchObject({ code: 'LV-MILK', loaded: 24 });
   expect(p.products[0].batches.map((b: { batchNo: string; pieces: number }) => [b.batchNo, b.pieces])).toEqual([['M-1', 24]]);
 
-  // 120 tins less on the shelves (10 cartons received, 2 loaded); shop A's third carton stays reserved.
-  expect(await milkStock()).toMatchObject({ onHand: 96, reserved: 36 });
+  // Stock is only reduced on delivery (client, 7 Oct): the 2 loaded cartons are in transit, still counted.
+  // Shop A's third carton and shop B's two stay reserved.
+  expect(await milkStock()).toMatchObject({ onHand: 120, inTransit: 24, reserved: 36, free: 60 });
   const a = await order(orderA);
   expect(a.stage).toBe('on_vehicle');
   expect(a.lines.find((l: { productId: number }) => l.productId === milk)).toMatchObject({ onVehicle: 24, reserved: 12, shortPieces: 0 });
   expect(a.history.at(-1)).toMatchObject({ title: 'Loaded', detail: 'On LL 1234 · delivery note DN-000001' });
-  const moves = (await get(app, store, `/stock/batches/${p.products[0].batches[0].batchId}/movements`)).json();
-  expect(moves[0]).toMatchObject({ kind: 'loaded', change: -24 });
+  const m1 = (await milkStock()).batches.find((b: { batchNo: string }) => b.batchNo === 'M-1');
+  expect(m1).toMatchObject({ onHand: 48, inTransit: 24 });
+  // In-transit stock is not on the shelf, so it cannot be written off or counted away.
+  const lost = await post(app, store, '/stock/adjustments', { batchId: m1.id, reason: 'lost', pieces: 25 });
+  expect(lost.json().message).toBe('Only 24 pieces of this batch are in stock.');
+  const count = await post(app, store, '/stock/counts', { companyCode: 'LV', lines: [{ batchId: m1.id, pieces: 24 }] });
+  expect(count.json().differences).toEqual([]);
 
   // Nothing about a loaded plan can change, and the order cannot be cancelled while on the vehicle.
   expect((await send('PUT', manager, `/loading-plans/${planId}/items`, { note: 'x' })).statusCode).toBe(409);
@@ -246,12 +252,14 @@ test('what is not on the shelves is not loaded and stays on the order', async ()
   const stock = await milkStock();
   for (const b of stock.batches) {
     const keep = b.batchNo === 'M-2' ? 12 : 0;
-    if (b.onHand > keep) await post(app, admin, '/stock/adjustments', { batchId: b.id, reason: 'lost', pieces: b.onHand - keep });
+    const shelf = b.onHand - b.inTransit;
+    if (shelf > keep) expect((await post(app, admin, '/stock/adjustments', { batchId: b.id, reason: 'lost', pieces: shelf - keep })).statusCode).toBe(200);
   }
   const r = (await post(app, store, `/loading-plans/${p2.id}/load`)).json();
   expect(r.notLoaded).toEqual([{ product: 'Test LV-MILK x', pieces: 12, cartons: 1, loosePieces: 0 }]);
   expect(r.products[0]).toMatchObject({ loaded: 12 });
   const b = await order(orderB);
   expect(b.lines[0]).toMatchObject({ onVehicle: 12, reserved: 0, shortPieces: 12 });
-  expect((await milkStock()).onHand).toBe(0);
+  // Nothing left on the shelves; what is on the two vehicles is still counted until delivered.
+  expect(await milkStock()).toMatchObject({ onHand: 36, inTransit: 36, free: 0 });
 });

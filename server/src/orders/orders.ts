@@ -180,9 +180,9 @@ export async function reserveStock(client: PoolClient, orderId: number, channel:
   // Lock every batch of these products in id order, so two orders at once cannot deadlock or reserve the same pieces.
   const { rows: batches } = await client.query<{ id: number; productId: number; expiryDate: string; free: number }>(
     `select b.id, b.product_id as "productId", to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate",
-       b.on_hand - coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0)::int as free
+       b.on_hand - b.in_transit - coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0)::int as free
      from stock_batches b
-     where b.product_id = any($1) and b.on_hand > 0 and b.expiry_date >= ${TODAY} + $2::int
+     where b.product_id = any($1) and b.on_hand > b.in_transit and b.expiry_date >= ${TODAY} + $2::int
      order by b.id for update of b`,
     [[...new Set(lines.map((l) => l.productId))], MIN_SHELF_DAYS[channel]],
   );

@@ -63,7 +63,7 @@ alter table order_lines add column on_vehicle int not null default 0 check (on_v
 alter table order_lines drop constraint order_lines_check;
 alter table order_lines add constraint order_lines_check check (delivered >= 0 and delivered + on_vehicle <= pieces);
 
--- Loading takes stock off the shelves.
-alter table stock_movements drop constraint stock_movements_kind_check;
-alter table stock_movements add constraint stock_movements_kind_check check (kind in ('received', 'adjusted', 'counted', 'loaded'));
-alter table stock_movements add column plan_id int references loading_plans(id);
+-- Loading does not reduce stock (client, 7 Oct): loaded pieces stay in on_hand as in transit until the
+-- delivery is confirmed (Phase 6). What is on the shelf is on_hand - in_transit.
+alter table stock_batches add column in_transit int not null default 0 check (in_transit >= 0);
+alter table stock_batches add constraint stock_batches_in_transit_on_hand_check check (in_transit <= on_hand);

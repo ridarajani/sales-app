@@ -84,11 +84,13 @@ type BatchRow = {
   batchNo: string;
   expiryDate: string;
   onHand: number;
+  inTransit: number;
   piecesPerCarton: number;
 };
 
 const batchSelect = `select b.id, b.product_id as "productId", p.company_code as "companyCode", b.batch_no as "batchNo",
-    to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate", b.on_hand as "onHand", p.pieces_per_carton as "piecesPerCarton"
+    to_char(b.expiry_date, 'YYYY-MM-DD') as "expiryDate", b.on_hand as "onHand", b.in_transit as "inTransit",
+    p.pieces_per_carton as "piecesPerCarton"
   from stock_batches b join products p on p.id = b.product_id`;
 
 const totalPieces = (q: { cartons: number; pieces: number }, piecesPerCarton: number) => q.cartons * piecesPerCarton + q.pieces;
@@ -109,7 +111,9 @@ async function lockBatch(client: PoolClient, user: { companies: string[] }, batc
   return rows[0];
 }
 
-const notEnough = (onHand: number) => new HttpError(409, 'not_enough_stock', `Only ${onHand} pieces of this batch are in stock.`);
+// Loaded stock is still counted until it is delivered, but it is not on the shelf to take off.
+const onShelf = (b: { onHand: number; inTransit: number }) => b.onHand - b.inTransit;
+const notEnough = (shelf: number) => new HttpError(409, 'not_enough_stock', `Only ${shelf} pieces of this batch are in stock.`);
 
 async function applyChange(
   client: PoolClient,
@@ -185,16 +189,18 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
       onHand: number;
       nearestExpiry: string | null;
       reserved: number;
-      batches: { id: number; batchNo: string; expiryDate: string; onHand: number; reserved: number }[];
+      inTransit: number;
+      batches: { id: number; batchNo: string; expiryDate: string; onHand: number; inTransit: number; reserved: number }[];
     }>(
       `select p.id as "productId", p.code, p.company_code as "companyCode", p.brand, p.name, p.pack_size as "packSize",
          p.pieces_per_carton as "piecesPerCarton",
          coalesce((select sum(b.on_hand) from stock_batches b where b.product_id = p.id), 0)::int as "onHand",
+         coalesce((select sum(b.in_transit) from stock_batches b where b.product_id = p.id), 0)::int as "inTransit",
          (select to_char(min(b.expiry_date), 'YYYY-MM-DD') from stock_batches b where b.product_id = p.id and b.on_hand > 0) as "nearestExpiry",
          coalesce((select sum(a.pieces) from order_allocations a join stock_batches b on b.id = a.batch_id where b.product_id = p.id), 0)::int
            as reserved,
          coalesce((select json_agg(json_build_object('id', b.id, 'batchNo', b.batch_no, 'expiryDate', to_char(b.expiry_date, 'YYYY-MM-DD'),
-             'onHand', b.on_hand, 'reserved', coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0))
+             'onHand', b.on_hand, 'inTransit', b.in_transit, 'reserved', coalesce((select sum(a.pieces) from order_allocations a where a.batch_id = b.id), 0))
              order by b.expiry_date, b.id)
            from stock_batches b where b.product_id = p.id and b.on_hand > 0), '[]') as batches
        from products p join companies co on co.code = p.company_code
@@ -207,9 +213,14 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
       .map((r) => ({
         ...r,
         ...split(r.onHand, r.piecesPerCarton),
-        // Set aside for open orders (Phase 4). Free is what can still be sold.
-        free: Math.max(0, r.onHand - r.reserved),
-        batches: r.batches.map((b) => ({ ...b, ...split(b.onHand, r.piecesPerCarton), free: Math.max(0, b.onHand - b.reserved) })),
+        // onHand counts stock out on vehicles until it is delivered. Reserved is set aside for open orders.
+        // Free is what is on the shelf and can still be sold.
+        free: Math.max(0, r.onHand - r.inTransit - r.reserved),
+        batches: r.batches.map((b) => ({
+          ...b,
+          ...split(b.onHand, r.piecesPerCarton),
+          free: Math.max(0, b.onHand - b.inTransit - b.reserved),
+        })),
       }));
   });
 
@@ -331,7 +342,7 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
       const pieces = totalPieces(body, batch.piecesPerCarton);
       if (pieces === 0) throw invalid('Please type how much.');
       const change = direction === 'remove' ? -pieces : pieces;
-      if (batch.onHand + change < 0) throw notEnough(batch.onHand);
+      if (onShelf(batch) + change < 0) throw notEnough(onShelf(batch));
       if (needsApproval) {
         const { rows } = await client.query<{ id: number }>(
           `insert into stock_adjustment_requests (batch_id, change, reason, note, requested_by) values ($1, $2, $3, $4, $5) returning id`,
@@ -382,7 +393,7 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
         if (req.status !== 'pending') throw new HttpError(409, 'already_decided', 'This request has already been decided.');
         const batch = await lockBatch(client, request.user, req.batchId);
         if (decision === 'approve') {
-          if (batch.onHand + req.change < 0) throw notEnough(batch.onHand);
+          if (onShelf(batch) + req.change < 0) throw notEnough(onShelf(batch));
           await applyChange(client, batch.id, req.change, req.reason, req.note, req.requestedBy, req.id);
         }
         await client.query(
@@ -428,14 +439,15 @@ export function stockRoutes(app: FastifyInstance, db: Db) {
         const batch = await lockBatch(client, request.user, l.batchId);
         if (batch.companyCode !== body.companyCode) throw invalid(`Batch ${batch.batchNo} belongs to another company.`);
         const counted = totalPieces(l, batch.piecesPerCarton);
-        const change = counted - batch.onHand;
+        // The count is of the shelf; stock out on vehicles stays as it is.
+        const change = counted - onShelf(batch);
         if (change === 0) continue;
-        await client.query('update stock_batches set on_hand = $2 where id = $1', [batch.id, counted]);
+        await client.query('update stock_batches set on_hand = $2 where id = $1', [batch.id, counted + batch.inTransit]);
         await client.query(
           `insert into stock_movements (batch_id, change, kind, count_id, user_id) values ($1, $2, 'counted', $3, $4)`,
           [batch.id, change, countId, request.user.id],
         );
-        differences.push({ batchId: batch.id, batchNo: batch.batchNo, before: batch.onHand, counted, change });
+        differences.push({ batchId: batch.id, batchNo: batch.batchNo, before: onShelf(batch), counted, change });
       }
       return { id: countId, number, differences };
     });
