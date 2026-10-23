@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { audit } from '../audit.js';
+import { CUSTOMER_OWES } from '../cash/balances.js';
 import { assertCompany, HttpError, notAllowed, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import type { Db } from '../db/pool.js';
 import { idParams, invalid, notFound, type Channel } from '../lists/common.js';
@@ -310,13 +311,11 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
       [customerId, request.user.companies],
     );
     if (!rows[0]) throw notFound('customer');
-    // What a customer owes: their opening balance plus their invoices. Payments come off in Phase 7.
+    // What a customer owes: their opening balance plus their invoices, less what they paid.
     const { rows: companies } = await db.query(
       `select co.code, co.name, co.facility_code as "facilityCode", cc.payment_terms_days as "paymentTermsDays",
-         (coalesce(ob.amount, 0) + coalesce((select sum(iv.total) from invoices iv
-            where iv.customer_id = cc.customer_id and iv.company_code = cc.company_code), 0))::float8 as balance
+         ${CUSTOMER_OWES('cc.customer_id', 'cc.company_code')}::float8 as balance
        from customer_companies cc join companies co on co.code = cc.company_code
-         left join opening_balances ob on ob.customer_id = cc.customer_id and ob.company_code = cc.company_code
        where cc.customer_id = $1 and cc.company_code = any($2) order by co.sort_order`,
       [customerId, request.user.companies],
     );

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
+import { INVOICE_BALANCE } from '../cash/balances.js';
 import { HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import type { Db } from '../db/pool.js';
 import { logoPath } from '../files.js';
@@ -54,6 +55,12 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
     `select iv.id, iv.number, iv.company_code as "companyCode", iv.invoice_type as "invoiceType", iv.plan_id as "planId",
        iv.lpo_no as "lpoNo", to_char(iv.invoice_date, 'YYYY-MM-DD') as "invoiceDate", to_char(iv.due_date, 'YYYY-MM-DD') as "dueDate",
        iv.subtotal::float8 as subtotal, iv.vat_rate::float8 as "vatRate", iv.vat::float8 as vat, iv.total::float8 as total,
+       ${INVOICE_BALANCE('iv')}::float8 as balance,
+       coalesce((select json_agg(json_build_object('id', c.id, 'number', c.number, 'mode', c.mode, 'amount', a.amount::float8,
+           'at', c.created_at) order by c.id)
+         from collection_allocations a join collections c on c.id = a.collection_id where a.invoice_id = iv.id), '[]') as payments,
+       coalesce((select sum(c.discount) from collections c where c.invoice_id = iv.id), 0)::float8 as discount,
+       coalesce((select sum(c.wht) from collections c where c.invoice_id = iv.id), 0)::float8 as wht,
        iv.created_at as "createdAt", cb.name as "createdBy", s.name as "salesmanName",
        lp.number as "planNumber", lp.delivery_note_no as "deliveryNoteNo", v.plate as "vehiclePlate",
        (select d.confirmed_at from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as "deliveredAt",
@@ -183,7 +190,7 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
       `select iv.id, iv.number, iv.company_code as "companyCode", iv.invoice_type as "invoiceType", iv.customer_id as "customerId",
          c.name as "customerName", c.area, iv.lpo_no as "lpoNo", to_char(iv.invoice_date, 'YYYY-MM-DD') as "invoiceDate",
          to_char(iv.due_date, 'YYYY-MM-DD') as "dueDate", iv.subtotal::float8 as subtotal, iv.vat::float8 as vat, iv.total::float8 as total,
-         s.name as "salesmanName", v.plate as "vehiclePlate",
+         ${INVOICE_BALANCE('iv')}::float8 as balance, s.name as "salesmanName", v.plate as "vehiclePlate",
          exists (select 1 from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as delivered
        from invoices iv join customers c on c.id = iv.customer_id left join users s on s.id = iv.salesman_id
          left join loading_plans lp on lp.id = iv.plan_id left join vehicles v on v.id = lp.vehicle_id
