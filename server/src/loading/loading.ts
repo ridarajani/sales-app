@@ -401,8 +401,16 @@ export function loadingRoutes(app: FastifyInstance, db: Db) {
          (select count(distinct o.customer_id) from loading_plan_items i join order_lines l on l.id = i.order_line_id
             join orders o on o.id = l.order_id where i.plan_id = lp.id)::int as customers,
          (select coalesce(sum(case when lp.status = 'planned' then i.pieces else i.loaded end), 0) from loading_plan_items i where i.plan_id = lp.id)::int as pieces,
+         ctn.cartons, ctn."loosePieces",
          (select count(*) from loading_plan_changes ch where ch.plan_id = lp.id and not ch.seen and ${newFor})::int as "newChanges"
        from loading_plans lp left join vehicles v on v.id = lp.vehicle_id left join users d on d.id = lp.driver_id
+         -- Products have different carton sizes, so cartons and loose pieces are worked out per product, then added up.
+         left join lateral (
+           select coalesce(sum(t.pieces / t.ppc), 0)::int as cartons, coalesce(sum(t.pieces % t.ppc), 0)::int as "loosePieces"
+           from (select p.pieces_per_carton as ppc, sum(case when lp.status = 'planned' then i.pieces else i.loaded end) as pieces
+                 from loading_plan_items i join order_lines l on l.id = i.order_line_id join products p on p.id = l.product_id
+                 where i.plan_id = lp.id group by p.id) t
+         ) ctn on true
        where ${where} order by lp.id desc limit 200`,
       params,
     );

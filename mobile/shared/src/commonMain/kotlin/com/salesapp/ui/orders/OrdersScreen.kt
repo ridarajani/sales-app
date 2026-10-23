@@ -148,7 +148,7 @@ private fun OrderRow(order: OrderListItem, showShort: Boolean, onClick: () -> Un
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                OrderStatusBadge(order.status, modifier = Modifier.padding(start = 8.dp))
+                OrderStateBadge(order.status, order.stage, modifier = Modifier.padding(start = 8.dp))
             }
             val date = if (order.createdAt.isBlank()) "" else formatIsoDate(localIsoDateFromUtcTimestamp(order.createdAt))
             Text(
@@ -181,16 +181,22 @@ private val sampleOrders = listOf(
         id = 3, number = "SO-000123", status = "open", createdAt = "2026-10-23T07:45:00Z",
         customerId = 11, customerName = "Chikondi Grocery", area = "Area 25",
         companies = listOf(OrderCompanyRef("LV", "LPO-4471"), OrderCompanyRef("ZT")), shortPieces = 18, total = 1_254_000,
+        stage = "on_vehicle",
+    ),
+    OrderListItem(
+        id = 4, number = "SO-000124", status = "open", createdAt = "2026-10-23T09:20:00Z",
+        customerId = 14, customerName = "Kanengo Wholesalers", area = "Kanengo",
+        companies = listOf(OrderCompanyRef("LV")), total = 318_000, stage = "planned",
     ),
     OrderListItem(
         id = 2, number = "SO-000122", status = "hold", createdAt = "2026-10-22T13:10:00Z",
         customerId = 12, customerName = "Mwayi Supermarket", area = "Limbe",
-        companies = listOf(OrderCompanyRef("ZF")), total = 486_500,
+        companies = listOf(OrderCompanyRef("ZF")), total = 486_500, stage = "hold",
     ),
     OrderListItem(
         id = 1, number = "SO-000121", status = "cancelled", invoiceType = "plain", createdAt = "2026-10-21T09:00:00Z",
         customerId = 13, customerName = "Tiyamike Shop", area = "Ndirande",
-        companies = listOf(OrderCompanyRef("GL")), total = 72_000,
+        companies = listOf(OrderCompanyRef("GL")), total = 72_000, stage = "cancelled",
     ),
 )
 

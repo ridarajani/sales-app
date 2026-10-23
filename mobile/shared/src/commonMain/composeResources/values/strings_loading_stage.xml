@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Order stage pills (an open order on its way through loading) -->
+    <string name="order_stage_open">Open</string>
+    <string name="order_stage_planned">Planned</string>
+    <string name="order_stage_on_vehicle">On the vehicle</string>
+    <string name="order_stage_part_delivered">Part delivered</string>
+
+    <!-- Stock: loaded on a vehicle, and free on the shelf -->
+    <string name="stock_transit_in_transit">In transit %1$s</string>
+    <string name="stock_transit_free">Free %1$s</string>
+    <string name="stock_transit_help">In transit is loaded on a vehicle and still counted until it is delivered. Free is on the shelf and not set aside for orders.</string>
+</resources>

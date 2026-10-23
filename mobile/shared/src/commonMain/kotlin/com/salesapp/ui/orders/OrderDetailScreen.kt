@@ -166,7 +166,7 @@ private fun Header(order: OrderDetail, seesStock: Boolean) {
     ListCard(onClick = null) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OrderStatusBadge(order.status)
+                OrderStateBadge(order.status, order.stage)
                 if (seesStock && order.shortPieces > 0 && (order.status == "open" || order.status == "hold")) ShortBadge()
             }
             Text(order.customerName, color = scheme.onSurface, style = MaterialTheme.typography.titleMedium)
@@ -375,6 +375,7 @@ private val previewOpenOrder = OrderDetail(
     vat = 106_050,
     total = 712_050,
     shortPieces = 24,
+    stage = "planned",
     canChange = true,
     canManage = true,
 )
@@ -413,6 +414,7 @@ private fun OrderDetailCancelledPreview() {
                     ),
                     subtotal = 120_000,
                     total = 120_000,
+                    stage = "cancelled",
                 ),
             ),
             onEvent = {},

@@ -384,6 +384,7 @@ erDiagram
 - **Stock is reduced only on delivery** (client, 7 Oct: reserved on order, in transit on loading, deducted on delivery). Loaded pieces stay in `stock_batches.on_hand` and are counted in `stock_batches.in_transit` until Phase 6 confirms the delivery. What is on the shelf is `on_hand - in_transit`; adjustments and stock counts work on the shelf only. `GET /stock` shows `inTransit`, and free = on hand − in transit − reserved.
 - **`order_lines.on_vehicle`** counts pieces on a vehicle and not yet delivered; the order's reservation is worked out again for what is left.
 - **Order stage:** orders now show a `stage` worked out from their lines: `open`, `planned`, `on_vehicle` or `part_delivered` (or the order's status when it is on hold, done or cancelled). An order cannot drop below what is planned, loaded or delivered, and cannot be cancelled or closed while part of it is on a vehicle.
+- **Plans list:** `GET /loading-plans` also gives `cartons` and `loosePieces` for each plan, worked out per product with its own `pieces_per_carton` and then added up (planned pieces while planned, loaded pieces after), so the phone can show cartons when a plan mixes carton sizes.
 - **Audit actions:** `loading_plan_started`, `loading_plan_changed`, `loading_plan_sent`, `loading_plan_changed_by_warehouse`, `loading_plan_loaded`, `loading_plan_out`, `loading_plan_deleted`.
 
 ## Phase 6 notes

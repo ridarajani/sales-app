@@ -283,6 +283,10 @@ data class StockBatch(
     val pieces: Int = 0,
     val cartons: Int = 0,
     val loosePieces: Int = 0,
+    // Pieces loaded on a vehicle (still counted in onHand until delivered), set aside for orders, and free on the shelf.
+    val inTransit: Int = 0,
+    val reserved: Int = 0,
+    val free: Int = 0,
 )
 
 @Serializable
@@ -300,6 +304,10 @@ data class StockProduct(
     val loosePieces: Int = 0,
     val nearestExpiry: String? = null,
     val batches: List<StockBatch> = emptyList(),
+    // Pieces loaded on a vehicle (still counted in onHand until delivered), set aside for orders, and free on the shelf.
+    val inTransit: Int = 0,
+    val reserved: Int = 0,
+    val free: Int = 0,
 )
 
 // daysLeft below zero means the batch has expired.

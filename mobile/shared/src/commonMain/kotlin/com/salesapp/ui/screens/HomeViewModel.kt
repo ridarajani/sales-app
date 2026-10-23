@@ -6,11 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.salesapp.core.currentHour
 import com.salesapp.data.Api
 import com.salesapp.data.AppState
+import com.salesapp.data.LoadingRepository
 import com.salesapp.data.PendingAdjustment
 import com.salesapp.data.ShortDatedBatch
 import com.salesapp.data.StockRepository
 import com.salesapp.data.canApproveStock
+import com.salesapp.data.canSeePlans
 import com.salesapp.data.canSeeStock
+import com.salesapp.data.seesPlanChanges
 import com.salesapp.resources.Res
 import com.salesapp.resources.home_coming_soon
 import com.salesapp.resources.home_good_afternoon
@@ -40,7 +43,6 @@ import com.salesapp.resources.tile_expiring_mixed
 import com.salesapp.resources.tile_expiring_loading
 import com.salesapp.resources.tile_expiring_none
 import com.salesapp.resources.tile_expiring_one
-import com.salesapp.resources.tile_deliveries
 import com.salesapp.resources.tile_hand_over_cash
 import com.salesapp.resources.tile_hand_over_cash_sub
 import com.salesapp.resources.tile_hand_over_goods
@@ -52,11 +54,12 @@ import com.salesapp.resources.tile_invoices_share
 import com.salesapp.resources.tile_jobs
 import com.salesapp.resources.tile_ledger
 import com.salesapp.resources.tile_ledger_sub
-import com.salesapp.resources.tile_load_van
-import com.salesapp.resources.tile_loading_plan
-import com.salesapp.resources.tile_loading_plans
+import com.salesapp.resources.tile_loading
+import com.salesapp.resources.tile_loading_sub
 import com.salesapp.resources.tile_look_up
 import com.salesapp.resources.tile_more
+import com.salesapp.resources.tile_my_trips
+import com.salesapp.resources.tile_my_trips_sub
 import com.salesapp.resources.tile_more_sub
 import com.salesapp.resources.tile_my_customers
 import com.salesapp.resources.tile_my_salesmen
@@ -99,6 +102,7 @@ import com.salesapp.ui.navigation.ApprovalsRoute
 import com.salesapp.ui.navigation.ExpiringRoute
 import com.salesapp.ui.navigation.NewOrderRoute
 import com.salesapp.ui.navigation.OrdersRoute
+import com.salesapp.ui.navigation.PlansRoute
 import com.salesapp.ui.navigation.ProductsRoute
 import com.salesapp.ui.navigation.ReceiveStockRoute
 import com.salesapp.ui.navigation.StockCountRoute
@@ -125,10 +129,12 @@ class TileDef(
     val opens: Any? = null,
     // A sub-line worked out at run time; the screen shows it instead of subRes when it is set.
     val subText: String? = null,
+    // A small red number on the tile when above 0.
+    val count: Int? = null,
 )
 
-private fun tile(label: StringResource, sub: StringResource, icon: ImageVector, opens: Any? = null, subText: String? = null) =
-    TileDef(label, sub, icon, opens, subText)
+private fun tile(label: StringResource, sub: StringResource, icon: ImageVector, opens: Any? = null, subText: String? = null, count: Int? = null) =
+    TileDef(label, sub, icon, opens, subText, count)
 
 private fun expiringTile(subText: String?) =
     tile(Res.string.tile_expiring, Res.string.tile_expiring_loading, AppIcons.Inbox, ExpiringRoute, subText)
@@ -142,15 +148,27 @@ private fun newOrderTile() = tile(Res.string.tile_new_order, Res.string.tile_new
 
 private fun ordersTile() = tile(Res.string.tile_orders, Res.string.tile_orders_sub, AppIcons.Receipt, OrdersRoute)
 
+// Loading plans; count is how many changes from the other side wait to be seen.
+private fun loadingTile(count: Int?) = tile(Res.string.tile_loading, Res.string.tile_loading_sub, AppIcons.Truck, PlansRoute, count = count)
+
+private fun myTripsTile() = tile(Res.string.tile_my_trips, Res.string.tile_my_trips_sub, AppIcons.Truck, PlansRoute)
+
 // The squares each kind of person sees, in order. The first one is highlighted.
 // Only admin, management and warehouse get stock squares (the same roles as canSeeStock); no other role lists them.
 // Everyone but drivers gets Orders (canSeeOrders); those who book (canBookOrders) start with New order.
-internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: String? = null): List<TileDef> = when (role) {
+// Everyone who may see loading plans (canSeePlans) gets Loading, or My trips for a driver; never a salesman.
+internal fun tilesFor(
+    role: String,
+    expiringSub: String? = null,
+    approvalsSub: String? = null,
+    loadingCount: Int? = null,
+): List<TileDef> = when (role) {
     "admin" -> listOf(
         newOrderTile(),
         tile(Res.string.tile_users, Res.string.tile_users_admin_sub, AppIcons.Person, UsersRoute),
         tile(Res.string.tile_customers, Res.string.tile_customers_add, AppIcons.People, CustomersRoute),
         ordersTile(),
+        loadingTile(loadingCount),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
         tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
         tile(Res.string.tile_companies, Res.string.tile_companies_sub, AppIcons.Settings, CompaniesRoute),
@@ -165,7 +183,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
         tile(Res.string.tile_today, Res.string.tile_today_sub, AppIcons.Chart),
         ordersTile(),
         approvalsTile(approvalsSub),
-        tile(Res.string.tile_loading_plans, Res.string.tile_nothing_waiting, AppIcons.Truck),
+        loadingTile(loadingCount),
         tile(Res.string.tile_airtel, Res.string.tile_airtel_both, AppIcons.Money),
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
         tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
@@ -179,7 +197,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     )
     "sales_manager" -> listOf(
         newOrderTile(),
-        tile(Res.string.tile_loading_plan, Res.string.tile_nothing_waiting, AppIcons.Truck),
+        loadingTile(loadingCount),
         tile(Res.string.tile_collect_money, Res.string.tile_collect_money_sub, AppIcons.Money),
         tile(Res.string.tile_airtel, Res.string.tile_airtel_ledger, AppIcons.Money),
         tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
@@ -202,7 +220,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     "warehouse" -> listOf(
         tile(Res.string.tile_jobs, Res.string.tile_nothing_waiting, AppIcons.Box),
         ordersTile(),
-        tile(Res.string.tile_load_van, Res.string.tile_nothing_waiting, AppIcons.Truck),
+        loadingTile(loadingCount),
         tile(Res.string.tile_receive_stock, Res.string.tile_receive_stock_sub, AppIcons.Box, ReceiveStockRoute),
         tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
         expiringTile(expiringSub),
@@ -213,7 +231,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
         more(),
     )
     "driver" -> listOf(
-        tile(Res.string.tile_deliveries, Res.string.tile_nothing_waiting, AppIcons.Truck),
+        myTripsTile(),
         tile(Res.string.tile_hand_over_goods, Res.string.tile_hand_over_goods_sub, AppIcons.Box),
         tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
         more(),
@@ -221,6 +239,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     "cashier" -> listOf(
         tile(Res.string.tile_count_cash, Res.string.tile_nothing_waiting, AppIcons.Money),
         ordersTile(),
+        loadingTile(loadingCount),
         tile(Res.string.tile_record_payment, Res.string.tile_record_payment_sub, AppIcons.Money),
         tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
@@ -230,6 +249,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     "accounts" -> listOf(
         tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
         ordersTile(),
+        loadingTile(loadingCount),
         tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
         tile(Res.string.tile_ledger, Res.string.tile_ledger_sub, AppIcons.List),
         tile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, CustomersRoute),
@@ -256,6 +276,7 @@ data class HomeState(
     val sheetOpen: Boolean = false,
     val expiringSub: String? = null,
     val approvalsSub: String? = null,
+    val loadingCount: Int? = null,
 )
 
 sealed interface HomeEvent {
@@ -270,7 +291,11 @@ sealed interface HomeEffect {
     data class Open(val route: Any) : HomeEffect
 }
 
-class HomeViewModel(private val app: AppState, private val stockRepository: StockRepository) : ViewModel() {
+class HomeViewModel(
+    private val app: AppState,
+    private val stockRepository: StockRepository,
+    private val loadingRepository: LoadingRepository,
+) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
@@ -279,6 +304,7 @@ class HomeViewModel(private val app: AppState, private val stockRepository: Stoc
 
     private var expiringLoading = false
     private var approvalsLoading = false
+    private var loadingLoading = false
 
     init {
         viewModelScope.launch {
@@ -288,11 +314,12 @@ class HomeViewModel(private val app: AppState, private val stockRepository: Stoc
                         name = user?.name ?: "",
                         firstName = user?.name?.trim()?.substringBefore(' ') ?: "",
                         role = user?.role ?: "",
-                        tiles = if (user != null) tilesFor(user.role, it.expiringSub, it.approvalsSub) else emptyList(),
+                        tiles = if (user != null) tilesFor(user.role, it.expiringSub, it.approvalsSub, it.loadingCount) else emptyList(),
                     )
                 }
                 loadExpiring()
                 loadApprovals()
+                loadLoading()
             }
         }
     }
@@ -321,6 +348,7 @@ class HomeViewModel(private val app: AppState, private val stockRepository: Stoc
                 _state.update { it.copy(greeting = greetingFor(currentHour())) }
                 loadExpiring()
                 loadApprovals()
+                loadLoading()
             }
         }
     }
@@ -333,7 +361,7 @@ class HomeViewModel(private val app: AppState, private val stockRepository: Stoc
         viewModelScope.launch {
             try {
                 val sub = expiringSubText(stockRepository.shortDated(days = 90))
-                _state.update { it.copy(expiringSub = sub, tiles = tilesFor(it.role, sub, it.approvalsSub)) }
+                _state.update { it.copy(expiringSub = sub, tiles = tilesFor(it.role, sub, it.approvalsSub, it.loadingCount)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -352,13 +380,33 @@ class HomeViewModel(private val app: AppState, private val stockRepository: Stoc
         viewModelScope.launch {
             try {
                 val sub = approvalsSubText(stockRepository.pendingAdjustments())
-                _state.update { it.copy(approvalsSub = sub, tiles = tilesFor(it.role, it.expiringSub, sub)) }
+                _state.update { it.copy(approvalsSub = sub, tiles = tilesFor(it.role, it.expiringSub, sub, it.loadingCount)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Keep the plain sub-line until it loads.
             } finally {
                 approvalsLoading = false
+            }
+        }
+    }
+
+    // The Loading square shows how many changes from the other side wait to be seen.
+    // Only people who may see plans ask, and only planners and the warehouse get a number; errors are ignored.
+    private fun loadLoading() {
+        val user = app.user ?: return
+        if (!user.canSeePlans() || loadingLoading) return
+        loadingLoading = true
+        viewModelScope.launch {
+            try {
+                val count = if (user.seesPlanChanges()) loadingRepository.newChangesTotal() else null
+                _state.update { it.copy(loadingCount = count, tiles = tilesFor(it.role, it.expiringSub, it.approvalsSub, count)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Keep the tile without a number until it loads.
+            } finally {
+                loadingLoading = false
             }
         }
     }

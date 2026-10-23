@@ -30,6 +30,7 @@ import com.salesapp.resources.stock_product_per_carton
 import com.salesapp.resources.stock_product_total
 import com.salesapp.resources.stock_qty
 import com.salesapp.resources.stock_title
+import com.salesapp.resources.stock_transit_help
 import com.salesapp.ui.components.CompanyDot
 import com.salesapp.ui.components.EmptyState
 import com.salesapp.ui.components.ErrorState
@@ -89,7 +90,7 @@ fun StockProductScreen(state: StockProductState, onEvent: (StockProductEvent) ->
                     item(key = "header") { ProductHeader(product) }
                     item(key = "label") { SectionLabel(stringResource(Res.string.stock_product_batches)) }
                     items(product.batches, key = { it.id }) { batch ->
-                        BatchRow(batch, onClick = { onEvent(StockProductEvent.OpenBatch(batch.id)) })
+                        BatchRow(batch, product.piecesPerCarton, onClick = { onEvent(StockProductEvent.OpenBatch(batch.id)) })
                     }
                 }
             }
@@ -111,17 +112,24 @@ private fun ProductHeader(product: StockProduct) {
                 color = scheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            TransitLines(product.inTransit, product.free, product.piecesPerCarton)
             Text(
                 stringResource(Res.string.stock_product_per_carton, product.piecesPerCarton),
                 color = scheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(Res.string.stock_transit_help),
+                color = scheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
 }
 
 @Composable
-private fun BatchRow(batch: StockBatch, onClick: () -> Unit) {
+private fun BatchRow(batch: StockBatch, piecesPerCarton: Int, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     ListCard(onClick = onClick) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -132,6 +140,7 @@ private fun BatchRow(batch: StockBatch, onClick: () -> Unit) {
                 color = scheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
+            TransitLines(batch.inTransit, batch.free, piecesPerCarton)
         }
     }
 }
@@ -139,9 +148,12 @@ private fun BatchRow(batch: StockBatch, onClick: () -> Unit) {
 private val sampleProduct = StockProduct(
     1, "LV-KG-400", "LV", "Kerrygold", "Milk powder tin", "400g tin", 24, 250, 250, 10, 10, "2026-12-01",
     listOf(
-        StockBatch(1, "B1", "2026-12-01", 100, 100, 4, 4),
-        StockBatch(2, "B2", "2099-06-01", 150, 150, 6, 6),
+        StockBatch(1, "B1", "2026-12-01", 100, 100, 4, 4, inTransit = 48, reserved = 30, free = 22),
+        StockBatch(2, "B2", "2099-06-01", 150, 150, 6, 6, reserved = 30, free = 120),
     ),
+    inTransit = 48,
+    reserved = 60,
+    free = 142,
 )
 
 @Preview

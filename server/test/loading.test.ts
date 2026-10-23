@@ -167,6 +167,13 @@ test('sending needs a vehicle, a driver and orders; later changes show as new to
   expect(list[0]).toMatchObject({ number: 'LP-000001', customers: 2, pieces: 68, newChanges: 0 });
 });
 
+test('the plans list counts cartons per product, since products have different carton sizes', async () => {
+  // Planned: 48 tins of milk (12 per carton) and 20 sachets of tea (40 per carton).
+  // Splitting the 68 pieces by one carton size would be wrong; per product it is 4 ctn + 0, and 0 ctn + 20.
+  const list = (await get(app, manager, '/loading-plans')).json();
+  expect(list.find((x: { id: number }) => x.id === planId)).toMatchObject({ pieces: 68, cartons: 4, loosePieces: 20 });
+});
+
 test('the warehouse changes a product with a reason: less comes off the last order, more fills open orders', async () => {
   expect((await send('PATCH', store, `/loading-plans/${planId}/warehouse`, { products: [{ productId: milk, cartons: 3 }] })).json().message).toMatch(
     /say why/,
@@ -207,6 +214,9 @@ test('loading takes stock off the shelves into transit, oldest first, and makes 
   expect(p.notLoaded).toEqual([]);
   expect(p.products[0]).toMatchObject({ code: 'LV-MILK', loaded: 24 });
   expect(p.products[0].batches.map((b: { batchNo: string; pieces: number }) => [b.batchNo, b.pieces])).toEqual([['M-1', 24]]);
+  // Once loaded, the list counts what was loaded: 2 ctn of milk and 1 ctn of tea.
+  const listed = (await get(app, store, '/loading-plans')).json().find((x: { id: number }) => x.id === planId);
+  expect(listed).toMatchObject({ pieces: 64, cartons: 3, loosePieces: 0 });
 
   // Stock is only reduced on delivery (client, 7 Oct): the 2 loaded cartons are in transit, still counted.
   // Shop A's third carton and shop B's two stay reserved.

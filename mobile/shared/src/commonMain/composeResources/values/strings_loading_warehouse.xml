@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Warehouse plan screen -->
+    <string name="loading_wh_no_access">You cannot see loading plans.</string>
+    <string name="loading_wh_vehicle">Vehicle %1$s · %2$s</string>
+    <string name="loading_wh_no_vehicle">not chosen</string>
+    <string name="loading_wh_no_driver">no driver</string>
+    <string name="loading_wh_not_sent">The planner has not sent this plan yet.</string>
+    <string name="loading_wh_help">Load these products. If you load a different number, change it and write the reason.</string>
+    <string name="loading_wh_load_amount">Load %1$s</string>
+    <string name="loading_wh_loaded_amount">Loaded %1$s</string>
+    <string name="loading_wh_for_one_shop">For 1 shop</string>
+    <string name="loading_wh_for_shops">For %1$d shops</string>
+    <string name="loading_wh_batches_to_pick">Batches to pick</string>
+    <string name="loading_wh_batches_loaded">Batches loaded</string>
+    <string name="loading_wh_batch">Batch %1$s · expires %2$s · %3$s</string>
+    <string name="loading_wh_short">Only %1$s set aside. Pick the rest from the oldest batches on the shelf.</string>
+    <string name="loading_wh_none_set_aside">Nothing set aside. Pick it from the oldest batches on the shelf.</string>
+    <string name="loading_wh_change">Change cartons</string>
+    <string name="loading_wh_planned_now">Planned now: %1$s</string>
+    <string name="loading_wh_cartons">Cartons</string>
+    <string name="loading_wh_pieces">Pieces</string>
+    <string name="loading_wh_reason">Why did it change?</string>
+    <string name="loading_wh_reason_needed">Please say why the quantity changed.</string>
+    <string name="loading_wh_save_change">Save change</string>
+    <string name="loading_wh_cancel">Cancel</string>
+    <string name="loading_wh_change_saved">Change saved.</string>
+    <string name="loading_wh_not_fit">Did not fit: %1$s, %2$s. No open order has more of this product.</string>
+    <string name="loading_wh_loaded">Loaded</string>
+    <string name="loading_wh_load_title">Is everything on the vehicle?</string>
+    <string name="loading_wh_load_text">The delivery note and gate pass are made now. The plan cannot change after this.</string>
+    <string name="loading_wh_load_yes">Yes, it is loaded</string>
+    <string name="loading_wh_delivery_note">Delivery note %1$s</string>
+    <string name="loading_wh_gate_pass">Gate pass %1$s</string>
+    <string name="loading_wh_not_loaded">Not loaded</string>
+    <string name="loading_wh_not_loaded_row">%1$s: %2$s</string>
+    <string name="loading_wh_gate">Vehicle left the gate</string>
+    <string name="loading_wh_gate_title">Has the vehicle left?</string>
+    <string name="loading_wh_gate_text">The driver takes the delivery note and gate pass.</string>
+    <string name="loading_wh_gate_yes">Yes, it left</string>
+    <string name="loading_wh_left">The vehicle has left the warehouse.</string>
+    <string name="loading_wh_empty">There is nothing on this plan.</string>
+</resources>

@@ -139,6 +139,7 @@ private fun BatchHeader(product: StockProduct, batch: StockBatch) {
                 color = scheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            TransitLines(batch.inTransit, batch.free, product.piecesPerCarton)
         }
     }
 }
@@ -184,7 +185,7 @@ private fun reasonWord(reason: String?): String = stringResource(
 )
 
 private val sampleBatchProduct = StockProduct(1, "LV-KG-400", "LV", "Kerrygold", "Milk powder tin", "400g tin", 24, 250, 250, 10, 10, "2026-12-01")
-private val sampleBatch = StockBatch(1, "B1", "2026-12-01", 250, 250, 10, 10)
+private val sampleBatch = StockBatch(1, "B1", "2026-12-01", 250, 250, 10, 10, inTransit = 48, reserved = 60, free = 142)
 private val sampleMovements = listOf(
     StockMovement(3, -5, "adjusted", "damaged", "Wet cartons", "Banda Phiri", "2026-10-20T09:00:00Z"),
     StockMovement(2, 12, "counted", null, "", "Banda Phiri", "2026-10-10T09:00:00Z"),

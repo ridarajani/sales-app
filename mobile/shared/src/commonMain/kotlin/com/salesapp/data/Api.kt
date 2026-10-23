@@ -99,6 +99,10 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     private suspend inline fun <reified T, reified B : Any> patch(path: String, body: B?): T =
         decode { send(HttpMethod.Patch, path, body).body<T>() }
 
+    // No body, so no Content-Type: the server rejects an empty JSON body.
+    private suspend inline fun <reified T> delete(path: String): T =
+        decode { send<Unit>(HttpMethod.Delete, path, null).body<T>() }
+
     // Stops the connection and frees its resources.
     fun close() {
         client.close()
@@ -233,4 +237,35 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     suspend fun closeOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/close", OrderNote(note))
 
     suspend fun cancelOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/cancel", OrderNote(note))
+
+    // Loading plans.
+
+    // status: planned, loaded, out or done (null for all); facility: F1 or F2 (null for all).
+    suspend fun loadingPlans(status: String?, facility: String?): List<LoadingPlanListItem> =
+        get("/loading-plans", mapOf("status" to status, "facility" to facility))
+
+    suspend fun loadingPlan(id: Int): PlanDetail = get("/loading-plans/$id")
+
+    suspend fun createPlan(request: NewPlanRequest): PlanDetail = post<PlanDetail, NewPlanRequest>("/loading-plans", request)
+
+    suspend fun openLines(id: Int): List<OpenProduct> = get("/loading-plans/$id/open-lines")
+
+    suspend fun savePlanItems(id: Int, request: PlanItemsRequest): PlanDetail =
+        put<PlanDetail, PlanItemsRequest>("/loading-plans/$id/items", request)
+
+    // send, load, gate and seen have no body.
+    suspend fun sendPlan(id: Int): PlanDetail = post<PlanDetail, Unit>("/loading-plans/$id/send", null)
+
+    suspend fun loadPlan(id: Int): PlanDetail = post<PlanDetail, Unit>("/loading-plans/$id/load", null)
+
+    suspend fun gatePlan(id: Int): PlanDetail = post<PlanDetail, Unit>("/loading-plans/$id/gate", null)
+
+    suspend fun seenPlan(id: Int): PlanDetail = post<PlanDetail, Unit>("/loading-plans/$id/seen", null)
+
+    suspend fun warehouseChange(id: Int, request: WarehouseChangeRequest): PlanDetail =
+        patch<PlanDetail, WarehouseChangeRequest>("/loading-plans/$id/warehouse", request)
+
+    suspend fun deletePlan(id: Int) {
+        delete<JsonObject>("/loading-plans/$id")
+    }
 }

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Plans list -->
+    <string name="loading_list_title">Loading</string>
+    <string name="loading_list_title_driver">My trips</string>
+    <string name="loading_list_no_vehicle">No vehicle yet</string>
+    <string name="loading_list_driver">Driver %1$s</string>
+    <string name="loading_list_no_driver">No driver yet</string>
+    <string name="loading_list_shop_one">1 shop · %1$s</string>
+    <string name="loading_list_shops">%1$d shops · %2$s</string>
+    <string name="loading_list_delivery_note">Delivery note %1$s</string>
+    <string name="loading_list_new">New plan</string>
+    <string name="loading_list_empty">No loading plans yet.</string>
+    <string name="loading_list_empty_driver">No trips yet. A trip shows here once your vehicle is loaded.</string>
+    <string name="loading_list_no_match">No plans here.</string>
+
+    <!-- New plan -->
+    <string name="loading_new_title">New plan</string>
+    <string name="loading_new_which">Which warehouse?</string>
+    <string name="loading_new_facility_companies">%1$s · %2$s</string>
+    <string name="loading_new_make">Make the plan</string>
+    <string name="loading_new_making">Making the plan...</string>
+    <string name="loading_new_no_facility">You have no warehouse to plan from.</string>
+</resources>
