@@ -15,8 +15,10 @@ import { vehicleRoutes } from './lists/vehicles.js';
 import { stockRoutes } from './stock/stock.js';
 import { orderRoutes } from './orders/orders.js';
 import { loadingRoutes } from './loading/loading.js';
+import { invoiceRoutes } from './invoices/invoices.js';
+import { deliveryRoutes } from './delivery/delivery.js';
 
-export function buildApp(db: Db, options: { apkDir?: string } = {}) {
+export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string; brandingDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
   const apkDir = options.apkDir ?? config.apkDir;
 
@@ -70,6 +72,8 @@ export function buildApp(db: Db, options: { apkDir?: string } = {}) {
   stockRoutes(app, db);
   orderRoutes(app, db);
   loadingRoutes(app, db);
+  invoiceRoutes(app, db, options.brandingDir ?? config.brandingDir);
+  deliveryRoutes(app, db, options.uploadDir ?? config.uploadDir);
 
   return app;
 }

@@ -19,7 +19,7 @@ export const ORDER_VIEWERS = ['admin', 'management', 'sales_manager', 'salesman'
 // Least shelf life a batch must have left to be reserved for each kind of customer.
 // Taken from the prototype's settings; still to confirm with the client.
 export const MIN_SHELF_DAYS: Record<Channel, number> = { supermarket: 90, wholesaler: 30, minibus: 30, upcountry: 60 };
-const DEFAULT_VAT_RATE = 17.5;
+export const DEFAULT_VAT_RATE = 17.5;
 
 export const INVOICE_TYPES = ['vat', 'plain'] as const;
 const LIVE = ['open', 'hold'];
@@ -70,13 +70,13 @@ const listQuery = z.object({
 const totalPieces = (q: { cartons: number; pieces: number }, piecesPerCarton: number) => q.cartons * piecesPerCarton + q.pieces;
 const money = (n: number) => `MWK ${n.toLocaleString('en-US')}`;
 // "10 ctn", "10 ctn + 4 pcs" or "4 pcs".
-function qtyText(pieces: number, piecesPerCarton: number) {
+export function qtyText(pieces: number, piecesPerCarton: number) {
   const { cartons, loosePieces } = split(pieces, piecesPerCarton);
   if (loosePieces === 0) return `${cartons} ctn`;
   return cartons ? `${cartons} ctn + ${loosePieces} pcs` : `${loosePieces} pcs`;
 }
 // Price is per carton, so loose pieces cost their share of a carton.
-const lineAmount = (pieces: number, pricePerCarton: number, piecesPerCarton: number) =>
+export const lineAmount = (pieces: number, pricePerCarton: number, piecesPerCarton: number) =>
   Math.round((pricePerCarton * pieces) / piecesPerCarton);
 
 const isManager = (user: AuthUser) => (ORDER_MANAGERS as readonly string[]).includes(user.role);
@@ -310,10 +310,11 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
       [customerId, request.user.companies],
     );
     if (!rows[0]) throw notFound('customer');
-    // Until invoices and payments exist (Phase 6), what a customer owes is their opening balance.
+    // What a customer owes: their opening balance plus their invoices. Payments come off in Phase 7.
     const { rows: companies } = await db.query(
       `select co.code, co.name, co.facility_code as "facilityCode", cc.payment_terms_days as "paymentTermsDays",
-         coalesce(ob.amount, 0)::int as balance
+         (coalesce(ob.amount, 0) + coalesce((select sum(iv.total) from invoices iv
+            where iv.customer_id = cc.customer_id and iv.company_code = cc.company_code), 0))::float8 as balance
        from customer_companies cc join companies co on co.code = cc.company_code
          left join opening_balances ob on ob.customer_id = cc.customer_id and ob.company_code = cc.company_code
        where cc.customer_id = $1 and cc.company_code = any($2) order by co.sort_order`,

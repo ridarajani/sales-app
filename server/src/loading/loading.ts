@@ -15,6 +15,8 @@ export const PLANNERS = ['admin', 'management', 'sales_manager'] as const;
 // The warehouse changes quantities with a reason, loads the vehicle and lets it out of the gate.
 export const LOADERS = ['admin', 'warehouse'] as const;
 // Drivers see only their own plans once loaded. Salesmen never see plans (they show stock).
+// Make the invoices for a loaded vehicle.
+export const INVOICE_MAKERS = ['admin', 'sales_manager', 'accounts'] as const;
 export const PLAN_VIEWERS = ['admin', 'management', 'sales_manager', 'warehouse', 'driver', 'accounts', 'cashier'] as const;
 
 const id = z.number().int().positive().max(INT4_MAX);
@@ -54,14 +56,14 @@ function qtyText(pieces: number, piecesPerCarton: number) {
 const has = (roles: readonly string[], user: AuthUser) => roles.includes(user.role);
 
 // Which plans a user may see. $1 = their companies, $2 = their id. Both branches name both, so Postgres knows their types.
-function visibleWhere(user: AuthUser) {
+export function visibleWhere(user: AuthUser) {
   if (user.role === 'driver') return `$1::text[] is not null and lp.driver_id = $2::int and lp.status <> 'planned'`;
   return `$2::int is not null and exists (select 1 from companies x where x.facility_code = lp.facility_code and x.code = any($1::text[]))`;
 }
 
 type PlanHead = { id: number; number: string; facilityCode: string; status: string; sent: boolean; vehicleId: number | null; driverId: number | null };
 
-async function lockPlan(client: PoolClient, user: AuthUser, planId: number): Promise<PlanHead> {
+export async function lockPlan(client: PoolClient, user: AuthUser, planId: number): Promise<PlanHead> {
   const { rows } = await client.query<PlanHead>(
     `select lp.id, lp.number, lp.facility_code as "facilityCode", lp.status, lp.sent_at is not null as sent,
        lp.vehicle_id as "vehicleId", lp.driver_id as "driverId"
@@ -176,6 +178,9 @@ type ItemRow = {
   piecesPerCarton: number;
   pieces: number;
   loaded: number;
+  delivered: number | null;
+  shortReason: string | null;
+  invoiced: boolean;
 };
 
 // One plan as the app shows it: products with the customers under each (the warehouse view),
@@ -186,7 +191,10 @@ export async function planDetail(db: Db | PoolClient, user: AuthUser, planId: nu
        lp.sent_at as "sentAt", lp.vehicle_id as "vehicleId", v.plate as "vehiclePlate", v.description as "vehicleDescription",
        lp.driver_id as "driverId", d.name as "driverName", lp.note, lp.delivery_note_no as "deliveryNoteNo", lp.gate_pass_no as "gatePassNo",
        lp.loaded_at as "loadedAt", lb.name as "loadedBy", lp.out_at as "outAt", ob.name as "outBy",
-       cb.name as "createdBy", lp.created_at as "createdAt", lp.updated_at as "updatedAt"
+       cb.name as "createdBy", lp.created_at as "createdAt", lp.updated_at as "updatedAt",
+       (select count(*) from loading_plan_items i join order_lines l on l.id = i.order_line_id join products p on p.id = l.product_id
+          where i.plan_id = lp.id and i.loaded > 0 and p.company_code = any($1::text[])
+            and not exists (select 1 from invoice_lines il where il.plan_item_id = i.id))::int as "notInvoiced"
      from loading_plans lp join facilities f on f.code = lp.facility_code join users cb on cb.id = lp.created_by
        left join vehicles v on v.id = lp.vehicle_id left join users d on d.id = lp.driver_id
        left join users lb on lb.id = lp.loaded_by left join users ob on ob.id = lp.out_by
@@ -199,7 +207,8 @@ export async function planDetail(db: Db | PoolClient, user: AuthUser, planId: nu
   const { rows: items } = await db.query<ItemRow>(
     `select i.id as "itemId", l.id as "lineId", o.id as "orderId", o.number as "orderNumber", c.id as "customerId", c.name as "customerName",
        c.area, coalesce(oc.lpo_no, '') as "lpoNo", p.id as "productId", p.code, p.brand, p.name, p.pack_size as "packSize",
-       p.company_code as "companyCode", p.pieces_per_carton as "piecesPerCarton", i.pieces, i.loaded
+       p.company_code as "companyCode", p.pieces_per_carton as "piecesPerCarton", i.pieces, i.loaded,
+       i.delivered, i.short_reason as "shortReason", exists (select 1 from invoice_lines il where il.plan_item_id = i.id) as invoiced
      from loading_plan_items i join order_lines l on l.id = i.order_line_id join orders o on o.id = l.order_id
        join customers c on c.id = o.customer_id join products p on p.id = l.product_id
        left join order_companies oc on oc.order_id = o.id and oc.company_code = p.company_code
@@ -277,12 +286,50 @@ export async function planDetail(db: Db | PoolClient, user: AuthUser, planId: nu
     };
   });
 
+  // Delivery confirmations and invoices, per customer (Phase 6).
+  const { rows: deliveries } = await db.query<{ id: number; customerId: number; receivedBy: string; confirmedAt: string; confirmedBy: string; hasPhoto: boolean }>(
+    `select d.id, d.customer_id as "customerId", d.received_by as "receivedBy", d.confirmed_at as "confirmedAt", u.name as "confirmedBy",
+       d.photo_file is not null as "hasPhoto"
+     from deliveries d join users u on u.id = d.confirmed_by where d.plan_id = $1`,
+    [planId],
+  );
+  const { rows: invoices } = await db.query<{ id: number; number: string; customerId: number; companyCode: string; invoiceType: string; total: number }>(
+    `select i.id, i.number, i.customer_id as "customerId", i.company_code as "companyCode", i.invoice_type as "invoiceType", i.total::float8 as total
+     from invoices i where i.plan_id = $1 and i.company_code = any($2) order by i.id`,
+    [planId, user.companies],
+  );
+
   // One drop per customer, in the order they were added.
-  const drops = new Map<number, { customerId: number; customerName: string; area: string; orders: string[]; lines: unknown[] }>();
+  type Drop = {
+    customerId: number;
+    customerName: string;
+    area: string;
+    orders: string[];
+    lines: unknown[];
+    delivery: (typeof deliveries)[number] | null;
+    invoices: typeof invoices;
+    invoiced: boolean;
+  };
+  const drops = new Map<number, Drop>();
   for (const it of [...items].sort((a, b) => a.orderId - b.orderId || a.itemId - b.itemId)) {
-    const d = drops.get(it.customerId) ?? { customerId: it.customerId, customerName: it.customerName, area: it.area, orders: [], lines: [] };
+    const d = drops.get(it.customerId) ?? {
+      customerId: it.customerId,
+      customerName: it.customerName,
+      area: it.area,
+      orders: [],
+      lines: [],
+      delivery: deliveries.find((x) => x.customerId === it.customerId) ?? null,
+      invoices: invoices.filter((x) => x.customerId === it.customerId),
+      invoiced: true,
+    };
+    // The driver can confirm a drop only once everything loaded for it has an invoice.
+    if (it.loaded > 0 && !it.invoiced) d.invoiced = false;
     if (!d.orders.includes(it.orderNumber)) d.orders.push(it.orderNumber);
     d.lines.push({
+      itemId: it.itemId,
+      loaded: it.loaded,
+      delivered: it.delivered,
+      shortReason: it.shortReason,
       orderNumber: it.orderNumber,
       companyCode: it.companyCode,
       lpoNo: it.lpoNo,
@@ -320,6 +367,10 @@ export async function planDetail(db: Db | PoolClient, user: AuthUser, planId: nu
     canLoad: has(LOADERS, user) && planned && plan.sent,
     canGate: has(LOADERS, user) && plan.status === 'loaded',
     canDelete: has(PLANNERS, user) && planned,
+    invoices,
+    // Invoices are made once the vehicle is loaded, before delivery (client, 16 Oct).
+    canMakeInvoices: has(INVOICE_MAKERS, user) && ['loaded', 'out'].includes(plan.status) && plan.notInvoiced > 0,
+    canDeliver: (user.role === 'admin' || (user.role === 'driver' && plan.driverId === user.id)) && plan.status === 'out',
   };
 }
 
