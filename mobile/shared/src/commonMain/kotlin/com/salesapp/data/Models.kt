@@ -241,6 +241,8 @@ data class CompanyDetails(
     val name: String,
     val facilityCode: String = "",
     val tpin: String? = null,
+    // The server may send the rate as a number or as text ("17.50"); null means none is set.
+    @Serializable(with = LenientDoubleSerializer::class)
     val vatRate: Double? = null,
     val phone: String? = null,
     val email: String? = null,

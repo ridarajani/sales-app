@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="orders_list_title">Orders</string>
+    <string name="orders_list_search_hint">Search order number or shop</string>
+    <string name="orders_list_new">New order</string>
+    <string name="orders_list_empty">No orders yet.</string>
+    <string name="orders_list_no_match">No orders match.</string>
+    <string name="orders_list_number_date">%1$s · %2$s</string>
+</resources>

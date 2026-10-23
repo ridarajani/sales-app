@@ -32,3 +32,14 @@ fun User.canSeeStock(): Boolean = role == "admin" || role == "management" || rol
 fun User.canApproveStock(): Boolean = role == "admin" || role == "management"
 
 fun User.canKeepStock(): Boolean = role == "admin" || role == "warehouse"
+
+// Orders: everyone but drivers can see them (a salesman only his own).
+fun User.canSeeOrders(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "warehouse", "cashier", "accounts")
+
+fun User.canBookOrders(): Boolean = role == "admin" || role == "sales_manager" || role == "salesman"
+
+// Who picks the salesman when booking; a salesman always books for himself.
+fun User.picksSalesman(): Boolean = role == "admin" || role == "sales_manager"
+
+// Salesmen never see stock: no Short pill, no "not in stock yet", no Reserve again.
+fun User.seesOrderStock(): Boolean = role != "salesman"

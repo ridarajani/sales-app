@@ -96,6 +96,9 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     private suspend inline fun <reified T, reified B : Any> put(path: String, body: B?): T =
         decode { send(HttpMethod.Put, path, body).body<T>() }
 
+    private suspend inline fun <reified T, reified B : Any> patch(path: String, body: B?): T =
+        decode { send(HttpMethod.Patch, path, body).body<T>() }
+
     // Stops the connection and frees its resources.
     fun close() {
         client.close()
@@ -206,4 +209,28 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
         post<AdjustmentDecision, DecisionRequest>("/stock/adjustments/$id/reject", DecisionRequest(note))
 
     suspend fun countStock(request: CountRequest): CountResult = post<CountResult, CountRequest>("/stock/counts", request)
+
+    // Orders.
+
+    // status: open, hold, done or cancelled (null for all); q matches the order number or customer name.
+    suspend fun orders(status: String?, q: String?, company: String?): List<OrderListItem> =
+        get("/orders", mapOf("status" to status, "q" to q?.trim()?.ifEmpty { null }, "company" to company))
+
+    suspend fun booking(customerId: Int): BookingInfo = get("/orders/booking/$customerId")
+
+    suspend fun createOrder(request: NewOrderRequest): OrderDetail = post<OrderDetail, NewOrderRequest>("/orders", request)
+
+    suspend fun order(id: Int): OrderDetail = get("/orders/$id")
+
+    suspend fun changeOrder(id: Int, change: OrderChange): OrderDetail = patch<OrderDetail, OrderChange>("/orders/$id", change)
+
+    suspend fun reserveOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/reserve", OrderNote(note))
+
+    suspend fun holdOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/hold", OrderNote(note))
+
+    suspend fun releaseOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/release", OrderNote(note))
+
+    suspend fun closeOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/close", OrderNote(note))
+
+    suspend fun cancelOrder(id: Int, note: String = ""): OrderDetail = post<OrderDetail, OrderNote>("/orders/$id/cancel", OrderNote(note))
 }

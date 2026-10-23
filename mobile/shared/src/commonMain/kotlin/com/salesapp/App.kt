@@ -47,6 +47,7 @@ import com.salesapp.ui.navigation.PinRoute
 import com.salesapp.ui.navigation.ServerAddressRoute
 import com.salesapp.ui.navigation.catalogGraph
 import com.salesapp.ui.navigation.open
+import com.salesapp.ui.orders.ordersGraph
 import com.salesapp.ui.screens.HomePage
 import com.salesapp.ui.screens.PhonePage
 import com.salesapp.ui.screens.PinPage
@@ -139,6 +140,7 @@ private fun AppContent() {
                     composable<ServerAddressRoute> { ServerAddressPage(onBack = { nav.popBackStack() }) }
                     usersGraph(nav)
                     stockGraph(nav)
+                    ordersGraph(nav)
                     customersGraph(nav, onExit = { nav.popBackStack() })
                     catalogGraph(nav, onExit = { nav.popBackStack() })
                 }

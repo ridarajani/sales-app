@@ -59,14 +59,14 @@ import com.salesapp.resources.tile_look_up
 import com.salesapp.resources.tile_more
 import com.salesapp.resources.tile_more_sub
 import com.salesapp.resources.tile_my_customers
-import com.salesapp.resources.tile_my_orders
-import com.salesapp.resources.tile_my_orders_sub
 import com.salesapp.resources.tile_my_salesmen
 import com.salesapp.resources.tile_my_salesmen_sub
 import com.salesapp.resources.tile_new_order
 import com.salesapp.resources.tile_new_order_sub
 import com.salesapp.resources.tile_approvals_loading
 import com.salesapp.resources.tile_nothing_waiting
+import com.salesapp.resources.tile_orders
+import com.salesapp.resources.tile_orders_sub
 import com.salesapp.resources.tile_products
 import com.salesapp.resources.tile_products_sub
 import com.salesapp.resources.tile_receive_stock
@@ -97,6 +97,8 @@ import com.salesapp.ui.navigation.CompaniesRoute
 import com.salesapp.ui.navigation.CustomersRoute
 import com.salesapp.ui.navigation.ApprovalsRoute
 import com.salesapp.ui.navigation.ExpiringRoute
+import com.salesapp.ui.navigation.NewOrderRoute
+import com.salesapp.ui.navigation.OrdersRoute
 import com.salesapp.ui.navigation.ProductsRoute
 import com.salesapp.ui.navigation.ReceiveStockRoute
 import com.salesapp.ui.navigation.StockCountRoute
@@ -136,12 +138,19 @@ private fun approvalsTile(subText: String?) =
 
 private fun more() = tile(Res.string.tile_more, Res.string.tile_more_sub, AppIcons.Grid)
 
+private fun newOrderTile() = tile(Res.string.tile_new_order, Res.string.tile_new_order_sub, AppIcons.Cart, NewOrderRoute)
+
+private fun ordersTile() = tile(Res.string.tile_orders, Res.string.tile_orders_sub, AppIcons.Receipt, OrdersRoute)
+
 // The squares each kind of person sees, in order. The first one is highlighted.
 // Only admin, management and warehouse get stock squares (the same roles as canSeeStock); no other role lists them.
+// Everyone but drivers gets Orders (canSeeOrders); those who book (canBookOrders) start with New order.
 internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: String? = null): List<TileDef> = when (role) {
     "admin" -> listOf(
+        newOrderTile(),
         tile(Res.string.tile_users, Res.string.tile_users_admin_sub, AppIcons.Person, UsersRoute),
         tile(Res.string.tile_customers, Res.string.tile_customers_add, AppIcons.People, CustomersRoute),
+        ordersTile(),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
         tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
         tile(Res.string.tile_companies, Res.string.tile_companies_sub, AppIcons.Settings, CompaniesRoute),
@@ -154,6 +163,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     )
     "management" -> listOf(
         tile(Res.string.tile_today, Res.string.tile_today_sub, AppIcons.Chart),
+        ordersTile(),
         approvalsTile(approvalsSub),
         tile(Res.string.tile_loading_plans, Res.string.tile_nothing_waiting, AppIcons.Truck),
         tile(Res.string.tile_airtel, Res.string.tile_airtel_both, AppIcons.Money),
@@ -168,13 +178,13 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
         more(),
     )
     "sales_manager" -> listOf(
-        tile(Res.string.tile_new_order, Res.string.tile_new_order_sub, AppIcons.Cart),
+        newOrderTile(),
         tile(Res.string.tile_loading_plan, Res.string.tile_nothing_waiting, AppIcons.Truck),
         tile(Res.string.tile_collect_money, Res.string.tile_collect_money_sub, AppIcons.Money),
         tile(Res.string.tile_airtel, Res.string.tile_airtel_ledger, AppIcons.Money),
         tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
         tile(Res.string.tile_my_salesmen, Res.string.tile_my_salesmen_sub, AppIcons.People, UsersRoute),
-        tile(Res.string.tile_my_orders, Res.string.tile_my_orders_sub, AppIcons.Cart),
+        ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
         tile(Res.string.tile_invoices, Res.string.tile_invoices_share, AppIcons.Receipt),
@@ -182,15 +192,16 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
         more(),
     )
     "salesman" -> listOf(
-        tile(Res.string.tile_new_order, Res.string.tile_new_order_sub, AppIcons.Cart),
+        newOrderTile(),
         tile(Res.string.tile_collect_money, Res.string.tile_collect_money_sub, AppIcons.Money),
         tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
-        tile(Res.string.tile_my_orders, Res.string.tile_my_orders_sub, AppIcons.Cart),
+        ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         more(),
     )
     "warehouse" -> listOf(
         tile(Res.string.tile_jobs, Res.string.tile_nothing_waiting, AppIcons.Box),
+        ordersTile(),
         tile(Res.string.tile_load_van, Res.string.tile_nothing_waiting, AppIcons.Truck),
         tile(Res.string.tile_receive_stock, Res.string.tile_receive_stock_sub, AppIcons.Box, ReceiveStockRoute),
         tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
@@ -209,6 +220,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     )
     "cashier" -> listOf(
         tile(Res.string.tile_count_cash, Res.string.tile_nothing_waiting, AppIcons.Money),
+        ordersTile(),
         tile(Res.string.tile_record_payment, Res.string.tile_record_payment_sub, AppIcons.Money),
         tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
@@ -217,6 +229,7 @@ internal fun tilesFor(role: String, expiringSub: String? = null, approvalsSub: S
     )
     "accounts" -> listOf(
         tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
+        ordersTile(),
         tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
         tile(Res.string.tile_ledger, Res.string.tile_ledger_sub, AppIcons.List),
         tile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, CustomersRoute),
