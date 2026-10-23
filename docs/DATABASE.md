@@ -159,6 +159,48 @@ erDiagram
         int requested_by FK
         int decided_by FK
     }
+    orders ||--|{ order_companies : "for"
+    orders ||--|{ order_lines : "has"
+    orders ||--o{ order_events : "history"
+    order_lines ||--o{ order_allocations : "reserves"
+    stock_batches ||--o{ order_allocations : "set aside"
+    customers ||--o{ orders : "places"
+    orders {
+        int id PK
+        text number "SO-000123"
+        text facility_code FK
+        int customer_id FK
+        int salesman_id FK
+        text invoice_type "vat or plain"
+        date wanted_on
+        text status "open, hold, done, cancelled"
+        int booked_by FK
+    }
+    order_companies {
+        int order_id PK
+        text company_code PK
+        text lpo_no
+    }
+    order_lines {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int pieces
+        int price_per_carton "MWK, without VAT"
+        int delivered "pieces"
+    }
+    order_allocations {
+        int line_id PK
+        int batch_id PK
+        int pieces
+    }
+    order_events {
+        bigint id PK
+        int order_id FK
+        int user_id FK
+        text title
+        text detail
+    }
 ```
 
 | Table | Added in | What it holds |
@@ -182,6 +224,12 @@ erDiagram
 | `stock_counts` | Phase 3 | Stock counts |
 | `stock_movements` | Phase 3 | Every change to stock: received, adjusted or counted |
 | `stock_adjustment_requests` | 22 Oct answers | Damaged-stock write-offs waiting for a manager's approval |
+| `shared_number_series` | Phase 4 | The last number of series shared by all companies, such as orders |
+| `orders` | Phase 4 | Customer orders, one customer and one facility each |
+| `order_companies` | Phase 4 | The companies on an order, with the customer's LPO number for each |
+| `order_lines` | Phase 4 | Products on an order: quantity, typed price and how much was delivered |
+| `order_allocations` | Phase 4 | Stock set aside for each order line, per batch |
+| `order_events` | Phase 4 | The history of each order |
 
 ## Phase 1 notes
 
@@ -220,3 +268,16 @@ erDiagram
 - **Salesmen under two managers:** `user_companies.manager_id` holds the sales manager for each company. Mr. Rajjab works for all four companies, under one manager for LV and ZT and another for ZF and GL. `users.manager_id` stays as the main manager. Either manager sees the salesman and can reset his PIN.
 - **Customer invoice details:** `customers.address`, `city`, `tpin` and `reg_no` print on the VAT invoice. They are optional columns at the end of the customer import, so older files still import.
 - **Damaged stock:** a warehouse write-off for `damaged` waits in `stock_adjustment_requests` until Admin or Management approves it; stock changes only on approval. An admin's own write-off applies at once. Audit actions: `stock_adjustment_requested`, `stock_adjustment_approved`, `stock_adjustment_rejected`.
+
+## Phase 4 notes
+
+- **One order** is for one customer and the companies of one facility, so it can mix Lucky Ventures and Zoona Trading products, but never products from both warehouses. Invoices (Phase 6) are split per company.
+- **Numbers:** orders use one shared series, `SO-000001`, from `shared_number_series` (client, 22 Oct: no separate numbering per company).
+- **Quantities** are pieces like stock; the app types cartons plus loose pieces. **Prices** are typed per carton on every order, in whole kwacha, without VAT. A line's amount is price × pieces ÷ pieces per carton, rounded to the kwacha. There is no discount.
+- **VAT or plain invoice:** picked on each order (`orders.invoice_type`). A VAT order adds `companies.vat_rate` (17.5% when empty) per company. The choice is saved in `customers.last_invoice_type` and offered next time.
+- **LPO:** one number per company on the order. Required when the customer is marked "needs LPO".
+- **Stock reservation:** a new order sets stock aside at once, oldest expiry first, in `order_allocations`. Free stock = `on_hand` minus reserved. A batch must have enough shelf life left for the customer's channel: supermarket 90 days, upcountry 60, wholesaler and minibus 30 (from the prototype; still to confirm with the client). If there is not enough, the order is still booked and shows what is short; "reserve again" picks up new stock.
+- **Statuses:** `open` (booked, stock reserved), `hold` (stays reserved, cannot be loaded), `cancelled` (stock released), `done` (closed by a manager after part delivery; the rest is released). Phase 5 adds loading states.
+- **Who:** a salesman books and sees only their own orders, and can change or cancel them while open. A sales manager or admin books for their companies, can name the salesman, and can change, hold, release, cancel and close any order of their companies. Management, warehouse, cashier and accounts see orders of their companies. Drivers do not see orders.
+- **Owes:** the booking screen shows what the customer owes each company. Until invoices and payments exist (Phase 6) this is the opening balance. There is no credit check (client, 7 Oct).
+- **Audit actions:** `order_booked`, `order_changed`, `order_held`, `order_released`, `order_cancelled`, `order_closed`.
