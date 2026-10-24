@@ -8,6 +8,7 @@ import { idParams, invalid, notFound } from '../lists/common.js';
 import { nextNumber } from '../numbering.js';
 import { inTransaction } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
+import { addAirtelPayment } from './airtel.js';
 import { CUSTOMER_OWES, INVOICE_BALANCE, OPENING_LEFT } from './balances.js';
 
 // Record payments from customers. Salesmen and sales managers collect in the field; Accounts and the cashier at the office.
@@ -179,6 +180,17 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
           a.invoiceId,
           a.amount,
         ]);
+      }
+      if (body.mode === 'airtel' && body.amount > 0) {
+        const { rows: cu } = await client.query<{ name: string }>('select name from customers where id = $1', [body.customerId]);
+        await addAirtelPayment(client, {
+          companyCode: body.companyCode,
+          amount: body.amount,
+          reference: body.reference,
+          description: `${cu[0]!.name} · ${number}`,
+          collectionId,
+          userId: user.id,
+        });
       }
       return { id: collectionId, number };
     });

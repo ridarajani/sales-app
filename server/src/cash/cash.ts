@@ -8,6 +8,7 @@ import { idParams, invalid, notFound } from '../lists/common.js';
 import { nextNumber, nextSharedNumber } from '../numbering.js';
 import { inTransaction } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
+import { addAirtelExpense } from './airtel.js';
 
 // Those who may spend company money in the field and hand cash to the cashier.
 export const EXPENSE_MAKERS = ['admin', 'sales_manager', 'salesman'] as const;
@@ -49,10 +50,12 @@ const expenseWhere = (user: AuthUser) =>
 const handoverWhere = (user: AuthUser) =>
   sees(user)
     ? `$2::int is not null and (exists (select 1 from collections c where c.handover_id = h.id and c.company_code = any($1::text[]))
-         or exists (select 1 from expenses e where e.handover_id = h.id and e.company_code = any($1::text[])))`
+         or exists (select 1 from expenses e where e.handover_id = h.id and e.company_code = any($1::text[]))
+         or exists (select 1 from airtel_entries a where a.handover_id = h.id and a.company_code = any($1::text[])))`
     : '$1::text[] is not null and h.handed_by = $2::int';
 
-// Cash a person holds, per company: what they collected less what they spent, not yet handed over.
+// Cash a person holds, per company: what they collected and took out of an Airtel wallet, less what they spent,
+// not yet handed over.
 async function cashHeld(db: Db, userId: number) {
   const { rows: collections } = await db.query(
     `select c.id, c.number, c.company_code as "companyCode", cu.name as "customerName", c.amount::float8 as amount, c.created_at as "createdAt"
@@ -66,31 +69,40 @@ async function cashHeld(db: Db, userId: number) {
      from expenses e where e.spent_by = $1 and e.custody = 'with' order by e.id`,
     [userId],
   );
-  const codes = [...new Set([...collections, ...expenses].map((x) => x.companyCode as string))].sort();
+  const { rows: withdrawals } = await db.query(
+    `select a.id, a.company_code as "companyCode", a.debit::float8 as amount, a.created_at as "createdAt"
+     from airtel_entries a where a.created_by = $1 and a.custody = 'with' order by a.id`,
+    [userId],
+  );
+  const codes = [...new Set([...collections, ...expenses, ...withdrawals].map((x) => x.companyCode as string))].sort();
   const sum = (list: { amount: number; companyCode: string }[], code?: string) =>
     list.filter((x) => !code || x.companyCode === code).reduce((t, x) => t + x.amount, 0);
   const companies = codes.map((code) => ({
     code,
     cash: sum(collections, code),
+    withdrawals: sum(withdrawals, code),
     expenses: sum(expenses, code),
-    net: sum(collections, code) - sum(expenses, code),
+    net: sum(collections, code) + sum(withdrawals, code) - sum(expenses, code),
   }));
   const cash = sum(collections);
+  const taken = sum(withdrawals);
   const spent = sum(expenses);
-  return { collections, expenses, companies, cash, expensesTotal: spent, net: cash - spent };
+  return { collections, withdrawals, expenses, companies, cash, withdrawalsTotal: taken, expensesTotal: spent, net: cash + taken - spent };
 }
 
 async function handoverDetail(db: Db, user: AuthUser, handoverId: number) {
   const { rows } = await db.query(
-    `select h.id, h.number, h.handed_by as "handedById", hb.name as "handedBy", h.cash::float8 as cash, h.expenses::float8 as expenses,
-       h.net::float8 as net, h.status, h.counted::float8 as counted, h.difference::float8 as difference, h.note,
+    `select h.id, h.number, h.handed_by as "handedById", hb.name as "handedBy", h.cash::float8 as cash, h.withdrawals::float8 as withdrawals,
+       h.expenses::float8 as expenses, h.net::float8 as net, h.status, h.counted::float8 as counted, h.difference::float8 as difference, h.note,
        cb.name as "countedBy", h.counted_at as "countedAt", h.created_at as "createdAt",
        coalesce((select json_agg(json_build_object('id', c.id, 'number', c.number, 'companyCode', c.company_code, 'customerName', cu.name,
            'amount', c.amount::float8) order by c.id)
          from collections c join customers cu on cu.id = c.customer_id where c.handover_id = h.id), '[]') as collections,
        coalesce((select json_agg(json_build_object('id', e.id, 'number', e.number, 'companyCode', e.company_code, 'description', e.description,
            'amount', e.amount::float8, 'hasPhoto', e.photo_file is not null) order by e.id)
-         from expenses e where e.handover_id = h.id), '[]') as "expenseList"
+         from expenses e where e.handover_id = h.id), '[]') as "expenseList",
+       coalesce((select json_agg(json_build_object('id', a.id, 'companyCode', a.company_code, 'amount', a.debit::float8) order by a.id)
+         from airtel_entries a where a.handover_id = h.id), '[]') as "withdrawalList"
      from handovers h join users hb on hb.id = h.handed_by left join users cb on cb.id = h.counted_by
      where h.id = $3 and ${handoverWhere(user)}`,
     [user.companies, user.id, handoverId],
@@ -98,11 +110,13 @@ async function handoverDetail(db: Db, user: AuthUser, handoverId: number) {
   const h = rows[0];
   if (!h) return null;
   // One total for the cashier; behind it each company's money is kept apart.
-  const byCompany = new Map<string, { code: string; cash: number; expenses: number; net: number }>();
-  const row = (code: string) => byCompany.get(code) ?? byCompany.set(code, { code, cash: 0, expenses: 0, net: 0 }).get(code)!;
+  const byCompany = new Map<string, { code: string; cash: number; withdrawals: number; expenses: number; net: number }>();
+  const row = (code: string) =>
+    byCompany.get(code) ?? byCompany.set(code, { code, cash: 0, withdrawals: 0, expenses: 0, net: 0 }).get(code)!;
   for (const c of h.collections) row(c.companyCode).cash += c.amount;
+  for (const a of h.withdrawalList) row(a.companyCode).withdrawals += a.amount;
   for (const e of h.expenseList) row(e.companyCode).expenses += e.amount;
-  for (const r of byCompany.values()) r.net = r.cash - r.expenses;
+  for (const r of byCompany.values()) r.net = r.cash + r.withdrawals - r.expenses;
   return {
     ...h,
     companies: [...byCompany.values()].sort((a, b) => a.code.localeCompare(b.code)),
@@ -130,6 +144,9 @@ export function cashRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
          values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
         [number, body.companyCode, body.amount, body.description, body.mode, photoFile, user.id, body.mode === 'cash' ? 'with' : 'na'],
       );
+      if (body.mode === 'airtel') {
+        await addAirtelExpense(client, { companyCode: body.companyCode, amount: body.amount, description: body.description, expenseId: rows[0]!.id, user });
+      }
       return { id: rows[0]!.id, number };
     });
     await audit(db, { userId: user.id, action: 'expense_recorded', details: { expenseId: saved.id, number: saved.number, amount: body.amount } });
@@ -188,18 +205,24 @@ export function cashRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
         `select id, amount::float8 as amount from expenses where spent_by = $1 and custody = 'with' order by id for update`,
         [user.id],
       );
-      if (cols.length === 0 && exps.length === 0) throw new HttpError(409, 'nothing_to_hand_over', 'You have no cash to hand over.');
+      const { rows: wds } = await client.query<{ id: number; amount: number }>(
+        `select id, debit::float8 as amount from airtel_entries where created_by = $1 and custody = 'with' order by id for update`,
+        [user.id],
+      );
+      if (cols.length === 0 && exps.length === 0 && wds.length === 0) throw new HttpError(409, 'nothing_to_hand_over', 'You have no cash to hand over.');
       const cash = cols.reduce((t, c) => t + c.amount, 0);
+      const taken = wds.reduce((t, w) => t + w.amount, 0);
       const spent = exps.reduce((t, e) => t + e.amount, 0);
       const number = await nextSharedNumber(client, 'HO');
       const { rows } = await client.query<{ id: number }>(
-        `insert into handovers (number, handed_by, cash, expenses, net) values ($1, $2, $3, $4, $5) returning id`,
-        [number, user.id, cash, spent, cash - spent],
+        `insert into handovers (number, handed_by, cash, withdrawals, expenses, net) values ($1, $2, $3, $4, $5, $6) returning id`,
+        [number, user.id, cash, taken, spent, cash + taken - spent],
       );
       const handoverId = rows[0]!.id;
       await client.query(`update collections set custody = 'handed', handover_id = $2 where id = any($1)`, [cols.map((c) => c.id), handoverId]);
       await client.query(`update expenses set custody = 'handed', handover_id = $2 where id = any($1)`, [exps.map((e) => e.id), handoverId]);
-      return { id: handoverId, number, net: cash - spent };
+      await client.query(`update airtel_entries set custody = 'handed', handover_id = $2 where id = any($1)`, [wds.map((w) => w.id), handoverId]);
+      return { id: handoverId, number, net: cash + taken - spent };
     });
     await audit(db, { userId: user.id, action: 'cash_handed_over', details: { handoverId: saved.id, number: saved.number, net: saved.net } });
     return reply.code(201).send(await handoverDetail(db, user, saved.id));
@@ -215,7 +238,7 @@ export function cashRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
       where += ` and h.status = $${params.length}`;
     }
     const { rows } = await db.query(
-      `select h.id, h.number, hb.name as "handedBy", h.cash::float8 as cash, h.expenses::float8 as expenses, h.net::float8 as net,
+      `select h.id, h.number, hb.name as "handedBy", h.cash::float8 as cash, h.withdrawals::float8 as withdrawals, h.expenses::float8 as expenses, h.net::float8 as net,
          h.status, h.counted::float8 as counted, h.difference::float8 as difference, h.created_at as "createdAt", h.counted_at as "countedAt"
        from handovers h join users hb on hb.id = h.handed_by
        where ${where} order by h.status = 'handed' desc, h.id desc limit 300`,
@@ -256,6 +279,7 @@ export function cashRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
       );
       await client.query(`update collections set custody = 'counted' where handover_id = $1`, [h.id]);
       await client.query(`update expenses set custody = 'counted' where handover_id = $1`, [h.id]);
+      await client.query(`update airtel_entries set custody = 'counted' where handover_id = $1`, [h.id]);
       return { number: h.number, difference };
     });
     await audit(db, {

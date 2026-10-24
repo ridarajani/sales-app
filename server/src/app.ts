@@ -19,6 +19,7 @@ import { invoiceRoutes } from './invoices/invoices.js';
 import { deliveryRoutes } from './delivery/delivery.js';
 import { collectionRoutes } from './cash/collections.js';
 import { cashRoutes } from './cash/cash.js';
+import { airtelRoutes } from './cash/airtel.js';
 
 export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string; brandingDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -78,6 +79,7 @@ export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string;
   deliveryRoutes(app, db, options.uploadDir ?? config.uploadDir);
   collectionRoutes(app, db, options.uploadDir ?? config.uploadDir);
   cashRoutes(app, db, options.uploadDir ?? config.uploadDir);
+  airtelRoutes(app, db);
 
   return app;
 }

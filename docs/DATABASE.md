@@ -219,6 +219,13 @@ erDiagram
     invoices ||--o{ collection_allocations : "paid by"
     handovers ||--o{ collections : "cash in"
     handovers ||--o{ expenses : "spent"
+    users ||--o| airtel_wallets : "holds"
+    airtel_wallets ||--o{ airtel_wallet_companies : "serves"
+    airtel_wallets ||--o{ airtel_entries : "ledger"
+    airtel_wallets ||--o{ airtel_checks : "checked"
+    collections ||--o| airtel_entries : "paid in"
+    expenses ||--o| airtel_entries : "paid out"
+    handovers ||--o{ airtel_entries : "withdrawn cash"
     loading_plans {
         int id PK
         text number "LP-000123"
@@ -331,12 +338,47 @@ erDiagram
         text number UK "HO-000001"
         int handed_by FK
         bigint cash
+        bigint withdrawals
         bigint expenses
         bigint net
         text status "handed, counted"
         bigint counted
         bigint difference
         int counted_by FK
+    }
+    airtel_wallets {
+        int id PK
+        int holder_id FK,UK
+        bigint opening_balance
+        boolean active
+    }
+    airtel_wallet_companies {
+        int wallet_id FK
+        text company_code PK
+    }
+    airtel_entries {
+        int id PK
+        int wallet_id FK
+        text company_code FK
+        text kind "payment, expense, withdrawal, charge"
+        bigint credit
+        bigint debit
+        text reference
+        int collection_id FK
+        int expense_id FK
+        text status "waiting, ticked, ok"
+        text custody
+        int handover_id FK
+        int created_by FK
+    }
+    airtel_checks {
+        int id PK
+        int wallet_id FK
+        bigint actual
+        bigint ledger
+        bigint difference
+        text note
+        int checked_by FK
     }
 ```
 
@@ -378,6 +420,10 @@ erDiagram
 | `collection_allocations` | Phase 7 | Which invoices (or the opening balance) each payment paid |
 | `expenses` | Phase 7 | Money spent for a company, with the bill photo |
 | `handovers` | Phase 7 | Cash handed to the cashier and what the cashier counted |
+| `airtel_wallets` | Phase 7 | Each sales manager's Airtel Money wallet and its opening balance |
+| `airtel_wallet_companies` | Phase 7 | Which companies' Airtel payments go into which wallet |
+| `airtel_entries` | Phase 7 | Every movement in a wallet: payments in, expenses, withdrawals and their charges |
+| `airtel_checks` | Phase 7 | The holder's checks of the real wallet balance against the app |
 
 ## Phase 1 notes
 
@@ -469,5 +515,6 @@ erDiagram
 - **Expenses** (`POST /expenses`): Admin, sales managers and salesmen record money spent for a company, with an optional bill photo. Numbered per company (`LV-EXP-000001`). Cash expenses come off the next handover; Airtel Money expenses do not.
 - **Cash custody:** cash stays the collector's responsibility (`custody = 'with'`) until the cashier counts it. `GET /cash/mine` shows what a person holds per company. `POST /handovers` hands all of it over in one total (cash less cash expenses), numbered `HO-000001` across companies; behind the total each company's money is kept apart. The cashier (or Admin, never the person who handed it over) counts it with `POST /handovers/:id/count`; a difference needs a note and is kept. Cash the cashier takes directly is counted at once.
 - **Who sees what:** Admin, Management, the cashier and Accounts see every payment, expense and handover of their companies. Salesmen see their own payments; salesmen and sales managers see their own expenses and handovers. Warehouse and drivers see none.
-- **Not yet:** the Airtel Money wallet ledger (ticking payments in, withdrawals, wallet check) comes in the next pull request. Cancelling a wrong payment, credit notes and the customer ledger card come in Phase 8; money on account is not put on later invoices automatically until then.
-- **Audit actions:** `payment_collected`, `expense_recorded`, `cash_handed_over`, `cash_counted`.
+- **Airtel Money wallets** (migration 019): Admin gives each sales manager one wallet for their companies (`POST /airtel/wallets`, with the opening balance); a company has at most one wallet. An Airtel payment adds a `waiting` entry to its company's wallet, and the holder ticks it (`POST /airtel/entries/:id/tick`) once it shows on their phone. Only the holder can pay an expense from the wallet; anyone else is told to pay in cash. The holder takes money out with `POST /airtel/wallets/:id/withdrawals` (the Airtel charge is recorded as an expense too); that money is cash in their hand and goes into their next handover, so handovers are now cash plus withdrawals less cash expenses. `POST /airtel/wallets/:id/checks` records the real balance against the app's, and keeps any difference. Admin, Management, the cashier and Accounts see the wallets of their companies; a sales manager sees their own.
+- **Not yet:** cancelling a wrong payment, credit notes and the customer ledger card come in Phase 8; money on account is not put on later invoices automatically until then.
+- **Audit actions:** `payment_collected`, `expense_recorded`, `cash_handed_over`, `cash_counted`, `airtel_wallet_set_up`, `airtel_wallet_changed`, `airtel_payment_ticked`, `airtel_withdrawal`, `airtel_wallet_checked`.

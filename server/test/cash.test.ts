@@ -164,22 +164,22 @@ test('cash expenses come off the cash handed to the cashier', async () => {
   expect(e.statusCode).toBe(201);
   expect(e.json()).toMatchObject({ number: 'LV-EXP-000001', mode: 'cash', custody: 'with', hasPhoto: true, spentBy: 'Seller' });
   const airtel = await post(app, seller, '/expenses', { companyCode: 'ZT', amount: 1000, description: 'Airtime', mode: 'airtel' });
-  expect(airtel.json()).toMatchObject({ custody: 'na' });
+  expect(airtel.json().message).toBe('This company has no Airtel Money wallet yet. Please pay in cash.');
   expect((await post(app, seller, '/expenses', { companyCode: 'LV', amount: 100, description: ' ' })).json().message).toBe('Please say what it was for.');
   expect((await post(app, cashier, '/expenses', { companyCode: 'LV', amount: 100, description: 'x' })).statusCode).toBe(403);
 
   const mine = (await get(app, seller, '/cash/mine')).json();
   expect(mine).toMatchObject({ cash: 55000, expensesTotal: 5000, net: 50000, companies: [{ code: 'LV', cash: 55000, expenses: 5000, net: 50000 }] });
-  expect((await get(app, seller, '/expenses')).json()).toHaveLength(2);
+  expect((await get(app, seller, '/expenses')).json()).toHaveLength(1);
   expect((await get(app, manager, '/expenses')).json()).toHaveLength(0);
-  expect((await get(app, cashier, '/expenses')).json()).toHaveLength(2);
+  expect((await get(app, cashier, '/expenses')).json()).toHaveLength(1);
 });
 
 test('the salesman hands over one total; the cashier counts it and any difference is kept', async () => {
   const h = await post(app, seller, '/handovers');
   expect(h.statusCode).toBe(201);
   expect(h.json()).toMatchObject({ number: 'HO-000001', cash: 55000, expenses: 5000, net: 50000, status: 'handed', canCount: false });
-  expect(h.json().companies).toEqual([{ code: 'LV', cash: 55000, expenses: 5000, net: 50000 }]);
+  expect(h.json().companies).toEqual([{ code: 'LV', cash: 55000, withdrawals: 0, expenses: 5000, net: 50000 }]);
   expect((await post(app, seller, '/handovers')).json().error).toBe('nothing_to_hand_over');
   expect((await get(app, seller, '/cash/mine')).json()).toMatchObject({ net: 0, collections: [] });
 
