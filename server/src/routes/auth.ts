@@ -44,7 +44,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       const { rows } = await client.query<LoginRow>(
         `select id, pin_hash, active,
            case when locked_until > now() then ceil(extract(epoch from (locked_until - now())) / 60)::int end as "minutesLeft"
-         from users where phone = $1 for update`,
+         from users where phone = $1 and deleted_at is null for update`,
         [phone],
       );
       const row = rows[0];
@@ -112,7 +112,7 @@ export function authRoutes(app: FastifyInstance, db: Db) {
       ? await db.query<{ name: string; role: string; active: boolean; minutesLeft: number | null }>(
           `select name, role, active,
              case when locked_until > now() then ceil(extract(epoch from (locked_until - now())) / 60)::int end as "minutesLeft"
-           from users where phone = $1`,
+           from users where phone = $1 and deleted_at is null`,
           [phone],
         )
       : { rows: [] };

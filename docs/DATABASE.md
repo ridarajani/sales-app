@@ -25,6 +25,8 @@ erDiagram
     companies ||--o{ products : "sells"
     facilities ||--o{ vehicles : "based at"
     users ||--o{ vehicles : "usual driver"
+    users ||--o{ user_dormant_vehicles : "does not use"
+    vehicles ||--o{ user_dormant_vehicles : "dormant for"
     customer_companies ||--o| opening_balances : "starts with"
     companies ||--o{ number_series : "numbers"
     products ||--o{ stock_batches : "kept in"
@@ -95,7 +97,9 @@ erDiagram
         text name
         text pack_size
         int pieces_per_carton
+        boolean vat_exempt
         boolean active
+        timestamptz deleted_at
     }
     vehicles {
         int id PK
@@ -104,6 +108,11 @@ erDiagram
         text facility_code FK
         int default_driver_id FK
         boolean active
+        timestamptz deleted_at
+    }
+    user_dormant_vehicles {
+        int user_id PK, FK
+        int vehicle_id PK, FK
     }
     opening_balances {
         int customer_id PK, FK
@@ -526,6 +535,7 @@ erDiagram
 | `trip_lines` | Phase 9 | Products on a trip: planned, loaded, sold, brought back and missing |
 | `trip_line_batches` | Phase 9 | Which batches each product was loaded from, and how much of each is sold |
 | `trip_sales` | Phase 9 | Each sale at a stop: customer, payment, signature and the phone's time |
+| `user_dormant_vehicles` | 24 Oct answers | Vehicles a person does not use, kept at the bottom of their list |
 
 ## Phase 1 notes
 
@@ -542,7 +552,7 @@ erDiagram
 
 - **Customers** can buy from several companies. Each user only sees the companies they work for, and only those companies' payment terms.
 - **Cash-only customers** always have 0 payment terms.
-- **Who edits lists:** Admin and Accounts edit customers and products; a sales manager can add or edit customers for their own companies only. Only Admin edits vehicles and company details.
+- **Who edits lists:** Admin and Accounts edit customers and products; a sales manager can add or edit customers for their own companies only. Only Admin edits company details; vehicles are kept by Admin and both sales managers (24 Oct answers).
 - **Opening balances** are entered once by Accounts or Admin. After that only Admin can correct one, and both are written to the audit log (`opening_balance_entered`, `opening_balance_corrected`).
 - **Document numbers** look like `LV-SO-000123`: company, document type, then a counter. Taken inside the same transaction as the document, so a cancelled save does not use up a number.
 - **Excel import:** download a template, upload it to check (nothing is saved), then upload again to save. Either every row is saved or none.
@@ -648,3 +658,11 @@ erDiagram
 - **Who:** Admin, Management and sales managers plan; the warehouse loads and sees no money; salesmen see only the trips they lead; drivers see their own trips once loaded.
 - **Not yet:** advance orders on a trip (confirmed orders delivered at a stop) come in Phase 9 part 2.
 - **Audit actions:** `trip_planned`, `trip_changed`, `trip_deleted`, `trip_loaded`, `trip_sale`, `trip_expense`, `trip_closed`.
+
+## Client answers of 24 October
+
+- **VAT exempt products:** `products.vat_exempt`. VAT is worked out only on the lines that are not exempt, rounded once per invoice (`vatOn` in `orders.ts`). Each invoice line keeps `invoice_lines.vat_exempt` as it was when invoiced, so returns use the same rule; a VAT invoice prints "(VAT exempt)" after such a line. The product import has an optional `VAT exempt` column (Yes or No).
+- **Delete** (`DELETE /products/:id`, `/customers/:id`, `/vehicles/:id`, `/users/:id`): a row nothing refers to is removed. One with history (an order, invoice, trip, opening balance or audit entry) gets `deleted_at` instead: it is switched off, hidden from every list and screen, and cannot be switched on again, while old documents keep its name. The answer is `{ deleted: true, keptForHistory }`. Codes, customer names, plates and login phones only need to be unique among rows that are not deleted, so they can be used again. Opening balances no longer vanish with their customer.
+- **Users:** `PUT /users/:id` changes the name, phone, job, companies or sales managers; only what is sent changes. A sales manager edits and deletes their own salesmen only. Deleting a user ends their login at once and clears them as a vehicle's usual driver. A sales manager with salesmen cannot be deleted, moved to another job or lose a company their salesmen use until the salesmen are moved.
+- **Vehicles** are shared by all four companies. Both sales managers, as well as Admin, add, edit and delete them. Each person marks the ones they do not use with `PUT /vehicles/:id/dormant { dormant }`; `GET /vehicles` gives `dormant` for the caller and lists those last.
+- **Invoices** carry no bank details. Audit actions: `product_deleted`, `customer_deleted`, `vehicle_deleted`, `user_updated`, `user_deleted`.

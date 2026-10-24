@@ -5,7 +5,7 @@ import { audit } from '../audit.js';
 import { HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import type { Db } from '../db/pool.js';
 import { parse } from '../users.js';
-import { assertCanEditCompanies, CHANNELS, companyCodes, idParams, invalid, notFound, optionalPhone } from './common.js';
+import { assertCanEditCompanies, CHANNELS, companyCodes, deleteOrMark, idParams, invalid, notFound, optionalPhone } from './common.js';
 
 export type CustomerCompany = { code: string; paymentTermsDays: number };
 export type Customer = {
@@ -67,7 +67,7 @@ const customerSelect = `select c.id, c.name, c.channel, c.area, c.address, c.cit
               where cc.customer_id = c.id and cc.company_code = any($1)), '[]') as companies,
     (select array_agg(cc.company_code) from customer_companies cc where cc.customer_id = c.id) as "allCompanies"
   from customers c
-  where exists (select 1 from customer_companies cc where cc.customer_id = c.id and cc.company_code = any($1))`;
+  where c.deleted_at is null and exists (select 1 from customer_companies cc where cc.customer_id = c.id and cc.company_code = any($1))`;
 
 type CustomerRow = Omit<Customer, 'canEdit'> & { allCompanies: string[] };
 
@@ -109,7 +109,7 @@ export async function insertCustomer(client: PoolClient, c: CleanCustomer): Prom
   const { rows } = await client.query<{ id: number }>(
     `insert into customers (name, channel, area, address, city, tpin, reg_no, phone, needs_lpo, cash_only)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     on conflict ((lower(name))) do nothing returning id`,
+     on conflict ((lower(name))) where deleted_at is null do nothing returning id`,
     [c.name, c.channel, c.area, c.address, c.city, c.tpin, c.regNo, c.phone, c.needsLpo, c.cashOnly],
   );
   const id = rows[0]?.id;
@@ -201,7 +201,7 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       const updated = await client.query(
         `update customers set name = $2, channel = $3, area = $4, phone = $5, needs_lpo = $6, cash_only = $7,
            active = coalesce($8, active), address = $9, city = $10, tpin = $11, reg_no = $12, updated_at = now()
-         where id = $1 and not exists (select 1 from customers o where lower(o.name) = lower($2) and o.id <> $1)`,
+         where id = $1 and not exists (select 1 from customers o where lower(o.name) = lower($2) and o.id <> $1 and o.deleted_at is null)`,
         [
           id,
           merged.name,
@@ -245,5 +245,15 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
     }
     await audit(db, { userId: request.user.id, action: 'customer_updated', details: { customerId: id, changes: Object.keys(body) } });
     return getCustomer(db, request.user, id);
+  });
+  // A sales manager may only delete a customer who buys from their companies alone.
+  app.delete('/customers/:id', { onRequest: auth, preHandler: editors }, async (request) => {
+    const { id } = parse(idParams, request.params);
+    const current = await getCustomer(db, request.user, id);
+    if (!current) throw notFound('customer');
+    assertCanEditCompanies(request.user, await allCompaniesOf(db, id));
+    const keptForHistory = await deleteOrMark(db, 'customers', id);
+    await audit(db, { userId: request.user.id, action: 'customer_deleted', details: { customerId: id, name: current.name, keptForHistory } });
+    return { deleted: true, keptForHistory };
   });
 }
