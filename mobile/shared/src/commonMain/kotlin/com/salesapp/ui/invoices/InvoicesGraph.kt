@@ -7,6 +7,9 @@ import androidx.navigation.toRoute
 import com.salesapp.ui.navigation.InvoiceDetailRoute
 import com.salesapp.ui.navigation.CollectMoneyRoute
 import com.salesapp.ui.navigation.InvoicesRoute
+import com.salesapp.ui.navigation.LedgerRoute
+import com.salesapp.ui.navigation.NewNoteRoute
+import com.salesapp.ui.navigation.NewReturnRoute
 import com.salesapp.ui.navigation.open
 
 // The invoice register and one invoice.
@@ -23,6 +26,9 @@ fun NavGraphBuilder.invoicesGraph(nav: NavController) {
             onCollect = { customerId, companyCode, invoiceId ->
                 nav.open(CollectMoneyRoute(customerId = customerId, companyCode = companyCode, invoiceId = invoiceId))
             },
+            onReturn = { invoiceId -> nav.open(NewReturnRoute(invoiceId)) },
+            onNote = { invoiceId -> nav.open(NewNoteRoute(invoiceId)) },
+            onLedger = { customerId, companyCode -> nav.open(LedgerRoute(customerId = customerId, companyCode = companyCode)) },
         )
     }
 }

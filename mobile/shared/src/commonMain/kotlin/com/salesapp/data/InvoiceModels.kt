@@ -54,6 +54,8 @@ data class InvoiceCompany(
 // quantity is the server's own wording for the amount, for example "4 ctn" or "4 ctn 3 pcs".
 @Serializable
 data class InvoiceLine(
+    // The invoice line's own id, which a sales return points at.
+    val lineId: Int = 0,
     val productId: Int = 0,
     val code: String = "",
     val brand: String = "",
@@ -65,6 +67,11 @@ data class InvoiceLine(
     val pricePerCarton: Double = 0.0,
     val amount: Double = 0.0,
     val orderNumber: String = "",
+    // Phase 8. delivered is null until the drop is confirmed; canReturn is the most that can still
+    // come back after delivery (delivered less what already came back).
+    val delivered: Int? = null,
+    val returned: Int = 0,
+    val canReturn: Int? = null,
 )
 
 @Serializable
@@ -86,6 +93,11 @@ data class InvoiceDetail(
     val discount: Double = 0.0,
     val wht: Double = 0.0,
     val payments: List<InvoicePayment> = emptyList(),
+    // Phase 8: what came back and the notes made on it.
+    val returns: List<InvoiceReturn> = emptyList(),
+    val notes: List<InvoiceNoteRow> = emptyList(),
+    // Whoever may book a return or make a note: admin, management, sales managers and accounts.
+    val canAdjust: Boolean = false,
     val createdAt: String = "",
     val createdBy: String = "",
     val salesmanName: String? = null,
@@ -107,5 +119,33 @@ data class InvoicePayment(
     val number: String = "",
     val mode: String = "cash",
     val amount: Double = 0.0,
+    val at: String = "",
+)
+
+// A return on this invoice. It only comes off the invoice once it is booked.
+@Serializable
+data class InvoiceReturn(
+    val id: Int,
+    val number: String = "",
+    val kind: String = "after",
+    val reason: String = "",
+    val total: Double = 0.0,
+    val booked: Boolean = false,
+    val goods: String = "waiting",
+    val at: String = "",
+) {
+    val notTakenAtDelivery: Boolean get() = kind == "delivery"
+}
+
+// A credit or debit note on this invoice; owesChange is + when the customer owes more.
+@Serializable
+data class InvoiceNoteRow(
+    val id: Int,
+    val number: String = "",
+    val kind: String = "credit_issued",
+    val reason: String = "",
+    val amount: Double = 0.0,
+    val owesChange: Double = 0.0,
+    val theirNumber: String = "",
     val at: String = "",
 )

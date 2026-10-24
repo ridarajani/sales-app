@@ -29,6 +29,22 @@ import com.salesapp.data.InvoiceDetail
 import com.salesapp.data.InvoiceLine
 import com.salesapp.resources.Res
 import com.salesapp.resources.invoice_balance
+import com.salesapp.resources.invoice_ledger
+import com.salesapp.resources.invoice_note
+import com.salesapp.resources.invoice_note_owes_less
+import com.salesapp.resources.invoice_note_owes_more
+import com.salesapp.resources.invoice_notes
+import com.salesapp.resources.invoice_return
+import com.salesapp.resources.invoice_return_after
+import com.salesapp.resources.invoice_return_book
+import com.salesapp.resources.invoice_return_booked
+import com.salesapp.resources.invoice_return_booking
+import com.salesapp.resources.invoice_return_delivery
+import com.salesapp.resources.invoice_return_row
+import com.salesapp.resources.invoice_return_to_book
+import com.salesapp.resources.invoice_return_to_book_help
+import com.salesapp.resources.invoice_returns
+import com.salesapp.resources.invoice_their_number
 import com.salesapp.resources.invoice_collect
 import com.salesapp.resources.invoice_date
 import com.salesapp.resources.invoice_delivered
@@ -77,6 +93,9 @@ fun InvoiceDetailPage(
     id: Int,
     onBack: () -> Unit,
     onCollect: (customerId: Int, companyCode: String, invoiceId: Int) -> Unit,
+    onReturn: (invoiceId: Int) -> Unit,
+    onNote: (invoiceId: Int) -> Unit,
+    onLedger: (customerId: Int, companyCode: String) -> Unit,
     viewModel: InvoiceDetailViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -85,7 +104,7 @@ fun InvoiceDetailPage(
         viewModel.onEvent(InvoiceDetailEvent.Refresh)
         onPauseOrDispose {}
     }
-    InvoiceDetailScreen(state, viewModel::onEvent, onBack, onCollect)
+    InvoiceDetailScreen(state, viewModel::onEvent, onBack, onCollect, onReturn, onNote, onLedger)
 }
 
 // One invoice: who it is for, what is on it, and the totals. Print or save opens it in the phone's
@@ -96,6 +115,9 @@ fun InvoiceDetailScreen(
     onEvent: (InvoiceDetailEvent) -> Unit,
     onBack: () -> Unit,
     onCollect: (customerId: Int, companyCode: String, invoiceId: Int) -> Unit = { _, _, _ -> },
+    onReturn: (invoiceId: Int) -> Unit = {},
+    onNote: (invoiceId: Int) -> Unit = {},
+    onLedger: (customerId: Int, companyCode: String) -> Unit = { _, _ -> },
 ) {
     val invoice = state.invoice
     Column(modifier = Modifier.fillMaxSize()) {
@@ -111,6 +133,9 @@ fun InvoiceDetailScreen(
                     Lines(invoice)
                     Totals(invoice)
                     Payments(invoice)
+                    // Phase 8: what came back and the notes on it.
+                    Returns(invoice, state.busy, onBook = { onEvent(InvoiceDetailEvent.BookReturn(it)) })
+                    Notes(invoice)
                     if (state.canCollect && invoice.balance > 0) {
                         SecondaryButton(
                             stringResource(Res.string.invoice_collect),
@@ -118,6 +143,28 @@ fun InvoiceDetailScreen(
                             enabled = !state.busy,
                         )
                     }
+                    // Two things that belong together, side by side.
+                    if (invoice.canAdjust) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SecondaryButton(
+                                stringResource(Res.string.invoice_return),
+                                onClick = { onReturn(invoice.id) },
+                                enabled = !state.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                            SecondaryButton(
+                                stringResource(Res.string.invoice_note),
+                                onClick = { onNote(invoice.id) },
+                                enabled = !state.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                    SecondaryButton(
+                        stringResource(Res.string.invoice_ledger),
+                        onClick = { onLedger(invoice.customer.id, invoice.companyCode) },
+                        enabled = !state.busy,
+                    )
                     state.actionError?.let { Say(it, error = true) }
                     if (state.busy) {
                         Text(
@@ -252,6 +299,94 @@ private fun Totals(invoice: InvoiceDetail) {
             if (invoice.discount > 0) TotalRow(stringResource(Res.string.invoice_less_discount), formatMwk(invoice.discount.toLong()))
             if (invoice.wht > 0) TotalRow(stringResource(Res.string.invoice_less_wht), formatMwk(invoice.wht.toLong()))
             TotalRow(stringResource(Res.string.invoice_balance), formatMwk(invoice.balance.toLong()), strong = true)
+        }
+    }
+}
+
+// What came back on this invoice. A return that is not booked yet is still owed in full, so it is
+// called out with the one button that fixes it.
+@Composable
+private fun Returns(invoice: InvoiceDetail, busy: Boolean, onBook: (Int) -> Unit) {
+    if (invoice.returns.isEmpty()) return
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(Res.string.invoice_returns))
+        invoice.returns.forEach { ret ->
+            ListCard(onClick = null) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(ret.number, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        Text(
+                            formatMwk(ret.total.toLong()),
+                            color = scheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        stringResource(
+                            Res.string.invoice_return_row,
+                            if (ret.notTakenAtDelivery) {
+                                stringResource(Res.string.invoice_return_delivery)
+                            } else {
+                                stringResource(Res.string.invoice_return_after)
+                            },
+                            ret.reason,
+                        ),
+                        color = scheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Badge(
+                        stringResource(if (ret.booked) Res.string.invoice_return_booked else Res.string.invoice_return_to_book),
+                        tone = if (ret.booked) BadgeTone.On else BadgeTone.Off,
+                    )
+                    if (!ret.booked && invoice.canAdjust) {
+                        Say(stringResource(Res.string.invoice_return_to_book_help), error = true)
+                        PrimaryButton(
+                            stringResource(if (busy) Res.string.invoice_return_booking else Res.string.invoice_return_book),
+                            onClick = { onBook(ret.id) },
+                            enabled = !busy,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The credit and debit notes on this invoice, each saying which way it moved the balance.
+@Composable
+private fun Notes(invoice: InvoiceDetail) {
+    if (invoice.notes.isEmpty()) return
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(Res.string.invoice_notes))
+        ListCard(onClick = null) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                invoice.notes.forEach { note ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(note.number, color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (note.owesChange >= 0) {
+                                stringResource(Res.string.invoice_note_owes_more, formatMwk(note.owesChange.toLong()))
+                            } else {
+                                stringResource(Res.string.invoice_note_owes_less, formatMwk(-note.owesChange.toLong()))
+                            },
+                            color = scheme.onSurface,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(note.reason, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+                        note.theirNumber.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                stringResource(Res.string.invoice_their_number, it),
+                                color = scheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.caption,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

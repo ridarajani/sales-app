@@ -83,6 +83,8 @@ data class PaymentListItem(
     val collectedBy: String = "",
     val custody: String = "na",
     val createdAt: String = "",
+    // Phase 8: a payment recorded by mistake stays on record but no longer counts.
+    val cancelled: Boolean = false,
 )
 
 @Serializable
@@ -108,6 +110,13 @@ data class PaymentDetail(
     val custody: String = "na",
     val handoverNumber: String? = null,
     val createdAt: String = "",
+    // Phase 8: cancelling a payment recorded by mistake.
+    val cancelled: Boolean = false,
+    val cancelledBy: String? = null,
+    val cancelledAt: String? = null,
+    val cancelReason: String = "",
+    // Accounts and admin, while its cash is still in hand and any Airtel payment is not ticked.
+    val canCancel: Boolean = false,
     val allocations: List<Allocation> = emptyList(),
     // Anything over what the invoices owed stays on account.
     val onAccount: Double = 0.0,
@@ -236,3 +245,6 @@ data class HandoverDetail(
 
 @Serializable
 data class CashCountRequest(val counted: Int, val note: String = "")
+
+@Serializable
+data class CancelRequest(val reason: String)

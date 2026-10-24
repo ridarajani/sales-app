@@ -6,6 +6,7 @@ import com.salesapp.core.Documents
 import com.salesapp.data.AppState
 import com.salesapp.data.InvoiceDetail
 import com.salesapp.data.InvoiceRepository
+import com.salesapp.data.ReturnsRepository
 import com.salesapp.data.canCollect
 import com.salesapp.data.canSeeInvoices
 import com.salesapp.resources.Res
@@ -32,6 +33,8 @@ data class InvoiceDetailState(
 
 sealed interface InvoiceDetailEvent {
     data object Retry : InvoiceDetailEvent
+    // Phase 8: a return that is not off the invoice yet.
+    data class BookReturn(val returnId: Int) : InvoiceDetailEvent
     // A payment may have changed the balance while this screen was away.
     data object Refresh : InvoiceDetailEvent
     // Opens the PDF in the phone's viewer, which is where Print and Save live.
@@ -43,6 +46,7 @@ sealed interface InvoiceDetailEvent {
 class InvoiceDetailViewModel(
     private val id: Int,
     private val repository: InvoiceRepository,
+    private val returns: ReturnsRepository,
     private val documents: Documents,
     private val app: AppState,
 ) : ViewModel() {
@@ -59,9 +63,28 @@ class InvoiceDetailViewModel(
         if (!_state.value.allowed) return
         when (event) {
             InvoiceDetailEvent.Retry -> load()
+            is InvoiceDetailEvent.BookReturn -> bookReturn(event.returnId)
             InvoiceDetailEvent.Refresh -> if (_state.value.invoice != null && !_state.value.busy) load(showSpinner = false)
             InvoiceDetailEvent.Print -> sendPdf(share = false)
             InvoiceDetailEvent.Share -> sendPdf(share = true)
+        }
+    }
+
+    // Booking a return takes it off the invoice, so the invoice is read again straight after.
+    private fun bookReturn(returnId: Int) {
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, actionError = null) }
+        viewModelScope.launch {
+            try {
+                returns.book(returnId)
+                _state.update { it.copy(busy = false) }
+                load(showSpinner = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = app.handleApiError(e)
+                _state.update { it.copy(busy = false, actionError = message) }
+            }
         }
     }
 

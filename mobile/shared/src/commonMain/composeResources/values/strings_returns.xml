@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home tiles -->
+    <string name="tile_returns">Sales returns</string>
+    <string name="tile_returns_sub">Goods that came back</string>
+    <string name="tile_returns_receive_one">1 to receive</string>
+    <string name="tile_returns_receive_many">%1$d to receive</string>
+    <string name="tile_ledger_card">Customer ledger</string>
+    <string name="tile_ledger_card_sub">Every invoice and payment</string>
+
+    <!-- On the invoice -->
+    <string name="invoice_return">Sales return</string>
+    <string name="invoice_note">Credit or debit note</string>
+    <string name="invoice_ledger">Customer ledger</string>
+    <string name="invoice_returns">Returns</string>
+    <string name="invoice_notes">Credit and debit notes</string>
+    <string name="invoice_return_row">%1$s · %2$s</string>
+    <string name="invoice_return_delivery">Not taken at delivery</string>
+    <string name="invoice_return_after">Brought back after delivery</string>
+    <string name="invoice_return_to_book">Not booked yet</string>
+    <string name="invoice_return_to_book_help">This return is not off the invoice yet. The invoice still owes the full amount until it is booked.</string>
+    <string name="invoice_return_book">Book it</string>
+    <string name="invoice_return_booking">Booking...</string>
+    <string name="invoice_return_booked">Booked, invoice reduced</string>
+    <string name="invoice_return_waiting">Waiting for the warehouse</string>
+    <string name="invoice_return_back">Back in the warehouse</string>
+    <string name="invoice_note_row">%1$s · %2$s</string>
+    <string name="invoice_note_owes_more">They owe %1$s more</string>
+    <string name="invoice_note_owes_less">They owe %1$s less</string>
+    <string name="invoice_their_number">Their number %1$s</string>
+
+    <!-- Sales return after delivery -->
+    <string name="return_title">Sales return</string>
+    <string name="return_help">What the customer gave back. The invoice and what they owe go down at once. The warehouse puts the stock back when it gets the goods.</string>
+    <string name="return_not_delivered">This invoice is not delivered yet, so nothing can come back. A shortage at delivery makes its own return.</string>
+    <string name="return_line_up_to">%1$s invoiced · up to %2$s can come back</string>
+    <string name="return_cartons">Cartons</string>
+    <string name="return_pieces">Pieces</string>
+    <string name="return_why">Why?</string>
+    <string name="return_note">Note</string>
+    <string name="return_save">Book the return</string>
+    <string name="return_saving">Booking...</string>
+    <string name="return_need_lines">Please type what came back.</string>
+    <string name="return_too_much">Only %1$s can still come back.</string>
+    <string name="return_need_reason">Please say why the goods came back.</string>
+    <string name="return_saved">Return %1$s booked</string>
+    <string name="return_saved_lower">The invoice and what they owe are now lower by %1$s.</string>
+    <string name="return_done">Done</string>
+
+    <!-- Credit or debit note -->
+    <string name="note_title">Credit or debit note</string>
+    <string name="note_help">Mostly for a price difference. Stock does not change.</string>
+    <string name="note_kind">What kind of note?</string>
+    <string name="note_credit_issued">Credit note issued</string>
+    <string name="note_credit_issued_sub">Customer owes less</string>
+    <string name="note_debit_issued">Debit note issued</string>
+    <string name="note_debit_issued_sub">Customer owes more</string>
+    <string name="note_debit_received">Debit note received from the customer</string>
+    <string name="note_debit_received_sub">Customer owes less</string>
+    <string name="note_credit_received">Credit note received from the customer</string>
+    <string name="note_credit_received_sub">Customer owes more</string>
+    <string name="note_amount">Amount (MWK)</string>
+    <string name="note_reason">Reason</string>
+    <string name="note_their_number">Their note number</string>
+    <string name="note_extra">Note</string>
+    <string name="note_save">Save note</string>
+    <string name="note_saving">Saving...</string>
+    <string name="note_need_amount">Please type the amount.</string>
+    <string name="note_need_their_number">Please type the number on the customer\'s note.</string>
+    <string name="note_saved">Note %1$s saved</string>
+
+    <!-- Sales returns list -->
+    <string name="returns_title">Sales returns</string>
+    <string name="returns_help">Goods not taken at delivery, or brought back later. Sales books each one against its invoice; the warehouse ticks when the goods are back.</string>
+    <string name="returns_from_invoice">For goods brought back after delivery, open the invoice and press Sales return.</string>
+    <string name="returns_search">Customer, invoice or return number</string>
+    <string name="returns_to_book">To book</string>
+    <string name="returns_waiting">Waiting for the warehouse</string>
+    <string name="returns_done">Done</string>
+    <string name="returns_empty">No returns yet.</string>
+    <string name="returns_no_match">No returns here.</string>
+    <string name="returns_no_access">You cannot see sales returns.</string>
+    <string name="returns_for_invoice">Invoice %1$s</string>
+
+    <!-- One return -->
+    <string name="return_detail_title">Return %1$s</string>
+    <string name="return_goods">What came back</string>
+    <string name="return_book_action">Book it: reduce the invoice</string>
+    <string name="return_to_book_by_sales">To book by sales</string>
+    <string name="return_receive">Received back</string>
+    <string name="return_receiving">Saving...</string>
+    <string name="return_received_done">The goods are back in the warehouse.</string>
+    <string name="return_receive_help">Tick anything that came back damaged. Good goods go on the shelf again; damaged ones do not.</string>
+    <string name="return_condition_good">Good</string>
+    <string name="return_condition_damaged">Damaged</string>
+    <string name="return_received_by">Back in the warehouse · %1$s</string>
+    <string name="return_booked_by">Booked by %1$s</string>
+    <string name="return_made_by">Recorded by %1$s</string>
+    <string name="return_delivery_note">Delivery note %1$s</string>
+    <string name="return_subtotal">Goods</string>
+    <string name="return_vat">VAT</string>
+    <string name="return_total">Off the invoice</string>
+</resources>

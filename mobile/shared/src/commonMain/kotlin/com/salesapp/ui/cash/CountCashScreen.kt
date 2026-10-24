@@ -39,7 +39,7 @@ import com.salesapp.resources.cash_per_company
 import com.salesapp.resources.count_brought
 import com.salesapp.resources.count_counted
 import com.salesapp.resources.count_no_access
-import com.salesapp.resources.count_title
+import com.salesapp.resources.cash_count_title
 import com.salesapp.resources.count_waiting
 import com.salesapp.resources.count_waiting_none
 import com.salesapp.resources.handover_count
@@ -98,7 +98,7 @@ fun CountCashScreen(
     onOpen: (Int) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(stringResource(Res.string.count_title), onBack = onBack)
+        TopBar(stringResource(Res.string.cash_count_title), onBack = onBack)
         if (!state.allowed) {
             Say(stringResource(Res.string.count_no_access), error = true, modifier = Modifier.padding(16.dp))
             return@Column

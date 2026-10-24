@@ -87,3 +87,16 @@ fun User.canSetUpWallets(): Boolean = role == "admin"
 
 // At the office a transfer is recorded without the customer there, so no signature is asked for.
 fun User.isOfficeCollector(): Boolean = role == "admin" || role == "accounts" || role == "cashier"
+
+// Phase 8. Booking a return or making a note changes what a customer owes, so only the sales team
+// and Accounts do it; the warehouse sees returns to take the goods back, but never their money.
+fun User.canAdjustInvoices(): Boolean = role in setOf("admin", "management", "sales_manager", "accounts")
+
+fun User.canSeeReturns(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "cashier", "accounts", "warehouse")
+
+fun User.canReceiveReturns(): Boolean = role == "admin" || role == "warehouse"
+
+fun User.canSeeLedger(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "cashier", "accounts")
+
+// Only Accounts and Admin cancel a payment recorded by mistake.
+fun User.canCancelPayments(): Boolean = role == "admin" || role == "accounts"

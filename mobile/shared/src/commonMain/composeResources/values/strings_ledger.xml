@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Customer ledger -->
+    <string name="ledger_title">Customer ledger</string>
+    <string name="ledger_no_access">You cannot see customer ledgers.</string>
+    <string name="ledger_pick">Pick a customer.</string>
+    <string name="ledger_search">Search a shop name</string>
+    <string name="ledger_no_customers">No shops found.</string>
+    <string name="ledger_which_company">Which company?</string>
+    <string name="ledger_owes">Owes %1$s</string>
+    <string name="ledger_owes_label">Owes</string>
+    <string name="ledger_late">%1$s is late</string>
+    <string name="ledger_nothing_late">Nothing is late</string>
+    <string name="ledger_all">All</string>
+    <string name="ledger_this_month">This month</string>
+    <string name="ledger_last_30">Last 30 days</string>
+    <string name="ledger_opening">Owed at the start</string>
+    <string name="ledger_charged">Charged</string>
+    <string name="ledger_paid">Paid</string>
+    <string name="ledger_balance">Balance %1$s</string>
+    <string name="ledger_empty">Nothing yet for this company.</string>
+    <string name="ledger_share">Share statement</string>
+    <string name="ledger_getting">Getting the statement...</string>
+    <string name="ledger_change_customer">Choose another shop</string>
+
+    <!-- Cancelling a payment -->
+    <string name="cancel_payment">Cancel this payment</string>
+    <string name="cancel_title">Cancel this payment?</string>
+    <string name="cancel_help">It stays on record but stops counting: what it paid is open again, and its cash leaves your hand.</string>
+    <string name="cancel_reason">Why is it being cancelled?</string>
+    <string name="cancel_confirm">Yes, cancel it</string>
+    <string name="cancel_saving">Cancelling...</string>
+    <string name="cancel_need_reason">Please say why the payment is cancelled.</string>
+    <string name="cancel_done">Payment cancelled.</string>
+    <string name="cancelled_pill">Cancelled</string>
+    <string name="cancelled_by">Cancelled by %1$s · %2$s</string>
+    <string name="cancelled_because">Why: %1$s</string>
+</resources>
