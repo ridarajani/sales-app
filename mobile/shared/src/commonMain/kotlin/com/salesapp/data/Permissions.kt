@@ -100,3 +100,12 @@ fun User.canSeeLedger(): Boolean = role in setOf("admin", "management", "sales_m
 
 // Only Accounts and Admin cancel a payment recorded by mistake.
 fun User.canCancelPayments(): Boolean = role == "admin" || role == "accounts"
+
+// Phase 9: trips. Salesmen see only the trips they lead and drivers only their own, which the
+// server already limits; the tile is shown to everyone who may see any trip at all.
+fun User.canSeeTrips(): Boolean =
+    role in setOf("admin", "management", "sales_manager", "salesman", "warehouse", "driver", "cashier", "accounts")
+
+fun User.canPlanTrips(): Boolean = role == "admin" || role == "management" || role == "sales_manager"
+
+fun User.canLoadTrips(): Boolean = role == "admin" || role == "warehouse"

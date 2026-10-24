@@ -159,6 +159,8 @@ data class CashCompany(
     val code: String,
     val cash: Double = 0.0,
     val withdrawals: Double = 0.0,
+    // Phase 9: the float of a trip this person leads.
+    val floats: Double = 0.0,
     val expenses: Double = 0.0,
     val net: Double = 0.0,
 )
@@ -182,10 +184,24 @@ data class CashHeld(
     val withdrawals: List<HeldWithdrawal> = emptyList(),
     val expenses: List<Expense> = emptyList(),
     val companies: List<CashCompany> = emptyList(),
+    // Phase 9: the floats of trips this person leads, which are cash in their hand too.
+    val floats: List<HeldFloat> = emptyList(),
     val cash: Double = 0.0,
     val withdrawalsTotal: Double = 0.0,
+    val floatsTotal: Double = 0.0,
     val expensesTotal: Double = 0.0,
     val net: Double = 0.0,
+)
+
+// A trip's float, held by its leader until the cash is handed over.
+@Serializable
+data class HeldFloat(
+    val id: Int,
+    val number: String = "",
+    val companyCode: String = "",
+    val route: String = "",
+    val amount: Double = 0.0,
+    val createdAt: String = "",
 )
 
 @Serializable
@@ -195,6 +211,7 @@ data class HandoverListItem(
     val handedBy: String = "",
     val cash: Double = 0.0,
     val withdrawals: Double = 0.0,
+    val floats: Double = 0.0,
     val expenses: Double = 0.0,
     val net: Double = 0.0,
     val status: String = "handed",
@@ -224,6 +241,7 @@ data class HandoverDetail(
     val handedBy: String = "",
     val cash: Double = 0.0,
     val withdrawals: Double = 0.0,
+    val floats: Double = 0.0,
     val expenses: Double = 0.0,
     val net: Double = 0.0,
     val status: String = "handed",
@@ -236,6 +254,7 @@ data class HandoverDetail(
     val collections: List<HeldCollection> = emptyList(),
     val expenseList: List<HandoverExpense> = emptyList(),
     val withdrawalList: List<HeldWithdrawal> = emptyList(),
+    val floatList: List<HeldFloat> = emptyList(),
     val companies: List<CashCompany> = emptyList(),
     // False for the person who handed it over: someone else must count it.
     val canCount: Boolean = false,

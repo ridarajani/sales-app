@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home tile -->
+    <string name="tile_trips">Trips</string>
+    <string name="tile_trips_sub">Minibus routes and upcountry trips</string>
+    <string name="tile_trips_one">1 on the road</string>
+    <string name="tile_trips_many">%1$d on the road</string>
+    <string name="tile_trips_none">Nothing on the road</string>
+
+    <!-- Trips list -->
+    <string name="trips_title">Trips</string>
+    <string name="trips_help">Load the van, sell at each stop, then close the trip.</string>
+    <string name="trips_no_access">You cannot see trips.</string>
+    <string name="trips_empty">No trips yet.</string>
+    <string name="trips_no_match">No trips here.</string>
+    <string name="trips_minibus">Minibus</string>
+    <string name="trips_upcountry">Upcountry</string>
+    <string name="trips_route">%1$s: %2$s</string>
+    <string name="trips_waiting">Waiting to load</string>
+    <string name="trips_on_road">On the road</string>
+    <string name="trips_closed">Closed</string>
+    <string name="trips_leader">Led by %1$s</string>
+    <string name="trips_to_load">%1$s to load</string>
+    <string name="trips_sold_of">Sold %1$d of %2$d cartons</string>
+    <string name="trips_plan">Plan a trip</string>
+    <string name="trips_status_planned">Waiting to load</string>
+    <string name="trips_status_out">On the road</string>
+    <string name="trips_status_closed">Closed</string>
+
+    <!-- Plan a trip -->
+    <string name="plan_title">Plan a trip</string>
+    <string name="plan_change_title">Change the trip</string>
+    <string name="plan_no_access">You cannot plan trips.</string>
+    <string name="plan_kind">Type</string>
+    <string name="plan_kind_minibus">Daily minibus route</string>
+    <string name="plan_kind_upcountry">Weekly upcountry trip</string>
+    <string name="plan_warehouse">Which warehouse?</string>
+    <string name="plan_company">Which company pays the float?</string>
+    <string name="plan_date">Date</string>
+    <string name="plan_route">Route</string>
+    <string name="plan_route_hint">e.g. Salima and Nkhotakota</string>
+    <string name="plan_stops">Stops</string>
+    <string name="plan_stop_hint">Add one stop</string>
+    <string name="plan_add_stop">Add</string>
+    <string name="plan_remove_stop">Take off %1$s</string>
+    <string name="plan_no_stops">No stops yet.</string>
+    <string name="plan_vehicle">Vehicle</string>
+    <string name="plan_driver">Driver</string>
+    <string name="plan_leader">Who leads the trip?</string>
+    <string name="plan_leader_help">The salesman or sales manager who sells and holds the cash.</string>
+    <string name="plan_staff">Staff on the trip</string>
+    <string name="plan_float">Float (MWK)</string>
+    <string name="plan_note">Note</string>
+    <string name="plan_products">What to load</string>
+    <string name="plan_products_help">The warehouse can change these when loading.</string>
+    <string name="plan_cartons">Cartons</string>
+    <string name="plan_pieces">Pieces</string>
+    <string name="plan_save">Save trip</string>
+    <string name="plan_saving">Saving...</string>
+    <string name="plan_saved">Trip %1$s planned.</string>
+    <string name="plan_changed">Trip saved.</string>
+    <string name="plan_delete">Delete trip</string>
+    <string name="plan_delete_title">Delete this trip?</string>
+    <string name="plan_delete_text">Nothing is loaded yet, so nothing goes back on the shelf. This cannot be undone.</string>
+    <string name="plan_delete_yes">Yes, delete it</string>
+    <string name="plan_deleted">Trip deleted.</string>
+    <string name="plan_need_route">Please type the route.</string>
+    <string name="plan_need_leader">Please pick who leads the trip.</string>
+    <string name="plan_need_lines">Add at least one product to load.</string>
+    <string name="plan_need_date">Please pick the date.</string>
+
+    <!-- Trip detail -->
+    <string name="trip_title">%1$s: %2$s</string>
+    <string name="trip_gate_pass">Gate pass %1$s</string>
+    <string name="trip_on_this_trip">On this trip</string>
+    <string name="trip_line_to_load">%1$s to load</string>
+    <string name="trip_line_sold">%1$s sold of %2$s</string>
+    <string name="trip_line_on_vehicle">%1$s still on the vehicle</string>
+    <string name="trip_line_back">%1$s came back</string>
+    <string name="trip_line_missing">%1$s missing</string>
+    <string name="trip_sales">Sales</string>
+    <string name="trip_no_sales">No sales yet.</string>
+    <string name="trip_sale_row">%1$s · %2$s</string>
+    <string name="trip_sale_pending">Invoice number when sent</string>
+    <string name="trip_expenses">Expenses</string>
+    <string name="trip_float_box">The float</string>
+    <string name="trip_float">Float</string>
+    <string name="trip_float_spent">Spent</string>
+    <string name="trip_float_left">Left of the float</string>
+    <string name="trip_overspent">More has been spent than the float. The extra comes out of the cash from sales.</string>
+    <string name="trip_cash_now">Cash you should have now</string>
+    <string name="trip_cash_sales">Cash from sales</string>
+    <string name="trip_staff">%1$s</string>
+    <string name="trip_closed_cash">Counted %1$s of %2$s expected</string>
+    <string name="trip_closed_matches">The cash and the stock match.</string>
+    <string name="trip_closed_note">Note: %1$s</string>
+
+    <!-- Loading the van -->
+    <string name="trip_load_title">Load the van</string>
+    <string name="trip_load_help">Type what actually went on. Only free stock goes on a trip, oldest expiry first.</string>
+    <string name="trip_load_vehicle">Vehicle</string>
+    <string name="trip_load_cartons">Cartons</string>
+    <string name="trip_load_pieces">Pieces</string>
+    <string name="trip_load_action">Loaded, van has left</string>
+    <string name="trip_loading">Loading...</string>
+    <string name="trip_load_not_loaded">Not loaded</string>
+    <string name="trip_load_not_loaded_row">%1$s: %2$s</string>
+    <string name="trip_load_need_vehicle">Please pick the vehicle.</string>
+
+    <!-- Actions while on the road -->
+    <string name="trip_edit">Change the trip</string>
+    <string name="trip_record_sale">Record a sale</string>
+    <string name="trip_add_expense">Add an expense</string>
+    <string name="trip_end_day">End the day</string>
+    <string name="trip_end_trip">End the trip</string>
+
+    <!-- The outbox -->
+    <string name="trip_outbox_one">1 sale not sent yet</string>
+    <string name="trip_outbox_sales">%1$d sales not sent yet</string>
+    <string name="trip_outbox_expenses">%1$d expenses not sent yet</string>
+    <string name="trip_outbox_both">%1$d not sent yet</string>
+    <string name="trip_outbox_help">They are kept on this phone and go up when there is a network.</string>
+    <string name="trip_send_now">Send now</string>
+    <string name="trip_sending">Sending...</string>
+    <string name="trip_sent_all">Everything is sent.</string>
+    <string name="trip_outbox_failed">The server would not take this one: %1$s</string>
+    <string name="trip_outbox_drop">Take it off the phone</string>
+    <string name="trip_close_blocked">Send what is on the phone before closing the trip.</string>
+    <string name="trip_saved_offline">Saved on this phone. It goes up when there is a network.</string>
+    <string name="trip_offline_pack">Working from what is saved on this phone.</string>
+
+    <!-- Record a sale -->
+    <string name="sale_title">Record a sale</string>
+    <string name="sale_no_access">Only the trip leader can record a sale.</string>
+    <string name="sale_where">Where?</string>
+    <string name="sale_customer">Customer</string>
+    <string name="sale_customer_search">Search a shop name</string>
+    <string name="sale_customer_owes">Owes %1$s</string>
+    <string name="sale_cash_only">Pays cash only</string>
+    <string name="sale_invoice_type">Invoice</string>
+    <string name="sale_vat">VAT invoice</string>
+    <string name="sale_plain">Plain invoice</string>
+    <string name="sale_paid_by">Paid by</string>
+    <string name="sale_cash">Cash</string>
+    <string name="sale_airtel">Airtel Money</string>
+    <string name="sale_credit">On account</string>
+    <string name="sale_products">What did they buy?</string>
+    <string name="sale_on_vehicle">%1$s on the van</string>
+    <string name="sale_cartons">Cartons</string>
+    <string name="sale_pieces">Pieces</string>
+    <string name="sale_price">Price per carton (MWK)</string>
+    <string name="sale_too_much">Only %1$s is on the van.</string>
+    <string name="sale_line_total">%1$s</string>
+    <string name="sale_total">Total</string>
+    <string name="sale_reference">Airtel Money reference</string>
+    <string name="sale_proof">Photo of the Airtel message</string>
+    <string name="sale_received_by">Name of the person who received the goods</string>
+    <string name="sale_received_by_hint">e.g. Grace</string>
+    <string name="sale_signature">Their signature</string>
+    <string name="sale_signature_hint">Ask the customer to sign with a finger.</string>
+    <string name="sale_save">Save sale</string>
+    <string name="sale_saving">Saving...</string>
+    <string name="sale_need_customer">Please pick the customer.</string>
+    <string name="sale_need_lines">Please type what they bought.</string>
+    <string name="sale_need_price">Please type the price per carton.</string>
+    <string name="sale_need_name">Please type the name of the person who received the goods.</string>
+    <string name="sale_need_signature">Please ask the customer to sign.</string>
+    <string name="sale_need_reference">Please type the Airtel Money reference.</string>
+    <string name="sale_no_credit">This shop pays cash only.</string>
+    <string name="sale_saved">Sale saved</string>
+    <string name="sale_invoices">Invoices</string>
+    <string name="sale_another">Record another sale</string>
+    <string name="sale_done">Done</string>
+
+    <!-- A trip expense -->
+    <string name="trip_expense_title">Add an expense</string>
+    <string name="trip_expense_kind">What was it for?</string>
+    <string name="trip_expense_note">Note</string>
+    <string name="trip_expense_amount">Amount (MWK)</string>
+    <string name="trip_expense_photo">Photo of the bill</string>
+    <string name="trip_expense_save">Save expense</string>
+    <string name="trip_expense_saving">Saving...</string>
+    <string name="trip_expense_need_kind">Please say what it was for.</string>
+    <string name="trip_expense_need_amount">Please type the amount.</string>
+    <string name="trip_expense_saved">Expense saved.</string>
+    <string name="trip_expense_from_float">It comes out of the float.</string>
+
+    <!-- Closing -->
+    <string name="close_title_day">End the day</string>
+    <string name="close_title_trip">End the trip</string>
+    <string name="close_help">Count what came back and the cash.</string>
+    <string name="close_back">What came back</string>
+    <string name="close_should_come_back">%1$s should come back</string>
+    <string name="close_cartons">Cartons</string>
+    <string name="close_pieces">Pieces</string>
+    <string name="close_missing">%1$s missing</string>
+    <string name="close_too_much">Only %1$s should come back.</string>
+    <string name="close_cash">Cash counted (MWK)</string>
+    <string name="close_cash_sales">Cash from sales</string>
+    <string name="close_cash_float">Float</string>
+    <string name="close_cash_expenses">Cash expenses</string>
+    <string name="close_cash_expected">Cash you should have</string>
+    <string name="close_short">%1$s short</string>
+    <string name="close_over">%1$s over</string>
+    <string name="close_matches">The cash matches.</string>
+    <string name="close_note">Note</string>
+    <string name="close_note_needed">A difference or missing stock needs a note.</string>
+    <string name="close_action">Close the trip</string>
+    <string name="close_closing">Closing...</string>
+    <string name="close_need_cash">Please type the cash you counted.</string>
+    <string name="close_done">Trip %1$s closed.</string>
+
+    <!-- On the invoice and in My cash -->
+    <string name="invoice_trip">Trip %1$s · %2$s</string>
+    <string name="invoice_trip_plain">Trip %1$s</string>
+    <string name="cash_from_floats">Trip floats</string>
+</resources>

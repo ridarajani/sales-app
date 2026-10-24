@@ -33,6 +33,9 @@ private const val OFFLINE_MESSAGE = "No connection. Check the internet and try a
 // Calls that carry a photo or a PDF. A phone on a slow line needs far more than the usual 15 seconds.
 const val FILE_TIMEOUT: Long = 60_000
 
+// A whole day of offline sales and their photos can go up in one sync, so it gets longer still.
+const val SYNC_TIMEOUT: Long = 180_000
+
 private val json = Json {
     ignoreUnknownKeys = true
     coerceInputValues = true
@@ -398,6 +401,45 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun cancelPayment(id: Int, request: CancelRequest): PaymentDetail =
         post<PaymentDetail, CancelRequest>("/collections/$id/cancel", request)
+
+    // Phase 9: minibus routes and upcountry trips.
+
+    // status: planned, out or closed; kind: minibus or upcountry.
+    suspend fun trips(status: String?, kind: String?): List<TripListItem> =
+        get("/trips", mapOf("status" to status, "kind" to kind))
+
+    suspend fun trip(id: Int): TripDetail = get("/trips/$id")
+
+    // Everything the leader's phone keeps for selling with no network.
+    suspend fun tripPack(id: Int): TripPack = get("/trips/$id/pack")
+
+    suspend fun planTrip(request: PlanTripRequest): TripDetail = post<TripDetail, PlanTripRequest>("/trips", request)
+
+    suspend fun changeTrip(id: Int, request: PlanTripRequest): TripDetail = put<TripDetail, PlanTripRequest>("/trips/$id", request)
+
+    suspend fun deleteTrip(id: Int) {
+        delete<JsonObject>("/trips/$id")
+    }
+
+    suspend fun loadTrip(id: Int, request: LoadTripRequest): TripDetail = post<TripDetail, LoadTripRequest>("/trips/$id/load", request)
+
+    // Carries a signature and often a photo, so it gets the longer timeout.
+    suspend fun tripSale(id: Int, request: TripSaleRequest): TripSaleDetail =
+        post<TripSaleDetail, TripSaleRequest>("/trips/$id/sales", request, timeoutMillis = FILE_TIMEOUT)
+
+    suspend fun tripExpense(id: Int, request: TripExpenseRequest): TripExpense =
+        post<TripExpense, TripExpenseRequest>("/trips/$id/expenses", request, timeoutMillis = FILE_TIMEOUT)
+
+    // Everything the phone saved offline, in one go. Each item answers for itself.
+    suspend fun syncTrip(id: Int, request: SyncRequest): SyncResult =
+        post<SyncResult, SyncRequest>("/trips/$id/sync", request, timeoutMillis = SYNC_TIMEOUT)
+
+    suspend fun closeTrip(id: Int, request: CloseTripRequest): TripDetail =
+        post<TripDetail, CloseTripRequest>("/trips/$id/close", request)
+
+    suspend fun tripSaleSignature(saleId: Int): ServerFile = bytes("/trip-sales/$saleId/signature")
+
+    suspend fun tripSaleProof(saleId: Int): ServerFile = bytes("/trip-sales/$saleId/proof")
 }
 
 // A file the server sent, with the type it gave it.

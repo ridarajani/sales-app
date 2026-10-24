@@ -10,6 +10,7 @@ import com.salesapp.data.AirtelRepository
 import com.salesapp.data.AppState
 import com.salesapp.data.CashRepository
 import com.salesapp.data.ReturnsRepository
+import com.salesapp.data.TripsRepository
 import com.salesapp.data.LoadingRepository
 import com.salesapp.data.PendingAdjustment
 import com.salesapp.data.ShortDatedBatch
@@ -18,6 +19,7 @@ import com.salesapp.data.canApproveStock
 import com.salesapp.data.canCountCash
 import com.salesapp.data.canReceiveReturns
 import com.salesapp.data.canSeePlans
+import com.salesapp.data.canSeeTrips
 import com.salesapp.data.canSeeWallets
 import com.salesapp.data.holdsCash
 import com.salesapp.data.canSeeStock
@@ -105,6 +107,11 @@ import com.salesapp.resources.tile_returns
 import com.salesapp.resources.tile_returns_receive_many
 import com.salesapp.resources.tile_returns_receive_one
 import com.salesapp.resources.tile_returns_sub
+import com.salesapp.resources.tile_trips
+import com.salesapp.resources.tile_trips_many
+import com.salesapp.resources.tile_trips_none
+import com.salesapp.resources.tile_trips_one
+import com.salesapp.resources.tile_trips_sub
 import com.salesapp.resources.tile_reports_export_sub
 import com.salesapp.resources.tile_reports_sales_sub
 import com.salesapp.resources.tile_reports_stock_sub
@@ -132,6 +139,7 @@ import com.salesapp.ui.navigation.ExpensesRoute
 import com.salesapp.ui.navigation.InvoicesRoute
 import com.salesapp.ui.navigation.LedgerRoute
 import com.salesapp.ui.navigation.ReturnsRoute
+import com.salesapp.ui.navigation.TripsRoute
 import com.salesapp.ui.navigation.MyCashRoute
 import com.salesapp.ui.navigation.PaymentsRoute
 import com.salesapp.ui.navigation.WalletsRoute
@@ -211,6 +219,10 @@ private fun returnsTile(subText: String? = null, count: Int? = null) =
 
 private fun ledgerTile() = tile(Res.string.tile_ledger_card, Res.string.tile_ledger_card_sub, AppIcons.List, LedgerRoute())
 
+// Phase 9: minibus routes and upcountry trips, with how many are on the road.
+private fun tripsTile(subText: String?, count: Int?) =
+    tile(Res.string.tile_trips, Res.string.tile_trips_sub, AppIcons.Truck, TripsRoute, subText, count)
+
 // Loading plans; count is how many changes from the other side wait to be seen.
 private fun loadingTile(count: Int?) = tile(Res.string.tile_loading, Res.string.tile_loading_sub, AppIcons.Truck, PlansRoute, count = count)
 
@@ -232,6 +244,8 @@ internal fun tilesFor(
     airtelCount: Int? = null,
     returnsSub: String? = null,
     returnsCount: Int? = null,
+    tripsSub: String? = null,
+    tripsCount: Int? = null,
 ): List<TileDef> = when (role) {
     "admin" -> listOf(
         newOrderTile(),
@@ -250,6 +264,7 @@ internal fun tilesFor(
         paymentsTile(),
         returnsTile(returnsSub, returnsCount),
         ledgerTile(),
+        tripsTile(tripsSub, tripsCount),
         expensesTile(),
         handOverTile(cashSub),
         countCashTile(countSub, countCount),
@@ -267,6 +282,7 @@ internal fun tilesFor(
         paymentsTile(),
         returnsTile(),
         ledgerTile(),
+        tripsTile(tripsSub, tripsCount),
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
         tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
         expiringTile(expiringSub),
@@ -286,6 +302,7 @@ internal fun tilesFor(
         expensesTile(),
         returnsTile(),
         ledgerTile(),
+        tripsTile(tripsSub, tripsCount),
         tile(Res.string.tile_my_salesmen, Res.string.tile_my_salesmen_sub, AppIcons.People, UsersRoute),
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
@@ -304,6 +321,7 @@ internal fun tilesFor(
         invoicesTile(Res.string.tile_invoices_share),
         returnsTile(),
         ledgerTile(),
+        tripsTile(tripsSub, tripsCount),
         more(),
     )
     "warehouse" -> listOf(
@@ -315,6 +333,7 @@ internal fun tilesFor(
         expiringTile(expiringSub),
         tile(Res.string.tile_stock_count, Res.string.tile_stock_count_sub, AppIcons.Inbox, StockCountRoute),
         returnsTile(returnsSub, returnsCount),
+        tripsTile(tripsSub, tripsCount),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
         tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
         tile(Res.string.tile_reports, Res.string.tile_reports_stock_sub, AppIcons.Chart),
@@ -325,6 +344,7 @@ internal fun tilesFor(
         tile(Res.string.tile_hand_over_goods, Res.string.tile_hand_over_goods_sub, AppIcons.Box),
         tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
         invoicesTile(Res.string.tile_invoices_register),
+        tripsTile(tripsSub, tripsCount),
         more(),
     )
     "cashier" -> listOf(
@@ -334,6 +354,7 @@ internal fun tilesFor(
         recordPaymentTile(),
         paymentsTile(),
         ledgerTile(),
+        tripsTile(tripsSub, tripsCount),
         airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
         tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         invoicesTile(Res.string.tile_invoices_register_print),
@@ -348,6 +369,7 @@ internal fun tilesFor(
         returnsTile(returnsSub, returnsCount),
         ledgerTile(),
         airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
+        tripsTile(tripsSub, tripsCount),
         ordersTile(),
         loadingTile(loadingCount),
         tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
@@ -386,6 +408,9 @@ data class HomeState(
     // Phase 8: returns waiting for the warehouse to take the goods back.
     val returnsSub: String? = null,
     val returnsCount: Int? = null,
+    // Phase 9: how many trips are on the road.
+    val tripsSub: String? = null,
+    val tripsCount: Int? = null,
 )
 
 sealed interface HomeEvent {
@@ -407,6 +432,7 @@ class HomeViewModel(
     private val cashRepository: CashRepository,
     private val airtelRepository: AirtelRepository,
     private val returnsRepository: ReturnsRepository,
+    private val tripsRepository: TripsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
@@ -423,7 +449,7 @@ class HomeViewModel(
     private fun tilesOf(s: HomeState, role: String = s.role): List<TileDef> =
         tilesFor(
             role, s.expiringSub, s.approvalsSub, s.loadingCount, s.cashSub, s.countSub, s.countCount,
-            s.airtelSub, s.airtelCount, s.returnsSub, s.returnsCount,
+            s.airtelSub, s.airtelCount, s.returnsSub, s.returnsCount, s.tripsSub, s.tripsCount,
         )
 
     init {
@@ -566,6 +592,15 @@ class HomeViewModel(
                         else -> getString(Res.string.tile_returns_receive_many, waiting)
                     }
                     _state.update { val next = it.copy(returnsSub = sub, returnsCount = waiting); next.copy(tiles = tilesOf(next)) }
+                }
+                if (user.canSeeTrips()) {
+                    val onRoad = tripsRepository.trips("out", null).size
+                    val sub = when (onRoad) {
+                        0 -> getString(Res.string.tile_trips_none)
+                        1 -> getString(Res.string.tile_trips_one)
+                        else -> getString(Res.string.tile_trips_many, onRoad)
+                    }
+                    _state.update { val next = it.copy(tripsSub = sub, tripsCount = onRoad); next.copy(tiles = tilesOf(next)) }
                 }
                 if (user.canSeeWallets()) {
                     val waiting = airtelRepository.waitingTotal()

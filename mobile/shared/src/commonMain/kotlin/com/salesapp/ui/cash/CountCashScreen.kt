@@ -32,6 +32,7 @@ import com.salesapp.data.HeldCollection
 import com.salesapp.resources.Res
 import com.salesapp.resources.cash_expenses_list
 import com.salesapp.resources.cash_from_airtel
+import com.salesapp.resources.cash_from_floats
 import com.salesapp.resources.cash_from_payments
 import com.salesapp.resources.cash_less_expenses
 import com.salesapp.resources.cash_payments_list
@@ -197,6 +198,7 @@ fun HandoverDetailScreen(state: HandoverDetailState, onEvent: (HandoverDetailEve
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             MoneyRow(stringResource(Res.string.cash_from_payments), handover.cash)
                             if (handover.withdrawals > 0) MoneyRow(stringResource(Res.string.cash_from_airtel), handover.withdrawals)
+                            if (handover.floats > 0) MoneyRow(stringResource(Res.string.cash_from_floats), handover.floats)
                             if (handover.expenses > 0) MoneyRow(stringResource(Res.string.cash_less_expenses), handover.expenses, negative = true)
                             MoneyRow(stringResource(Res.string.handover_expected_label), handover.net, strong = true)
                         }
