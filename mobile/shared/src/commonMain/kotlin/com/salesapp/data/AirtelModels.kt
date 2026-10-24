@@ -68,8 +68,10 @@ data class WalletDetail(
     val waiting: Int = 0,
     val entries: List<WalletEntry> = emptyList(),
     val checks: List<WalletCheck> = emptyList(),
-    // True for the holder and for admin: they may tick, take out cash and check the balance.
+    // True for the holder and for admin: they may tick a payment and check the balance.
     val canAct: Boolean = false,
+    // Only the holder takes money out, because it becomes cash in their own hand.
+    val canTakeOut: Boolean = false,
 )
 
 // Admin sets up or changes a wallet.

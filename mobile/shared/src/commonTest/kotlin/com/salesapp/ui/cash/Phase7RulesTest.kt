@@ -1,5 +1,6 @@
 package com.salesapp.ui.cash
 
+import com.salesapp.core.randomUuid
 import com.salesapp.data.CollectCompany
 import com.salesapp.data.CollectCustomer
 import com.salesapp.data.CollectInfo
@@ -142,6 +143,27 @@ class Phase7RulesTest {
         assertEquals(0L, HandoverDetailState(handover = handover, counted = 100_000).difference)
         assertEquals(-5_000L, HandoverDetailState(handover = handover, counted = 95_000).difference)
         assertEquals(2_000L, HandoverDetailState(handover = handover, counted = 102_000).difference)
-        assertNull(HandoverDetailState(handover = handover).difference)
+    }
+
+    // The field starts empty, so nobody can confirm a total they did not count.
+    @Test
+    fun theCountStartsEmptyAndHasNoDifferenceYet() {
+        val handover = HandoverDetail(id = 1, number = "HO-000001", net = 100_000.0, canCount = true)
+        val fresh = HandoverDetailState(loading = false, handover = handover)
+        assertNull(fresh.counted)
+        assertNull(fresh.difference)
+    }
+
+    // Every form sends its own id, and a new one is only made once a save has gone through.
+    @Test
+    fun everyFormGetsItsOwnId() {
+        val ids = List(50) { randomUuid() }
+        assertEquals(50, ids.toSet().size)
+        for (id in ids) {
+            assertEquals(36, id.length, id)
+            assertEquals('4', id[14], id)
+            assertTrue(id[19] in "89ab", id)
+            assertEquals(listOf(8, 13, 18, 23), id.indices.filter { id[it] == '-' }, id)
+        }
     }
 }

@@ -123,12 +123,15 @@ fun WalletDetailScreen(
                 Head(wallet)
                 if (state.canAct) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SecondaryButton(
-                            stringResource(Res.string.airtel_withdraw),
-                            onClick = { onEvent(WalletDetailEvent.OpenForm(WalletForm.Withdraw)) },
-                            enabled = !state.busy,
-                            modifier = Modifier.weight(1f),
-                        )
+                        // Only the holder takes money out: it becomes cash in their own hand.
+                        if (state.canTakeOut) {
+                            SecondaryButton(
+                                stringResource(Res.string.airtel_withdraw),
+                                onClick = { onEvent(WalletDetailEvent.OpenForm(WalletForm.Withdraw)) },
+                                enabled = !state.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                         SecondaryButton(
                             stringResource(Res.string.airtel_check),
                             onClick = { onEvent(WalletDetailEvent.OpenForm(WalletForm.Check)) },
@@ -144,7 +147,7 @@ fun WalletDetailScreen(
                     )
                 }
                 when (state.form) {
-                    WalletForm.Withdraw -> WithdrawForm(state, wallet, onEvent)
+                    WalletForm.Withdraw -> if (state.canTakeOut) WithdrawForm(state, wallet, onEvent)
                     WalletForm.Check -> CheckForm(state, onEvent)
                     null -> Unit
                 }
@@ -419,6 +422,7 @@ private val sampleWallet = WalletDetail(
         WalletCheck(id = 1, actual = 1_250_000.0, ledger = 1_250_000.0, difference = 0.0, by = "Mr. Abbas", at = "2026-10-24T07:00:00.000Z"),
     ),
     canAct = true,
+    canTakeOut = true,
 )
 
 @Preview
@@ -464,6 +468,10 @@ private fun WalletCheckPreview() {
 @Composable
 private fun WalletWatcherPreview() {
     SalesTheme {
-        WalletDetailScreen(state = WalletDetailState(loading = false, wallet = sampleWallet.copy(canAct = false)), onEvent = {}, onBack = {})
+        WalletDetailScreen(
+            state = WalletDetailState(loading = false, wallet = sampleWallet.copy(canAct = false, canTakeOut = false)),
+            onEvent = {},
+            onBack = {},
+        )
     }
 }

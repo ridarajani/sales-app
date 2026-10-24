@@ -149,8 +149,9 @@ class HandoverDetailViewModel(
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val handover = repository.handover(id)
-                // The count starts at what the app expects, so the cashier only changes it if it differs.
-                _state.update { it.copy(loading = false, handover = handover, counted = it.counted ?: handover.net.toLong(), error = null) }
+                // The field stays empty on purpose: a prefilled total can be confirmed with one tap
+                // without anyone counting it. What the app expects is shown above the field instead.
+                _state.update { it.copy(loading = false, handover = handover, error = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

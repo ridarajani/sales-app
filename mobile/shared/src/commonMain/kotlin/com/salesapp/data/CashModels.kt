@@ -59,6 +59,8 @@ data class CollectRequest(
     val receivedBy: String = "",
     val signature: String? = null,
     val proof: String? = null,
+    // One id per form: a repeat of the same id gives back the first receipt instead of a second one.
+    val requestId: String? = null,
 )
 
 // Where one payment went: an allocation with no invoice is the opening balance.
@@ -136,6 +138,8 @@ data class ExpenseRequest(
     val description: String,
     val mode: String = "cash",
     val photo: String? = null,
+    // One id per form, so a retry does not record the expense twice.
+    val requestId: String? = null,
 )
 
 // --- Cash held, and handing it over ---

@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesapp.core.Camera
+import com.salesapp.core.randomUuid
 import com.salesapp.core.signaturePng
 import com.salesapp.core.toBase64
 import com.salesapp.data.AppState
@@ -157,6 +158,10 @@ class CollectMoneyViewModel(
     val state: StateFlow<CollectState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+
+    // Sent with every Save from this form. A lost answer can be retried without making a second
+    // receipt; a new id is made only once a save has gone through.
+    private var requestId = randomUuid()
 
     init {
         if (!_state.value.allowed) {
@@ -330,8 +335,11 @@ class CollectMoneyViewModel(
                         receivedBy = s.receivedBy.trim(),
                         signature = signature,
                         proof = s.proof?.toBase64(),
+                        requestId = requestId,
                     ),
                 )
+                // Saved, so the next payment from this form is a new one.
+                requestId = randomUuid()
                 _state.update { it.copy(busy = false, saved = saved) }
             } catch (e: CancellationException) {
                 throw e

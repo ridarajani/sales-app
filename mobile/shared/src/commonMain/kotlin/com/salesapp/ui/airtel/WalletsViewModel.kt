@@ -96,6 +96,9 @@ data class WalletDetailState(
     val actionError: String? = null,
 ) {
     val canAct: Boolean get() = wallet?.canAct == true
+
+    // Admin can tick and check for the holder, but the cash only ever goes into the holder's hand.
+    val canTakeOut: Boolean get() = wallet?.canTakeOut == true
 }
 
 sealed interface WalletDetailEvent {
@@ -131,7 +134,7 @@ class WalletDetailViewModel(
             WalletDetailEvent.Retry -> load()
             WalletDetailEvent.Refresh -> if (s.wallet != null && !s.loading) load(showSpinner = false)
             is WalletDetailEvent.Tick -> act { repository.tick(event.entryId) }
-            is WalletDetailEvent.OpenForm -> _state.update {
+            is WalletDetailEvent.OpenForm -> if (event.form != WalletForm.Withdraw || s.canTakeOut) _state.update {
                 it.copy(
                     form = event.form,
                     actionError = null,
@@ -150,6 +153,7 @@ class WalletDetailViewModel(
 
     private fun withdraw() {
         val s = _state.value
+        if (!s.canTakeOut) return
         val company = s.withdrawCompany ?: s.wallet?.companies?.firstOrNull() ?: return
         viewModelScope.launch {
             if ((s.withdrawAmount ?: 0) <= 0) {
