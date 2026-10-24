@@ -39,6 +39,8 @@ const collectBody = z.object({
   // PNG or JPEG as base64: the customer's signature, and the photo of the bank slip or Airtel message.
   signature: z.string().max(4_000_000).optional(),
   proof: z.string().max(12_000_000).optional(),
+  // One id per form on the phone, so a retry after a lost answer does not make a second receipt.
+  requestId: z.string().trim().min(1).max(64).optional(),
 });
 const listQuery = z.object({
   company: z.string().optional(),
@@ -110,6 +112,16 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
     const body = parse(collectBody, request.body);
     const user = request.user;
     assertCompany(user, body.companyCode);
+    const earlier = async () => {
+      if (!body.requestId) return null;
+      const { rows } = await db.query<{ id: number }>('select id from collections where collected_by = $1 and request_id = $2', [
+        user.id,
+        body.requestId,
+      ]);
+      return rows[0] ? collectionDetail(db, user, rows[0].id) : null;
+    };
+    const repeat = await earlier();
+    if (repeat) return reply.code(200).send(repeat);
     if (body.amount + body.discount + body.wht === 0) throw invalid('Please type the amount received.');
     if ((body.discount || body.wht) && !body.invoiceId) throw invalid('Pick the invoice the discount or tax is for.');
     if (body.mode === 'airtel' && body.amount > 0 && !body.reference) throw invalid('Please type the Airtel Money reference.');
@@ -123,7 +135,7 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
     const signatureFile = body.signature ? await saveImage(uploadDir, body.signature, IMAGE_MAX, 'signature') : null;
     const proofFile = body.proof ? await saveImage(uploadDir, body.proof, IMAGE_MAX, 'photo') : null;
 
-    const saved = await inTransaction(db, async (client) => {
+    const saving = inTransaction(db, async (client) => {
       // One payment at a time per customer and company, so two never cover the same invoice.
       const { rows: link } = await client.query(
         'select 1 from customer_companies where customer_id = $1 and company_code = $2 for update',
@@ -168,10 +180,10 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
       const custody = body.mode !== 'cash' || body.amount === 0 ? 'na' : user.role === 'cashier' ? 'counted' : 'with';
       const { rows } = await client.query<{ id: number }>(
         `insert into collections (number, company_code, customer_id, invoice_id, mode, amount, discount, wht, wht_certificate,
-           reference, note, proof_file, signature_file, received_by, collected_by, custody)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) returning id`,
+           reference, note, proof_file, signature_file, received_by, collected_by, custody, request_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) returning id`,
         [number, body.companyCode, body.customerId, body.invoiceId ?? null, body.mode, body.amount, body.discount, body.wht,
-          body.whtCertificate, body.reference, body.note, proofFile, signatureFile, body.receivedBy, user.id, custody],
+          body.whtCertificate, body.reference, body.note, proofFile, signatureFile, body.receivedBy, user.id, custody, body.requestId ?? null],
       );
       const collectionId = rows[0]!.id;
       for (const a of allocations) {
@@ -194,6 +206,15 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
       }
       return { id: collectionId, number };
     });
+    let saved: Awaited<typeof saving>;
+    try {
+      saved = await saving;
+    } catch (err) {
+      // Two tries at the same moment: the second waits on the first and then finds its receipt.
+      const again = (err as { code?: string }).code === '23505' ? await earlier() : null;
+      if (again) return reply.code(200).send(again);
+      throw err;
+    }
     await audit(db, {
       userId: user.id,
       action: 'payment_collected',

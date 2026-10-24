@@ -212,3 +212,21 @@ test('cash taken by the cashier is counted at once', async () => {
   const log = (await get(app, admin, '/audit')).json().map((x: { action: string }) => x.action);
   expect(log).toEqual(expect.arrayContaining(['payment_collected', 'expense_recorded', 'cash_handed_over', 'cash_counted']));
 });
+
+test('a payment or expense sent twice with the same request id is saved once', async () => {
+  const body = { companyCode: 'ZT', amount: 2000, requestId: 'form-1' };
+  const first = await collect(seller, body);
+  expect(first.statusCode).toBe(201);
+  const again = await collect(seller, body);
+  expect(again.statusCode).toBe(200);
+  expect(again.json().number).toBe(first.json().number);
+  const both = await Promise.all([collect(seller, { ...body, requestId: 'form-2' }), collect(seller, { ...body, requestId: 'form-2' })]);
+  expect(new Set(both.map((r) => r.json().number)).size).toBe(1);
+  expect(both.map((r) => r.statusCode).sort()).toEqual([200, 201]);
+
+  const expense = { companyCode: 'LV', amount: 300, description: 'Water', requestId: 'form-3' };
+  const e1 = await post(app, seller, '/expenses', expense);
+  const e2 = await post(app, seller, '/expenses', expense);
+  expect([e1.statusCode, e2.statusCode]).toEqual([201, 200]);
+  expect(e2.json().number).toBe(e1.json().number);
+});

@@ -119,7 +119,8 @@ async function walletDetail(db: Db, user: AuthUser, walletId: number) {
     [walletId, w.openingBalance],
   );
   const holder = w.holderId === user.id;
-  return { ...w, entries, canAct: holder || user.role === 'admin' };
+  // Admin may tick and check for the holder, but only the holder takes money out: it becomes cash in their hand.
+  return { ...w, entries, canAct: holder || user.role === 'admin', canTakeOut: holder };
 }
 
 export function airtelRoutes(app: FastifyInstance, db: Db) {
