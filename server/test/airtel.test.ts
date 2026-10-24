@@ -95,6 +95,8 @@ test('an Airtel payment waits in the wallet until the holder ticks it', async ()
   });
   const entry = w.entries[0].id;
   expect((await wallet(cashier)).canAct).toBe(false);
+  expect(w.canTakeOut).toBe(true);
+  expect((await wallet(admin)).canTakeOut).toBe(false);
   expect((await post(app, cashier, `/airtel/entries/${entry}/tick`)).statusCode).toBe(403);
   expect((await post(app, manager, `/airtel/entries/${entry}/tick`)).statusCode).toBe(200);
   expect((await post(app, manager, `/airtel/entries/${entry}/tick`)).json().error).toBe('already_ticked');

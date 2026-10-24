@@ -27,6 +27,8 @@ const expenseBody = z.object({
   description: z.string('Please say what it was for.').trim().min(1, 'Please say what it was for.').max(300),
   mode: z.enum(['cash', 'airtel'], 'Please pick cash or Airtel Money.').default('cash'),
   photo: z.string().max(12_000_000).optional(),
+  // One id per form on the phone, so a retry after a lost answer does not record the expense twice.
+  requestId: z.string().trim().min(1).max(64).optional(),
 });
 const countBody = z.object({
   counted: z.number('Please type the cash you counted.').int('Amounts are whole kwacha.').min(0).max(10_000_000_000),
@@ -136,19 +138,35 @@ export function cashRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
     const body = parse(expenseBody, request.body);
     const user = request.user;
     assertCompany(user, body.companyCode);
+    const earlier = async () => {
+      if (!body.requestId) return null;
+      const { rows } = await db.query(`${expenseSelect} where e.spent_by = $1 and e.request_id = $2`, [user.id, body.requestId]);
+      return rows[0] ?? null;
+    };
+    const repeat = await earlier();
+    if (repeat) return reply.code(200).send(repeat);
     const photoFile = body.photo ? await saveImage(uploadDir, body.photo, PHOTO_MAX, 'photo') : null;
-    const saved = await inTransaction(db, async (client) => {
+    const saving = inTransaction(db, async (client) => {
       const number = await nextNumber(client, body.companyCode, 'EXP');
       const { rows } = await client.query<{ id: number }>(
-        `insert into expenses (number, company_code, amount, description, mode, photo_file, spent_by, custody)
-         values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
-        [number, body.companyCode, body.amount, body.description, body.mode, photoFile, user.id, body.mode === 'cash' ? 'with' : 'na'],
+        `insert into expenses (number, company_code, amount, description, mode, photo_file, spent_by, custody, request_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+        [number, body.companyCode, body.amount, body.description, body.mode, photoFile, user.id, body.mode === 'cash' ? 'with' : 'na',
+          body.requestId ?? null],
       );
       if (body.mode === 'airtel') {
         await addAirtelExpense(client, { companyCode: body.companyCode, amount: body.amount, description: body.description, expenseId: rows[0]!.id, user });
       }
       return { id: rows[0]!.id, number };
     });
+    let saved: Awaited<typeof saving>;
+    try {
+      saved = await saving;
+    } catch (err) {
+      const again = (err as { code?: string }).code === '23505' ? await earlier() : null;
+      if (again) return reply.code(200).send(again);
+      throw err;
+    }
     await audit(db, { userId: user.id, action: 'expense_recorded', details: { expenseId: saved.id, number: saved.number, amount: body.amount } });
     const { rows } = await db.query(`${expenseSelect} where e.id = $1`, [saved.id]);
     return reply.code(201).send(rows[0]);
