@@ -72,6 +72,8 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            // Lets a test drive the clock, so a race between two answers can be checked.
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
