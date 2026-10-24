@@ -4,6 +4,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.salesapp.ui.delivery.ConfirmDeliveryPage
+import com.salesapp.ui.navigation.ConfirmDeliveryRoute
 import com.salesapp.ui.navigation.NewPlanRoute
 import com.salesapp.ui.navigation.PlannerPlanRoute
 import com.salesapp.ui.navigation.PlansRoute
@@ -11,7 +13,8 @@ import com.salesapp.ui.navigation.TripRoute
 import com.salesapp.ui.navigation.WarehousePlanRoute
 import com.salesapp.ui.navigation.open
 
-// The plans list, a new plan, and one plan as the planner, the warehouse or the driver sees it.
+// The plans list, a new plan, one plan as the planner, the warehouse or the driver sees it,
+// and the driver confirming one shop's drop.
 fun NavGraphBuilder.loadingGraph(nav: NavController) {
     val back = { nav.popBackStack() }
     composable<PlansRoute> {
@@ -42,6 +45,16 @@ fun NavGraphBuilder.loadingGraph(nav: NavController) {
         WarehousePlanPage(id = entry.toRoute<WarehousePlanRoute>().id, onBack = { back() })
     }
     composable<TripRoute> { entry ->
-        TripPage(id = entry.toRoute<TripRoute>().id, onBack = { back() })
+        TripPage(id = entry.toRoute<TripRoute>().id, onBack = { back() }, onOpen = { nav.open(it) })
+    }
+    composable<ConfirmDeliveryRoute> { entry ->
+        val route = entry.toRoute<ConfirmDeliveryRoute>()
+        ConfirmDeliveryPage(
+            planId = route.planId,
+            customerId = route.customerId,
+            onBack = { back() },
+            // Back on the trip, the drop shows as delivered.
+            onDone = { back() },
+        )
     }
 }

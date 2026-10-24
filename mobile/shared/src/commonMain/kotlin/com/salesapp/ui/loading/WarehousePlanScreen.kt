@@ -143,7 +143,21 @@ fun WarehousePlanScreen(state: WarehousePlanState, onEvent: (WarehousePlanEvent)
                             }
                         }
                         NotLoadedCard(state.notLoaded)
-                        Documents(plan)
+                        DocumentNumbers(plan)
+                        if (state.hasDocuments) {
+                            VehicleDocuments(
+                                busy = state.busy,
+                                onDeliveryNote = { onEvent(WarehousePlanEvent.DeliveryNote) },
+                                onGatePass = { onEvent(WarehousePlanEvent.GatePass) },
+                            )
+                        }
+                        // Admin is an invoice maker and sees this screen while the vehicle is loaded.
+                        MakeInvoices(
+                            canMake = plan.canMakeInvoices,
+                            busy = state.busy,
+                            made = state.made,
+                            onMake = { onEvent(WarehousePlanEvent.MakeInvoices) },
+                        )
                         if (plan.status == "out" || plan.status == "done") Say(stringResource(Res.string.loading_wh_left))
                     }
                     state.actionError?.let { Say(it, error = true) }
@@ -294,7 +308,7 @@ private fun NotLoadedCard(rows: List<NotLoaded>) {
 }
 
 @Composable
-private fun Documents(plan: PlanDetail) {
+private fun DocumentNumbers(plan: PlanDetail) {
     val scheme = MaterialTheme.colorScheme
     val note = plan.deliveryNoteNo?.takeIf { it.isNotBlank() }
     val pass = plan.gatePassNo?.takeIf { it.isNotBlank() }

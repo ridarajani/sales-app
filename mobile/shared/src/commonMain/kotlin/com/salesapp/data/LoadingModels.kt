@@ -65,6 +65,12 @@ data class PlanDetail(
     val canLoad: Boolean = false,
     val canGate: Boolean = false,
     val canDelete: Boolean = false,
+    // Phase 6: the invoices made from this plan, for the user's own companies.
+    val invoices: List<PlanInvoice> = emptyList(),
+    val canMakeInvoices: Boolean = false,
+    val canDeliver: Boolean = false,
+    // Only in the reply to "Make invoices": the invoices that call made.
+    val made: List<MadeInvoice> = emptyList(),
     // Only in the reply to a warehouse change: what did not fit, in pieces.
     val notAdded: List<NotAdded> = emptyList(),
     // Only in the reply to Loaded: what was not on the shelves.
@@ -125,6 +131,11 @@ data class PlanDrop(
     // Order numbers.
     val orders: List<String> = emptyList(),
     val lines: List<PlanDropLine> = emptyList(),
+    // Phase 6: set once the driver has confirmed this drop.
+    val delivery: PlanDelivery? = null,
+    val invoices: List<PlanInvoice> = emptyList(),
+    // False while something loaded for this customer still has no invoice; the driver cannot confirm then.
+    val invoiced: Boolean = true,
 )
 
 // The amount is planned while the plan is planned, loaded after that.
@@ -141,6 +152,12 @@ data class PlanDropLine(
     val pieces: Int = 0,
     val cartons: Int = 0,
     val loosePieces: Int = 0,
+    // Phase 6, added last so the older positional uses keep working.
+    val itemId: Int = 0,
+    val loaded: Int = 0,
+    // What the customer actually took, and why less, once the drop is confirmed.
+    val delivered: Int = 0,
+    val shortReason: String? = null,
 )
 
 // before and after are pieces. Planner changes have an order and shop; warehouse changes have a reason.
@@ -228,3 +245,44 @@ data class WarehouseChangeRequest(val products: List<ProductQty>, val reason: St
 // The new total for the product across the whole plan; pieces are loose pieces on top of the cartons.
 @Serializable
 data class ProductQty(val productId: Int, val cartons: Int = 0, val pieces: Int = 0)
+
+// Phase 6. An invoice made from this plan, as the plan screens show it.
+@Serializable
+data class PlanInvoice(
+    val id: Int,
+    val number: String = "",
+    val customerId: Int = 0,
+    val companyCode: String = "",
+    val invoiceType: String = "vat",
+    val total: Double = 0.0,
+)
+
+// What "Make invoices" made.
+@Serializable
+data class MadeInvoice(val id: Int, val number: String = "", val total: Double = 0.0)
+
+// A confirmed drop.
+@Serializable
+data class PlanDelivery(
+    val id: Int,
+    val customerId: Int = 0,
+    val receivedBy: String = "",
+    val confirmedAt: String = "",
+    val confirmedBy: String = "",
+    val hasPhoto: Boolean = false,
+)
+
+// What the driver sends when confirming one customer's drop. The signature and photo are base64.
+@Serializable
+data class DeliveryRequest(
+    val customerId: Int,
+    val receivedBy: String = "",
+    val signature: String? = null,
+    val photo: String? = null,
+    val note: String = "",
+    val lines: List<DeliveryLineQty> = emptyList(),
+)
+
+// pieces are loose pieces on top of the cartons; reason is needed when less than loaded is taken.
+@Serializable
+data class DeliveryLineQty(val itemId: Int, val cartons: Int = 0, val pieces: Int = 0, val reason: String = "")

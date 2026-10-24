@@ -1,5 +1,7 @@
 package com.salesapp.di
 
+import com.salesapp.core.Camera
+import com.salesapp.core.Documents
 import com.salesapp.core.KeyValueStore
 import com.salesapp.data.Api
 import com.salesapp.data.AppState
@@ -10,10 +12,12 @@ import org.koin.dsl.module
 // Everything Koin can hand out. Screen view models live in customersModule and catalogModule.
 val appModule = module {
     single { KeyValueStore() }
+    single { Documents() }
+    single { Camera() }
     single { SessionStore(get()) }
     single { AppState(get(), get()) }
     // The one Api for the whole app lives in AppState: it reads the address and token each time.
     single<Api> { get<AppState>().api }
     single { ListsRepository(get()) }
-    includes(phase1Module, usersModule, customersModule, catalogModule, stockModule, ordersModule, loadingModule)
+    includes(phase1Module, usersModule, customersModule, catalogModule, stockModule, ordersModule, loadingModule, invoicesModule)
 }

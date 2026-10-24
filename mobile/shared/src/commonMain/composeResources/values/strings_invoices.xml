@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Making the invoices from a loaded plan -->
+    <string name="invoice_make">Make invoices</string>
+    <string name="invoice_making">Making the invoices...</string>
+    <string name="invoice_make_help">One invoice for each shop and company, with the order\'s LPO, for what went on the vehicle.</string>
+    <string name="invoice_made_one">1 invoice made</string>
+    <string name="invoice_made_many">%1$d invoices made</string>
+    <string name="invoice_made_row">%1$s · %2$s</string>
+
+    <!-- Invoice register -->
+    <string name="invoice_list_title">Invoices</string>
+    <string name="invoice_list_search">Number, shop or LPO</string>
+    <string name="invoice_list_all">All</string>
+    <string name="invoice_list_vat">VAT</string>
+    <string name="invoice_list_plain">Plain</string>
+    <string name="invoice_list_empty">No invoices yet. They are made once a vehicle is loaded.</string>
+    <string name="invoice_list_no_match">No invoices here.</string>
+    <string name="invoice_list_no_access">You cannot see invoices.</string>
+    <string name="invoice_delivered">Delivered</string>
+
+    <!-- Invoice detail -->
+    <string name="invoice_lpo">LPO %1$s</string>
+    <string name="invoice_date">Date %1$s</string>
+    <string name="invoice_due">Due %1$s</string>
+    <string name="invoice_vehicle">Vehicle %1$s</string>
+    <string name="invoice_delivery_note">Delivery note %1$s</string>
+    <string name="invoice_salesman">Salesman %1$s</string>
+    <string name="invoice_lines">Products</string>
+    <string name="invoice_line_price">%1$s × %2$s</string>
+    <string name="invoice_subtotal">Sub Total</string>
+    <string name="invoice_vat_at">VAT at %1$s%%</string>
+    <string name="invoice_vat_none">VAT</string>
+    <string name="invoice_total">Total</string>
+    <string name="invoice_print">Print or save</string>
+    <string name="invoice_share">Share on WhatsApp</string>
+    <string name="invoice_getting">Getting the invoice...</string>
+    <string name="invoice_no_viewer">No app on this phone can open a PDF. Install a PDF reader and try again.</string>
+</resources>

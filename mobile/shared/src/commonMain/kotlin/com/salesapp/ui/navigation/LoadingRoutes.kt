@@ -24,10 +24,19 @@ data class WarehousePlanRoute(val id: Int)
 @Serializable
 data class TripRoute(val id: Int)
 
+// The driver confirms one shop's drop (Phase 6).
+@Serializable
+data class ConfirmDeliveryRoute(val planId: Int, val customerId: Int)
+
 // Which screen opens a plan for this user.
 fun planRouteFor(user: User?, id: Int, status: String, sent: Boolean): Any = when (user?.role) {
     "management", "sales_manager" -> if (status == "planned") PlannerPlanRoute(id) else TripRoute(id)
     "warehouse" -> WarehousePlanRoute(id)
-    "admin" -> if (status == "planned" && !sent) PlannerPlanRoute(id) else WarehousePlanRoute(id)
+    // Admin plans, then loads with the warehouse, then follows the deliveries like everyone else.
+    "admin" -> when {
+        status == "planned" && !sent -> PlannerPlanRoute(id)
+        status == "out" || status == "done" -> TripRoute(id)
+        else -> WarehousePlanRoute(id)
+    }
     else -> TripRoute(id)
 }

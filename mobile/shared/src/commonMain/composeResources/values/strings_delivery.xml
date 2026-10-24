@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The drop list on a vehicle that is on the road -->
+    <string name="delivery_pill_delivered">Delivered</string>
+    <string name="delivery_confirm_open">Hand over goods</string>
+    <string name="delivery_not_invoiced">The invoices for this customer are not made yet. Ask the sales manager.</string>
+
+    <!-- Confirm delivery -->
+    <string name="delivery_title">Confirm delivery</string>
+    <string name="delivery_what">What did they take?</string>
+    <string name="delivery_on_vehicle">%1$s · %2$s on the vehicle</string>
+    <string name="delivery_cartons">Cartons</string>
+    <string name="delivery_pieces">Pieces</string>
+    <string name="delivery_back_note">Anything they do not take goes back to the warehouse and stays on their order as a balance.</string>
+    <string name="delivery_reason">Why less?</string>
+    <string name="delivery_reason_refused">Refused</string>
+    <string name="delivery_reason_damaged">Damaged</string>
+    <string name="delivery_reason_short">Short</string>
+    <string name="delivery_reason_closed">Shop closed</string>
+    <string name="delivery_received_by">Name of the person who received the goods</string>
+    <string name="delivery_received_by_hint">e.g. Grace</string>
+    <string name="delivery_signature">Their signature</string>
+    <string name="delivery_signature_hint">Ask the customer to sign with a finger.</string>
+    <string name="delivery_signature_clear">Clear</string>
+    <string name="delivery_photo">Add photo</string>
+    <string name="delivery_photo_again">Take another photo</string>
+    <string name="delivery_photo_added">Photo added</string>
+    <string name="delivery_photo_remove">Remove photo</string>
+    <string name="delivery_note_label">Note</string>
+    <string name="delivery_refused_all">Customer refused everything</string>
+    <string name="delivery_refused_all_on">Refused everything. No signature is needed.</string>
+    <string name="delivery_refused_undo">They did take something</string>
+    <string name="delivery_confirm">Confirm delivery</string>
+    <string name="delivery_confirming">Sending...</string>
+    <string name="delivery_done">Delivery confirmed.</string>
+    <string name="delivery_need_name">Please type the name of the person who received the goods.</string>
+    <string name="delivery_need_signature">Please ask the customer to sign.</string>
+    <string name="delivery_need_reason">Please say why less was delivered.</string>
+    <string name="delivery_too_much">Only %1$s was loaded.</string>
+    <string name="delivery_nothing">There is nothing to hand over for this customer.</string>
+
+    <!-- A drop that is already confirmed -->
+    <string name="delivery_received_from">Received by %1$s</string>
+    <string name="delivery_at">%1$s</string>
+    <string name="delivery_confirmed_by">Confirmed by %1$s</string>
+    <string name="delivery_line_taken">%1$s of %2$s taken</string>
+    <string name="delivery_line_all">%1$s taken</string>
+    <string name="delivery_line_reason">%1$s · %2$s</string>
+    <string name="delivery_photo_title">Photo</string>
+    <string name="delivery_image_failed">The picture could not be loaded.</string>
+
+    <!-- Vehicle documents -->
+    <string name="delivery_note_doc">Delivery note</string>
+    <string name="delivery_gate_pass_doc">Gate pass</string>
+</resources>

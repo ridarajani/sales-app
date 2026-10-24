@@ -10,6 +10,7 @@ import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -102,6 +103,13 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     // No body, so no Content-Type: the server rejects an empty JSON body.
     private suspend inline fun <reified T> delete(path: String): T =
         decode { send<Unit>(HttpMethod.Delete, path, null).body<T>() }
+
+    // A file from the server (a PDF, a signature or a photo), with the auth header. The server
+    // decides the type, so the caller is told it along with the bytes.
+    private suspend fun bytes(path: String): ServerFile {
+        val response = send<Unit>(HttpMethod.Get, path, null)
+        return ServerFile(response.readRawBytes(), response.contentType()?.toString() ?: "application/octet-stream")
+    }
 
     // Stops the connection and frees its resources.
     fun close() {
@@ -268,4 +276,31 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     suspend fun deletePlan(id: Int) {
         delete<JsonObject>("/loading-plans/$id")
     }
+
+    // Phase 6: invoices and delivery.
+
+    // Makes the invoices for the user's own companies from a loaded plan. The reply is the plan
+    // again, with `made` listing what this call made.
+    suspend fun makeInvoices(planId: Int): PlanDetail = post<PlanDetail, Unit>("/loading-plans/$planId/invoices", null)
+
+    suspend fun invoices(query: String?, company: String?, type: String?): List<InvoiceListItem> =
+        get("/invoices", mapOf("q" to query, "company" to company, "type" to type))
+
+    suspend fun invoice(id: Int): InvoiceDetail = get("/invoices/$id")
+
+    suspend fun invoicePdf(id: Int): ServerFile = bytes("/invoices/$id/pdf")
+
+    suspend fun deliveryNotePdf(planId: Int): ServerFile = bytes("/loading-plans/$planId/delivery-note.pdf")
+
+    suspend fun gatePassPdf(planId: Int): ServerFile = bytes("/loading-plans/$planId/gate-pass.pdf")
+
+    suspend fun deliverySignature(deliveryId: Int): ServerFile = bytes("/deliveries/$deliveryId/signature")
+
+    suspend fun deliveryPhoto(deliveryId: Int): ServerFile = bytes("/deliveries/$deliveryId/photo")
+
+    suspend fun confirmDelivery(planId: Int, request: DeliveryRequest): PlanDetail =
+        post<PlanDetail, DeliveryRequest>("/loading-plans/$planId/deliveries", request)
 }
+
+// A file the server sent, with the type it gave it.
+class ServerFile(val bytes: ByteArray, val contentType: String)

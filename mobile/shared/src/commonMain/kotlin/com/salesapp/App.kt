@@ -41,6 +41,7 @@ import com.salesapp.resources.update_later
 import com.salesapp.resources.update_text
 import com.salesapp.resources.update_title
 import com.salesapp.ui.customers.customersGraph
+import com.salesapp.ui.invoices.invoicesGraph
 import com.salesapp.ui.loading.loadingGraph
 import com.salesapp.ui.navigation.HomeRoute
 import com.salesapp.ui.navigation.PhoneRoute
@@ -143,6 +144,7 @@ private fun AppContent() {
                     stockGraph(nav)
                     ordersGraph(nav)
                     loadingGraph(nav)
+                    invoicesGraph(nav)
                     customersGraph(nav, onExit = { nav.popBackStack() })
                     catalogGraph(nav, onExit = { nav.popBackStack() })
                 }
