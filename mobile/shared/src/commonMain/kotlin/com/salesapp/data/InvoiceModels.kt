@@ -21,6 +21,8 @@ data class InvoiceListItem(
     val subtotal: Double = 0.0,
     val vat: Double = 0.0,
     val total: Double = 0.0,
+    // Phase 7: what is still owed on it.
+    val balance: Double = 0.0,
     val salesmanName: String? = null,
     val vehiclePlate: String? = null,
     val delivered: Boolean = false,
@@ -79,6 +81,11 @@ data class InvoiceDetail(
     val vatRate: Double = 0.0,
     val vat: Double = 0.0,
     val total: Double = 0.0,
+    // Phase 7: what is still owed, what came off it, and the payments against it.
+    val balance: Double = 0.0,
+    val discount: Double = 0.0,
+    val wht: Double = 0.0,
+    val payments: List<InvoicePayment> = emptyList(),
     val createdAt: String = "",
     val createdBy: String = "",
     val salesmanName: String? = null,
@@ -92,3 +99,13 @@ data class InvoiceDetail(
 ) {
     val isVat: Boolean get() = invoiceType == "vat"
 }
+
+// One payment that went against an invoice. amount is what went on this invoice, not the whole payment.
+@Serializable
+data class InvoicePayment(
+    val id: Int,
+    val number: String = "",
+    val mode: String = "cash",
+    val amount: Double = 0.0,
+    val at: String = "",
+)

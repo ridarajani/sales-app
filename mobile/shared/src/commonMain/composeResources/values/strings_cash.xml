@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home tiles -->
+    <string name="tile_expenses">Expenses</string>
+    <string name="tile_expenses_sub">Money spent for a company</string>
+    <string name="tile_payments">Payments</string>
+    <string name="tile_payments_sub">What customers have paid</string>
+
+    <!-- Expenses -->
+    <string name="expenses_title">Expenses</string>
+    <string name="expenses_no_access">You cannot record expenses.</string>
+    <string name="expenses_empty">No expenses yet.</string>
+    <string name="expenses_new">Record an expense</string>
+    <string name="expense_title">Record an expense</string>
+    <string name="expense_company">Which company?</string>
+    <string name="expense_amount">Amount (MWK)</string>
+    <string name="expense_what">What was it for?</string>
+    <string name="expense_what_hint">e.g. Fuel</string>
+    <string name="expense_how">How was it paid?</string>
+    <string name="expense_mode_cash">Cash</string>
+    <string name="expense_mode_airtel">Airtel Money</string>
+    <string name="expense_photo">Photo of the bill</string>
+    <string name="expense_save">Save expense</string>
+    <string name="expense_saving">Saving...</string>
+    <string name="expense_saved">Expense saved.</string>
+    <string name="expense_need_company">Pick the company.</string>
+    <string name="expense_need_amount">Please type the amount.</string>
+    <string name="expense_need_what">Please say what it was for.</string>
+    <string name="expense_cash_note">A cash expense comes off your next handover. An Airtel Money expense does not.</string>
+    <string name="expense_spent_by">Spent by %1$s</string>
+    <string name="expense_mode_row">Paid by %1$s</string>
+
+    <!-- My cash and handing over -->
+    <string name="cash_title">Hand over cash</string>
+    <string name="cash_no_access">You do not hold company cash.</string>
+    <string name="cash_to_hand_over">To hand over</string>
+    <string name="cash_nothing">You have no cash to hand over.</string>
+    <string name="cash_from_payments">Cash from payments</string>
+    <string name="cash_from_airtel">Taken out of Airtel Money</string>
+    <string name="cash_less_expenses">Less cash expenses</string>
+    <string name="cash_per_company">Per company</string>
+    <string name="cash_company_row">%1$s + %2$s − %3$s</string>
+    <string name="cash_payments_list">Payments in hand</string>
+    <string name="cash_withdrawals_list">Airtel withdrawals</string>
+    <string name="cash_expenses_list">Cash expenses</string>
+    <string name="cash_hand_over">Hand over %1$s</string>
+    <string name="cash_handing_over">Handing over...</string>
+    <string name="cash_handed_over">Handed over as %1$s. The cashier counts it next.</string>
+    <string name="cash_past">Past handovers</string>
+    <string name="cash_tile_amount">%1$s to hand over</string>
+    <string name="cash_tile_nothing">Nothing to hand over</string>
+
+    <!-- Counting cash -->
+    <string name="count_title">Count cash</string>
+    <string name="count_no_access">You cannot count cash.</string>
+    <string name="count_waiting_none">No cash waiting to be counted.</string>
+    <string name="count_brought">%1$s brought %2$s</string>
+    <string name="count_waiting">Waiting</string>
+    <string name="count_counted">Counted</string>
+    <string name="count_tile_one">1 handover waiting</string>
+    <string name="count_tile_many">%1$d handovers waiting</string>
+    <string name="count_tile_nothing">Nothing waiting</string>
+    <string name="handover_title">Handover %1$s</string>
+    <string name="handover_expected">They should have %1$s</string>
+    <string name="handover_expected_label">They should have</string>
+    <string name="handover_brought_by">Brought by %1$s</string>
+    <string name="handover_how_much">How much did you count? (MWK)</string>
+    <string name="handover_note">Note</string>
+    <string name="handover_count">Counted, confirm</string>
+    <string name="handover_counting">Saving...</string>
+    <string name="handover_short">%1$s short</string>
+    <string name="handover_over">%1$s over</string>
+    <string name="handover_matches">The count matches.</string>
+    <string name="handover_counted_by">Counted by %1$s · %2$s</string>
+    <string name="handover_counted_amount">Counted %1$s</string>
+    <string name="handover_need_count">Please type the cash you counted.</string>
+    <string name="handover_own">Someone else must count the cash you handed over.</string>
+    <string name="handover_done">Cash counted.</string>
+</resources>

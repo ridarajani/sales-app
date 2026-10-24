@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Collect money -->
+    <string name="collect_title">Collect money</string>
+    <string name="collect_title_office">Record a payment</string>
+    <string name="collect_no_access">You cannot record payments.</string>
+    <string name="collect_who">Who is paying?</string>
+    <string name="collect_search">Search a shop by name or phone</string>
+    <string name="collect_no_customers">No shops found.</string>
+    <string name="collect_owes">Owes %1$s</string>
+    <string name="collect_owes_nothing">Owes nothing</string>
+    <string name="collect_change_customer">Choose another shop</string>
+    <string name="collect_which_company">Which company?</string>
+    <string name="collect_company_owes">Owes %1$s</string>
+    <string name="collect_owes_label">Owes</string>
+    <string name="collect_opening_left">Opening balance %1$s</string>
+    <string name="collect_which_invoice">Which invoice?</string>
+    <string name="collect_no_invoice">No invoice, just money on account</string>
+    <string name="collect_no_open_invoices">No invoice is open. The money goes on account.</string>
+    <string name="collect_invoice_row">%1$s · owes %2$s</string>
+    <string name="collect_overdue">Late</string>
+    <string name="collect_how">How did they pay?</string>
+    <string name="collect_mode_cash">Cash</string>
+    <string name="collect_mode_bank">Bank transfer</string>
+    <string name="collect_mode_airtel">Airtel Money</string>
+    <string name="collect_amount">How much did they pay? (MWK)</string>
+    <string name="collect_reference">Airtel Money reference</string>
+    <string name="collect_proof">Photo of the proof of payment</string>
+    <string name="collect_proof_bank">Photo of the bank slip</string>
+    <string name="collect_less">Discount or tax off</string>
+    <string name="collect_less_needs_invoice">Pick the invoice first.</string>
+    <string name="collect_discount">Discount (MWK)</string>
+    <string name="collect_wht">Withholding tax (MWK)</string>
+    <string name="collect_wht_certificate">Tax certificate number</string>
+    <string name="collect_received_by">Name of the person who paid</string>
+    <string name="collect_received_by_hint">e.g. Grace</string>
+    <string name="collect_signature">Their signature</string>
+    <string name="collect_signature_hint">Ask the customer to sign with a finger.</string>
+    <string name="collect_note">Note</string>
+    <string name="collect_save">Save payment</string>
+    <string name="collect_saving">Saving...</string>
+    <string name="collect_need_amount">Please type the amount received.</string>
+    <string name="collect_need_name">Please type the name of the person who paid.</string>
+    <string name="collect_need_signature">Please ask the customer to sign.</string>
+    <string name="collect_need_reference">Please type the Airtel Money reference.</string>
+    <string name="collect_need_proof">Please add a photo of the proof of payment.</string>
+    <string name="collect_cash_note">Keep the cash safe until you hand it to the cashier.</string>
+    <string name="collect_oldest_first">The invoice picked is paid first, then the oldest invoices.</string>
+
+    <!-- After saving -->
+    <string name="collect_saved">Payment saved</string>
+    <string name="collect_receipt">Receipt %1$s</string>
+    <string name="collect_went_on">Where the money went</string>
+    <string name="collect_went_invoice">%1$s · %2$s</string>
+    <string name="collect_went_opening">Opening balance · %1$s</string>
+    <string name="collect_on_account">On account · %1$s</string>
+    <string name="collect_owes_now">They now owe %1$s</string>
+    <string name="collect_in_credit">They are %1$s in credit</string>
+    <string name="collect_another">Record another payment</string>
+    <string name="collect_done">Done</string>
+
+    <!-- Payments list and detail -->
+    <string name="payments_title">Payments</string>
+    <string name="payments_search">Receipt, shop, invoice or reference</string>
+    <string name="payments_empty">No payments yet.</string>
+    <string name="payments_no_match">No payments here.</string>
+    <string name="payments_no_access">You cannot see payments.</string>
+    <string name="payment_collected_by">Taken by %1$s</string>
+    <string name="payment_for_invoice">For %1$s</string>
+    <string name="payment_reference">Reference %1$s</string>
+    <string name="payment_discount">Discount %1$s</string>
+    <string name="payment_wht">Withholding tax %1$s</string>
+    <string name="payment_certificate">Certificate %1$s</string>
+    <string name="payment_custody_with">Cash still with %1$s</string>
+    <string name="payment_custody_handed">Handed over · %1$s</string>
+    <string name="payment_custody_counted">Counted by the cashier</string>
+    <string name="payment_proof">Proof of payment</string>
+    <string name="payment_signature">Signature</string>
+
+    <!-- On the invoice -->
+    <string name="invoice_balance">Still owed</string>
+    <string name="invoice_paid_off">Paid in full</string>
+    <string name="invoice_less_discount">Discount</string>
+    <string name="invoice_less_wht">Withholding tax</string>
+    <string name="invoice_payments">Payments</string>
+    <string name="invoice_payment_row">%1$s · %2$s</string>
+    <string name="invoice_collect">Collect money</string>
+</resources>

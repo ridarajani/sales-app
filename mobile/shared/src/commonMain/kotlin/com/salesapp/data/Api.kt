@@ -3,6 +3,7 @@ package com.salesapp.data
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.timeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -29,6 +30,9 @@ class ApiException(val code: String, override val message: String, val status: I
 private const val GENERIC_MESSAGE = "Something went wrong. Try again."
 private const val OFFLINE_MESSAGE = "No connection. Check the internet and try again."
 
+// Calls that carry a photo or a PDF. A phone on a slow line needs far more than the usual 15 seconds.
+const val FILE_TIMEOUT: Long = 60_000
+
 private val json = Json {
     ignoreUnknownKeys = true
     coerceInputValues = true
@@ -53,6 +57,7 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
         path: String,
         body: B?,
         query: Map<String, String?> = emptyMap(),
+        timeoutMillis: Long = 0,
     ): HttpResponse {
         val response = try {
             client.request {
@@ -60,6 +65,13 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
                 url(baseUrlProvider().trimEnd('/') + path)
                 query.forEach { (key, value) -> if (value != null) parameter(key, value) }
                 tokenProvider()?.let { header(HttpHeaders.Authorization, "Bearer $it") }
+                // Photos and PDFs take much longer than a list, so those calls ask for more time.
+                if (timeoutMillis > 0) {
+                    timeout {
+                        requestTimeoutMillis = timeoutMillis
+                        socketTimeoutMillis = timeoutMillis
+                    }
+                }
                 if (body != null) {
                     contentType(ContentType.Application.Json)
                     setBody(body)
@@ -91,8 +103,8 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     private suspend inline fun <reified T> get(path: String, query: Map<String, String?> = emptyMap()): T =
         decode { send<Unit>(HttpMethod.Get, path, null, query).body<T>() }
 
-    private suspend inline fun <reified T, reified B : Any> post(path: String, body: B?): T =
-        decode { send(HttpMethod.Post, path, body).body<T>() }
+    private suspend inline fun <reified T, reified B : Any> post(path: String, body: B?, timeoutMillis: Long = 0): T =
+        decode { send(HttpMethod.Post, path, body, timeoutMillis = timeoutMillis).body<T>() }
 
     private suspend inline fun <reified T, reified B : Any> put(path: String, body: B?): T =
         decode { send(HttpMethod.Put, path, body).body<T>() }
@@ -107,7 +119,7 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     // A file from the server (a PDF, a signature or a photo), with the auth header. The server
     // decides the type, so the caller is told it along with the bytes.
     private suspend fun bytes(path: String): ServerFile {
-        val response = send<Unit>(HttpMethod.Get, path, null)
+        val response = send<Unit>(HttpMethod.Get, path, null, timeoutMillis = FILE_TIMEOUT)
         return ServerFile(response.readRawBytes(), response.contentType()?.toString() ?: "application/octet-stream")
     }
 
@@ -298,8 +310,64 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun deliveryPhoto(deliveryId: Int): ServerFile = bytes("/deliveries/$deliveryId/photo")
 
+    // Sends a signature and often a photo, so it gets the longer timeout.
     suspend fun confirmDelivery(planId: Int, request: DeliveryRequest): PlanDetail =
-        post<PlanDetail, DeliveryRequest>("/loading-plans/$planId/deliveries", request)
+        post<PlanDetail, DeliveryRequest>("/loading-plans/$planId/deliveries", request, timeoutMillis = FILE_TIMEOUT)
+
+    // Phase 7: payments, expenses, cash and Airtel Money.
+
+    // What the collect screen needs once a customer is picked.
+    suspend fun collectInfo(customerId: Int): CollectInfo = get("/collections/customer/$customerId")
+
+    // Carries a signature and often a photo of the proof, so it gets the longer timeout.
+    suspend fun collect(request: CollectRequest): PaymentDetail =
+        post<PaymentDetail, CollectRequest>("/collections", request, timeoutMillis = FILE_TIMEOUT)
+
+    suspend fun collections(query: String?, mode: String?, company: String?): List<PaymentListItem> =
+        get("/collections", mapOf("q" to query, "mode" to mode, "company" to company))
+
+    suspend fun collection(id: Int): PaymentDetail = get("/collections/$id")
+
+    suspend fun collectionProof(id: Int): ServerFile = bytes("/collections/$id/proof")
+
+    suspend fun collectionSignature(id: Int): ServerFile = bytes("/collections/$id/signature")
+
+    // May carry a photo of the bill.
+    suspend fun addExpense(request: ExpenseRequest): Expense =
+        post<Expense, ExpenseRequest>("/expenses", request, timeoutMillis = FILE_TIMEOUT)
+
+    suspend fun expenses(company: String?): List<Expense> = get("/expenses", mapOf("company" to company))
+
+    suspend fun expensePhoto(id: Int): ServerFile = bytes("/expenses/$id/photo")
+
+    suspend fun myCash(): CashHeld = get("/cash/mine")
+
+    suspend fun handOver(): HandoverDetail = post<HandoverDetail, Unit>("/handovers", null)
+
+    // status: handed or counted; null for both.
+    suspend fun handovers(status: String?): List<HandoverListItem> = get("/handovers", mapOf("status" to status))
+
+    suspend fun handover(id: Int): HandoverDetail = get("/handovers/$id")
+
+    suspend fun countHandover(id: Int, request: CashCountRequest): HandoverDetail =
+        post<HandoverDetail, CashCountRequest>("/handovers/$id/count", request)
+
+    suspend fun wallets(): List<WalletListItem> = get("/airtel/wallets")
+
+    suspend fun wallet(id: Int): WalletDetail = get("/airtel/wallets/$id")
+
+    suspend fun tickEntry(entryId: Int): WalletDetail = post<WalletDetail, Unit>("/airtel/entries/$entryId/tick", null)
+
+    suspend fun withdraw(walletId: Int, request: WithdrawRequest): WalletDetail =
+        post<WalletDetail, WithdrawRequest>("/airtel/wallets/$walletId/withdrawals", request)
+
+    suspend fun checkWallet(walletId: Int, request: WalletCheckRequest): WalletDetail =
+        post<WalletDetail, WalletCheckRequest>("/airtel/wallets/$walletId/checks", request)
+
+    suspend fun createWallet(request: WalletRequest): WalletDetail = post<WalletDetail, WalletRequest>("/airtel/wallets", request)
+
+    suspend fun updateWallet(id: Int, request: WalletRequest): WalletDetail =
+        put<WalletDetail, WalletRequest>("/airtel/wallets/$id", request)
 }
 
 // A file the server sent, with the type it gave it.

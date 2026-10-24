@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.salesapp.core.Camera
 import com.salesapp.core.signaturePng
 import com.salesapp.core.toBase64
+import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.DeliveryLineQty
 import com.salesapp.data.DeliveryRequest
@@ -236,8 +237,16 @@ class ConfirmDeliveryViewModel(
                 _effects.trySend(ConfirmDeliveryEffect.Done)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: ApiException) {
+                // A retry after the first try did get through: the drop is confirmed, so close the screen.
+                if (e.code == "already_delivered") {
+                    app.message = getString(Res.string.delivery_done)
+                    _effects.trySend(ConfirmDeliveryEffect.Done)
+                } else {
+                    // The server's own words, which say exactly which product is wrong.
+                    _state.update { it.copy(busy = false, actionError = app.handleApiError(e)) }
+                }
             } catch (e: Exception) {
-                // The server's own words, which say exactly which product is wrong.
                 val message = app.handleApiError(e)
                 _state.update { it.copy(busy = false, actionError = message) }
             }
