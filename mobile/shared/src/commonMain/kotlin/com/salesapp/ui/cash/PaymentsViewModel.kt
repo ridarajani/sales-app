@@ -10,6 +10,9 @@ import com.salesapp.data.PaymentDetail
 import com.salesapp.data.PaymentListItem
 import com.salesapp.data.ServerFile
 import com.salesapp.data.canSeePayments
+import com.salesapp.resources.Res
+import com.salesapp.resources.cancel_done
+import com.salesapp.resources.cancel_need_reason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 
 data class PaymentsState(
     val allowed: Boolean = true,
@@ -98,10 +102,19 @@ data class PaymentDetailState(
     val signature: ImageBitmap? = null,
     val imagesFailed: Boolean = false,
     val error: String? = null,
+    // Phase 8: cancelling a payment recorded by mistake.
+    val cancelling: Boolean = false,
+    val cancelReason: String = "",
+    val busy: Boolean = false,
+    val actionError: String? = null,
 )
 
 sealed interface PaymentDetailEvent {
     data object Retry : PaymentDetailEvent
+    data object StartCancel : PaymentDetailEvent
+    data object StopCancel : PaymentDetailEvent
+    data class CancelReasonChanged(val value: String) : PaymentDetailEvent
+    data object Cancel : PaymentDetailEvent
 }
 
 class PaymentDetailViewModel(
@@ -117,7 +130,40 @@ class PaymentDetailViewModel(
     }
 
     fun onEvent(event: PaymentDetailEvent) {
-        if (event is PaymentDetailEvent.Retry) load()
+        val s = _state.value
+        if (s.busy && event != PaymentDetailEvent.Retry) return
+        when (event) {
+            PaymentDetailEvent.Retry -> load()
+            PaymentDetailEvent.StartCancel -> _state.update { it.copy(cancelling = true, cancelReason = "", actionError = null) }
+            PaymentDetailEvent.StopCancel -> _state.update { it.copy(cancelling = false, cancelReason = "", actionError = null) }
+            is PaymentDetailEvent.CancelReasonChanged -> _state.update { it.copy(cancelReason = event.value, actionError = null) }
+            PaymentDetailEvent.Cancel -> cancel()
+        }
+    }
+
+    // The payment stays on record but stops counting. The server refuses once the cash is with the
+    // cashier or the Airtel payment is ticked, and says so in its own words.
+    private fun cancel() {
+        val s = _state.value
+        if (s.busy || s.payment?.canCancel != true) return
+        viewModelScope.launch {
+            val reason = s.cancelReason.trim()
+            if (reason.isEmpty()) {
+                _state.update { it.copy(actionError = getString(Res.string.cancel_need_reason)) }
+                return@launch
+            }
+            _state.update { it.copy(busy = true, actionError = null) }
+            try {
+                val saved = repository.cancel(s.payment.id, reason)
+                app.message = getString(Res.string.cancel_done)
+                _state.update { it.copy(busy = false, payment = saved, cancelling = false, cancelReason = "") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = app.handleApiError(e)
+                _state.update { it.copy(busy = false, actionError = message) }
+            }
+        }
     }
 
     private fun load() {

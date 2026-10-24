@@ -36,10 +36,12 @@ import com.salesapp.data.User
 import com.salesapp.data.canCorrectOpeningBalance
 import com.salesapp.data.canEditCustomers
 import com.salesapp.data.canEnterOpeningBalance
+import com.salesapp.data.canSeeLedger
 import com.salesapp.data.canSeeOpeningBalances
 import com.salesapp.data.companyName
 import com.salesapp.resources.Res
 import com.salesapp.resources.customer_area
+import com.salesapp.resources.tile_ledger_card
 import com.salesapp.resources.none_placeholder
 import com.salesapp.resources.customer_balance_admin_only
 import com.salesapp.resources.customer_balance_as_of
@@ -87,6 +89,7 @@ fun CustomerDetailPage(
     onBack: () -> Unit,
     onEdit: (Int) -> Unit,
     onEnterBalance: (customerId: Int, companyCode: String) -> Unit,
+    onLedger: (Int) -> Unit,
     viewModel: CustomerDetailViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -102,12 +105,17 @@ fun CustomerDetailPage(
         viewModel.onEvent(CustomerDetailEvent.Refresh)
         onPauseOrDispose {}
     }
-    CustomerDetailScreen(state, viewModel::onEvent, onBack)
+    CustomerDetailScreen(state, viewModel::onEvent, onBack, onLedger)
 }
 
 // Everything about one customer, with buttons to edit or switch off for people who may.
 @Composable
-fun CustomerDetailScreen(state: CustomerDetailState, onEvent: (CustomerDetailEvent) -> Unit, onBack: () -> Unit) {
+fun CustomerDetailScreen(
+    state: CustomerDetailState,
+    onEvent: (CustomerDetailEvent) -> Unit,
+    onBack: () -> Unit,
+    onLedger: (Int) -> Unit = {},
+) {
     val customer = state.customer
     val user = state.user
     Column(modifier = Modifier.fillMaxSize()) {
@@ -127,6 +135,14 @@ fun CustomerDetailScreen(state: CustomerDetailState, onEvent: (CustomerDetailEve
                         DetailRow(stringResource(Res.string.customer_city), customer.city)
                         DetailRow(stringResource(Res.string.customer_tpin), customer.tpin)
                         DetailRow(stringResource(Res.string.customer_reg_no), customer.regNo)
+                    }
+                    // Phase 8: every invoice and payment with one company.
+                    if (user.canSeeLedger()) {
+                        SecondaryButton(
+                            stringResource(Res.string.tile_ledger_card),
+                            onClick = { onLedger(customer.id) },
+                            enabled = !state.busy,
+                        )
                     }
                     SectionTitle(stringResource(Res.string.customer_companies))
                     Section {

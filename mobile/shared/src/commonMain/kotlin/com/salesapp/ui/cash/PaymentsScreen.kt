@@ -54,9 +54,20 @@ import com.salesapp.resources.payments_no_access
 import com.salesapp.resources.payments_no_match
 import com.salesapp.resources.payments_search
 import com.salesapp.resources.payments_title
+import com.salesapp.resources.cancel
+import com.salesapp.resources.cancel_confirm
+import com.salesapp.resources.cancel_help
+import com.salesapp.resources.cancel_payment
+import com.salesapp.resources.cancel_reason
+import com.salesapp.resources.cancel_saving
+import com.salesapp.resources.cancelled_because
+import com.salesapp.resources.cancelled_by
+import com.salesapp.resources.cancelled_pill
 import com.salesapp.ui.components.Badge
 import com.salesapp.ui.components.BadgeTone
 import com.salesapp.ui.components.CompanyDot
+import com.salesapp.ui.components.DangerButton
+import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.EmptyState
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.FilterChips
@@ -64,6 +75,7 @@ import com.salesapp.ui.components.ListCard
 import com.salesapp.ui.components.LoadingState
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SearchField
+import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.SalesTheme
@@ -150,6 +162,7 @@ private fun PaymentRow(payment: PaymentListItem, onClick: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 )
                 Badge(modeLabel(payment.mode), tone = BadgeTone.Role)
+                if (payment.cancelled) Badge(stringResource(Res.string.cancelled_pill), tone = BadgeTone.Off)
             }
             Text(
                 payment.customerName,
@@ -265,8 +278,10 @@ fun PaymentDetailScreen(state: PaymentDetailState, onEvent: (PaymentDetailEvent)
                         }
                     }
                 }
+                // A cancelled payment stays on record but no longer counts.
+                if (payment.cancelled) Cancelled(payment)
                 // Cash stays the collector's responsibility until the cashier counts it.
-                Custody(payment)
+                if (!payment.cancelled) Custody(payment)
                 SectionLabel(stringResource(Res.string.collect_went_on))
                 ListCard(onClick = null) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -293,9 +308,67 @@ fun PaymentDetailScreen(state: PaymentDetailState, onEvent: (PaymentDetailEvent)
                     SectionLabel(stringResource(Res.string.payment_signature))
                     ServerPicture(it)
                 }
+                state.actionError?.let { Say(it, error = true) }
+                if (state.cancelling) {
+                    Text(
+                        stringResource(Res.string.cancel_help),
+                        color = scheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Field(
+                        label = stringResource(Res.string.cancel_reason),
+                        value = state.cancelReason,
+                        onValueChange = { onEvent(PaymentDetailEvent.CancelReasonChanged(it)) },
+                        enabled = !state.busy,
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SecondaryButton(
+                            stringResource(Res.string.cancel),
+                            onClick = { onEvent(PaymentDetailEvent.StopCancel) },
+                            enabled = !state.busy,
+                            modifier = Modifier.weight(1f),
+                        )
+                        DangerButton(
+                            stringResource(if (state.busy) Res.string.cancel_saving else Res.string.cancel_confirm),
+                            onClick = { onEvent(PaymentDetailEvent.Cancel) },
+                            enabled = !state.busy,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else if (payment.canCancel) {
+                    // Only Accounts and admin, and only while the money is still in hand.
+                    DangerButton(
+                        stringResource(Res.string.cancel_payment),
+                        onClick = { onEvent(PaymentDetailEvent.StartCancel) },
+                        enabled = !state.busy,
+                    )
+                }
             }
             state.error != null -> ErrorState(state.error, onRetry = { onEvent(PaymentDetailEvent.Retry) })
             else -> LoadingState()
+        }
+    }
+}
+
+// Who cancelled it, when, and why.
+@Composable
+private fun Cancelled(payment: PaymentDetail) {
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Say(
+            stringResource(
+                Res.string.cancelled_by,
+                payment.cancelledBy.orEmpty(),
+                payment.cancelledAt?.let { formatIsoDate(localIsoDateFromUtcTimestamp(it)) }.orEmpty(),
+            ),
+            error = true,
+        )
+        if (payment.cancelReason.isNotBlank()) {
+            Text(
+                stringResource(Res.string.cancelled_because, payment.cancelReason),
+                color = scheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
@@ -353,6 +426,62 @@ private fun PaymentsEmptyPreview() {
 
 @Preview
 @Composable
+private fun PaymentCancelledPreview() {
+    SalesTheme {
+        PaymentDetailScreen(
+            state = PaymentDetailState(
+                loading = false,
+                payment = PaymentDetail(
+                    id = 4,
+                    number = "LV-RCT-000008",
+                    companyCode = "LV",
+                    customerName = "Area 47 Superstore",
+                    mode = "cash",
+                    amount = 200_000.0,
+                    collectedBy = "Chimwemwe Banda",
+                    createdAt = "2026-10-24T09:40:00.000Z",
+                    cancelled = true,
+                    cancelledBy = "Thoko Mwale",
+                    cancelledAt = "2026-10-24T11:00:00.000Z",
+                    cancelReason = "Recorded against the wrong shop.",
+                ),
+            ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PaymentCancellingPreview() {
+    SalesTheme {
+        PaymentDetailScreen(
+            state = PaymentDetailState(
+                loading = false,
+                cancelling = true,
+                cancelReason = "Recorded against the wrong shop.",
+                payment = PaymentDetail(
+                    id = 4,
+                    number = "LV-RCT-000008",
+                    companyCode = "LV",
+                    customerName = "Area 47 Superstore",
+                    mode = "cash",
+                    amount = 200_000.0,
+                    collectedBy = "Chimwemwe Banda",
+                    custody = "with",
+                    createdAt = "2026-10-24T09:40:00.000Z",
+                    canCancel = true,
+                ),
+            ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
 private fun PaymentDetailPreview() {
     SalesTheme {
         PaymentDetailScreen(
@@ -375,6 +504,7 @@ private fun PaymentDetailPreview() {
                     collectedBy = "Chimwemwe Banda",
                     custody = "with",
                     createdAt = "2026-10-24T09:10:00.000Z",
+                    canCancel = true,
                     allocations = listOf(
                         Allocation(invoiceId = 3, invoiceNumber = "LV-INV-000014", amount = 564_000.0),
                         Allocation(invoiceId = null, amount = 136_000.0),

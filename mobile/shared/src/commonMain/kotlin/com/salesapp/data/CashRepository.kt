@@ -17,6 +17,9 @@ class CashRepository(private val api: Api, private val app: AppState) {
 
     suspend fun payment(id: Int): PaymentDetail = api.collection(id)
 
+    // A payment recorded by mistake; it stays on record but stops counting.
+    suspend fun cancel(id: Int, reason: String): PaymentDetail = api.cancelPayment(id, CancelRequest(reason))
+
     suspend fun proof(id: Int): ServerFile = api.collectionProof(id)
 
     suspend fun signature(id: Int): ServerFile = api.collectionSignature(id)

@@ -11,6 +11,6 @@ import org.koin.dsl.module
 val invoicesModule = module {
     single { InvoiceRepository(get(), get()) }
     viewModel { InvoicesViewModel(get(), get()) }
-    viewModel { (id: Int) -> InvoiceDetailViewModel(id, get(), get(), get()) }
+    viewModel { (id: Int) -> InvoiceDetailViewModel(id, get(), get(), get(), get()) }
     viewModel { (planId: Int, customerId: Int) -> ConfirmDeliveryViewModel(planId, customerId, get(), get(), get()) }
 }

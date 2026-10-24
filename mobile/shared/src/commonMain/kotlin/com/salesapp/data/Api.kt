@@ -118,8 +118,8 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     // A file from the server (a PDF, a signature or a photo), with the auth header. The server
     // decides the type, so the caller is told it along with the bytes.
-    private suspend fun bytes(path: String): ServerFile {
-        val response = send<Unit>(HttpMethod.Get, path, null, timeoutMillis = FILE_TIMEOUT)
+    private suspend fun bytes(path: String, query: Map<String, String?> = emptyMap()): ServerFile {
+        val response = send<Unit>(HttpMethod.Get, path, null, query, timeoutMillis = FILE_TIMEOUT)
         return ServerFile(response.readRawBytes(), response.contentType()?.toString() ?: "application/octet-stream")
     }
 
@@ -368,6 +368,36 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun updateWallet(id: Int, request: WalletRequest): WalletDetail =
         put<WalletDetail, WalletRequest>("/airtel/wallets/$id", request)
+
+    // Phase 8: returns, notes, the ledger and cancelling a payment.
+
+    // Goods given back after delivery. Booked as it is saved, so the invoice goes down at once.
+    suspend fun addReturn(invoiceId: Int, request: ReturnRequest): ReturnDetail =
+        post<ReturnDetail, ReturnRequest>("/invoices/$invoiceId/returns", request)
+
+    // status: to_book, waiting, done or all.
+    suspend fun returns(status: String, query: String?): List<ReturnListItem> =
+        get("/returns", mapOf("status" to status, "q" to query))
+
+    suspend fun salesReturn(id: Int): ReturnDetail = get("/returns/$id")
+
+    suspend fun bookReturn(id: Int): ReturnDetail = post<ReturnDetail, Unit>("/returns/$id/book", null)
+
+    suspend fun receiveReturn(id: Int, request: ReceiveRequest): ReturnDetail =
+        post<ReturnDetail, ReceiveRequest>("/returns/$id/receive", request)
+
+    suspend fun addNote(invoiceId: Int, request: NoteRequest): InvoiceNoteDetail =
+        post<InvoiceNoteDetail, NoteRequest>("/invoices/$invoiceId/notes", request)
+
+    // from and to are dates; company is required.
+    suspend fun ledger(customerId: Int, company: String, from: String?, to: String?): Ledger =
+        get("/customers/$customerId/ledger", mapOf("company" to company, "from" to from, "to" to to))
+
+    suspend fun statementPdf(customerId: Int, company: String, from: String?, to: String?): ServerFile =
+        bytes("/customers/$customerId/statement.pdf", mapOf("company" to company, "from" to from, "to" to to))
+
+    suspend fun cancelPayment(id: Int, request: CancelRequest): PaymentDetail =
+        post<PaymentDetail, CancelRequest>("/collections/$id/cancel", request)
 }
 
 // A file the server sent, with the type it gave it.
