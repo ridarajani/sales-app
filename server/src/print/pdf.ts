@@ -205,3 +205,86 @@ export function vehicleDocPdf(d: VehicleDocPrint): Promise<Buffer> {
   doc.text(signers.map((s) => `${s}: ____________________`).join('        '), MARGIN, doc.y, { width: WIDTH });
   return toBuffer(doc);
 }
+
+export type StatementPrint = {
+  company: { name: string; address: string | null; phone: string | null; email: string | null; tpin: string | null; logo: string | null };
+  customer: { name: string; address: string | null; city: string | null; area: string | null };
+  from: string | null;
+  to: string | null;
+  opening: number;
+  rows: { date: string; document: string; what: string; charged: number; paid: number; balance: number }[];
+  closing: number;
+  overdue: number;
+};
+
+// A statement of account for one customer and one company: the ledger card, to print or send by WhatsApp.
+export function statementPdf(s: StatementPrint): Promise<Buffer> {
+  const doc = new PDFDocument({ size: 'A4', margin: MARGIN, info: { Title: `Statement ${s.customer.name}` } });
+  let y = MARGIN;
+  let textX = MARGIN;
+  if (s.company.logo) {
+    try {
+      doc.image(s.company.logo, MARGIN, y, { fit: [90, 70] });
+      textX = MARGIN + 100;
+    } catch {
+      // A logo that cannot be read is left out rather than stopping the statement.
+    }
+  }
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(BURGUNDY).text(s.company.name, textX, y, { width: WIDTH - (textX - MARGIN) });
+  doc.font('Helvetica').fontSize(10).fillColor('black');
+  for (const line of [s.company.address, s.company.phone && `Tel: ${s.company.phone}`, s.company.email]) {
+    if (line) doc.text(line, textX, doc.y, { width: WIDTH - (textX - MARGIN) });
+  }
+  y = Math.max(doc.y, y + 72) + 10;
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(BURGUNDY).text('STATEMENT OF ACCOUNT', MARGIN, y, { width: WIDTH, align: 'center' });
+  y = doc.y + 10;
+  doc.fillColor('black');
+  const period = s.from || s.to ? `${s.from ? dateText(s.from) : 'Start'} to ${s.to ? dateText(s.to) : 'today'}` : 'All';
+  const half = WIDTH / 2 - 10;
+  const left = pairs(doc, MARGIN, y, half, [
+    ['Customer', s.customer.name],
+    ['Address', s.customer.address ?? ''],
+    ['City', s.customer.city || s.customer.area || ''],
+  ]);
+  const right = pairs(doc, MARGIN + half + 20, y, half, [
+    ['Period', period],
+    ['Printed', dateText(new Date().toISOString())],
+  ]);
+  doc.x = MARGIN;
+  doc.y = Math.max(left, right) + 10;
+
+  const blank = (n: number) => (n ? money(n) : '');
+  table(
+    doc,
+    [
+      { title: 'Date', width: 62 },
+      { title: 'Document', width: 92 },
+      { title: 'Details', width: WIDTH - 62 - 92 - 75 - 75 - 85 },
+      { title: 'Charged', width: 75, align: 'right' },
+      { title: 'Paid or less', width: 75, align: 'right' },
+      { title: 'Balance', width: 85, align: 'right' },
+    ],
+    [
+      [s.from ? dateText(s.from) : '', '', 'Balance brought forward', '', '', money(s.opening)],
+      ...s.rows.map((r) => [dateText(r.date), r.document, r.what, blank(r.charged), blank(r.paid), money(r.balance)]),
+    ],
+  );
+
+  doc.moveDown(0.5);
+  const totals: [string, number][] = [['Amount due MWK', s.closing], ...(s.overdue > 0 ? ([['Of which late', s.overdue]] as [string, number][]) : [])];
+  for (const [label, value] of totals) {
+    const top = doc.y;
+    const bold = label.startsWith('Amount');
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 12 : 10);
+    doc.text(label, MARGIN + WIDTH - 260, top, { width: 160, align: 'right' });
+    doc.text(money(value), MARGIN + WIDTH - 95, top, { width: 91, align: 'right' });
+    doc.x = MARGIN;
+    doc.y = top + (bold ? 18 : 15);
+  }
+  doc.moveDown(2);
+  doc.font('Helvetica-Oblique').fontSize(9).fillColor(GREY);
+  doc.text('A balance below 0 is money on account in your favour.', MARGIN, doc.y, { width: WIDTH, align: 'center' });
+  if (s.company.tpin) doc.text(`TPIN: ${s.company.tpin}`, { width: WIDTH, align: 'center' });
+  return toBuffer(doc);
+}

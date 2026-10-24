@@ -9,6 +9,7 @@ import { idParams, invalid, notFound } from '../lists/common.js';
 import { lockPlan, PLAN_VIEWERS, planDetail, visibleWhere } from '../loading/loading.js';
 import { addEvent, qtyText, reserveStock } from '../orders/orders.js';
 import { vehicleDocPdf } from '../print/pdf.js';
+import { returnsForShortDelivery } from '../returns/returns.js';
 import { inTransaction } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
 
@@ -193,6 +194,9 @@ export function deliveryRoutes(app: FastifyInstance, db: Db, uploadDir: string) 
           }
         }
 
+        // What was not taken is a return for the sales team to book against the invoice.
+        const returns = await returnsForShortDelivery(client, deliveryId, user.id);
+
         // The vehicle is done when every customer on it is confirmed.
         const { rows: open } = await client.query(
           `select 1 from loading_plan_items i where i.plan_id = $1 and i.loaded > 0 and i.delivery_id is null limit 1`,
@@ -200,12 +204,12 @@ export function deliveryRoutes(app: FastifyInstance, db: Db, uploadDir: string) 
         );
         if (!open[0]) await client.query(`update loading_plans set status = 'done', updated_at = now() where id = $1`, [plan.id]);
         else await client.query('update loading_plans set updated_at = now() where id = $1', [plan.id]);
-        return { number: plan.number, deliveryId, short: delivered.some((d) => d.delivered < d.loaded) };
+        return { number: plan.number, deliveryId, short: delivered.some((d) => d.delivered < d.loaded), returns };
       });
       await audit(db, {
         userId: user.id,
         action: 'delivery_confirmed',
-        details: { planId, number: result.number, deliveryId: result.deliveryId, customerId: body.customerId, short: result.short },
+        details: { planId, number: result.number, deliveryId: result.deliveryId, customerId: body.customerId, short: result.short, returns: result.returns },
       });
       return reply.code(201).send(await planDetail(db, user, planId));
     },
