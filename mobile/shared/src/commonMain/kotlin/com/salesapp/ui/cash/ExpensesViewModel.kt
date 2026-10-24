@@ -3,6 +3,7 @@ package com.salesapp.ui.cash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesapp.core.Camera
+import com.salesapp.core.randomUuid
 import com.salesapp.core.toBase64
 import com.salesapp.data.AppState
 import com.salesapp.data.CashRepository
@@ -141,6 +142,9 @@ class NewExpenseViewModel(
     private val _effects = Channel<NewExpenseEffect>(Channel.BUFFERED)
     val effects: Flow<NewExpenseEffect> = _effects.receiveAsFlow()
 
+    // One id per form, so a retry after a lost answer does not record the expense twice.
+    private var requestId = randomUuid()
+
     init {
         if (_state.value.allowed) load() else _state.update { it.copy(loading = false) }
     }
@@ -188,8 +192,11 @@ class NewExpenseViewModel(
                         description = s.description.trim(),
                         mode = s.mode,
                         photo = s.photo?.toBase64(),
+                        requestId = requestId,
                     ),
                 )
+                // Saved, so a fresh expense gets a fresh id.
+                requestId = randomUuid()
                 app.message = getString(Res.string.expense_saved)
                 _effects.trySend(NewExpenseEffect.Saved)
             } catch (e: CancellationException) {

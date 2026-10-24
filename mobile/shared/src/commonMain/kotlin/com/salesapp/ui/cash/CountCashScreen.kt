@@ -47,6 +47,7 @@ import com.salesapp.resources.handover_counted_amount
 import com.salesapp.resources.handover_counted_by
 import com.salesapp.resources.handover_counting
 import com.salesapp.resources.handover_brought_by
+import com.salesapp.resources.handover_expected
 import com.salesapp.resources.handover_expected_label
 import com.salesapp.resources.handover_how_much
 import com.salesapp.resources.handover_matches
@@ -226,6 +227,12 @@ fun HandoverDetailScreen(state: HandoverDetailState, onEvent: (HandoverDetailEve
                     }
                     if (handover.waiting) {
                         if (handover.canCount) {
+                            // What the app expects, so the cashier can compare without it being typed for them.
+                            Text(
+                                stringResource(Res.string.handover_expected, formatMwk(handover.net.toLong())),
+                                color = scheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             MwkField(
                                 label = stringResource(Res.string.handover_how_much),
                                 amount = state.counted,
@@ -388,6 +395,18 @@ private fun CountCashPreview() {
 @Preview
 @Composable
 private fun HandoverCountPreview() {
+    SalesTheme {
+        HandoverDetailScreen(
+            state = HandoverDetailState(loading = false, handover = sampleHandover),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun HandoverCountingPreview() {
     SalesTheme {
         HandoverDetailScreen(
             state = HandoverDetailState(loading = false, handover = sampleHandover, counted = 946_000),
