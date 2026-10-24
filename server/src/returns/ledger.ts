@@ -54,7 +54,7 @@ async function ledger(db: Db, user: AuthUser, customerId: number, query: z.infer
      union all
        select to_char(iv.invoice_date, 'YYYY-MM-DD'), iv.created_at, iv.number,
          'Invoice' || case when iv.lpo_no <> '' then ' · LPO ' || iv.lpo_no else '' end
-           || coalesce(' · ' || lp.delivery_note_no, ''),
+           || coalesce(' · delivery note ' || lp.delivery_note_no, ''),
          iv.total::float8, 0, iv.id
        from invoices iv left join loading_plans lp on lp.id = iv.plan_id where iv.customer_id = $1 and iv.company_code = $2
      union all
@@ -63,6 +63,11 @@ async function ledger(db: Db, user: AuthUser, customerId: number, query: z.infer
            || case when c.reference <> '' then ' · ' || c.reference else '' end,
          0, c.amount::float8, c.invoice_id
        from collections c where c.customer_id = $1 and c.company_code = $2 and c.amount > 0
+     union all
+       select ${LOCAL_DATE('c.cancelled_at')}, c.cancelled_at, c.number,
+         'Payment cancelled' || case when c.cancel_reason <> '' then ' · ' || c.cancel_reason else '' end,
+         (c.amount + c.discount + c.wht)::float8, 0, c.invoice_id
+       from collections c where c.customer_id = $1 and c.company_code = $2 and c.cancelled_at is not null
      union all
        select ${LOCAL_DATE('c.created_at')}, c.created_at, c.number, 'Discount · ' || iv.number, 0, c.discount::float8, c.invoice_id
        from collections c join invoices iv on iv.id = c.invoice_id where c.customer_id = $1 and c.company_code = $2 and c.discount > 0

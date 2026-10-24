@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
 import { INVOICE_BALANCE, NOTE_SIGN } from '../cash/balances.js';
+import { applyOnAccount } from '../cash/collections.js';
 import { HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import type { Db } from '../db/pool.js';
 import { logoPath } from '../files.js';
@@ -60,8 +61,8 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
        coalesce((select json_agg(json_build_object('id', c.id, 'number', c.number, 'mode', c.mode, 'amount', a.amount::float8,
            'at', c.created_at) order by c.id)
          from collection_allocations a join collections c on c.id = a.collection_id where a.invoice_id = iv.id), '[]') as payments,
-       coalesce((select sum(c.discount) from collections c where c.invoice_id = iv.id), 0)::float8 as discount,
-       coalesce((select sum(c.wht) from collections c where c.invoice_id = iv.id), 0)::float8 as wht,
+       coalesce((select sum(c.discount) from collections c where c.invoice_id = iv.id and c.cancelled_at is null), 0)::float8 as discount,
+       coalesce((select sum(c.wht) from collections c where c.invoice_id = iv.id and c.cancelled_at is null), 0)::float8 as wht,
        iv.created_at as "createdAt", cb.name as "createdBy", s.name as "salesmanName",
        lp.number as "planNumber", lp.delivery_note_no as "deliveryNoteNo", v.plate as "vehiclePlate",
        (select d.confirmed_at from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as "deliveredAt",
@@ -174,6 +175,8 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
         for (const orderId of new Set(its.map((it) => it.orderId))) {
           await addEvent(client, orderId, user.id, 'Invoice made', `${number} · MWK ${(subtotal + vat).toLocaleString('en-US')}`);
         }
+        // Money the customer paid on account goes on the new invoice.
+        await applyOnAccount(client, first.customerId, first.companyCode);
         invoices.push({ id: invoiceId, number, total: subtotal + vat });
       }
       return { number: plan.number, invoices };

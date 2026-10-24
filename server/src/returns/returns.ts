@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { audit } from '../audit.js';
 import { HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import { INVOICE_BALANCE, NOTE_SIGN } from '../cash/balances.js';
+import { applyOnAccount } from '../cash/collections.js';
 import type { Db } from '../db/pool.js';
 import { idParams, invalid, notFound } from '../lists/common.js';
 import { nextNumber } from '../numbering.js';
@@ -431,6 +432,8 @@ export function returnRoutes(app: FastifyInstance, db: Db) {
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
           [number, iv.companyCode, iv.customerId, iv.id, body.kind, body.amount, body.reason, body.theirNumber, body.note, user.id, body.requestId ?? null],
         );
+        // A note that makes the customer owe more takes money they paid on account.
+        if (body.kind === 'debit_issued' || body.kind === 'credit_received') await applyOnAccount(client, iv.customerId, iv.companyCode);
         return { id: rows[0]!.id, number, invoiceNumber: iv.number };
       });
     } catch (err) {

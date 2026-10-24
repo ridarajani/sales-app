@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { audit } from '../audit.js';
 import { assertCompany, HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
@@ -16,6 +17,8 @@ export const COLLECTORS = ['admin', 'sales_manager', 'salesman', 'accounts', 'ca
 export const COLLECTION_VIEWERS = ['admin', 'management', 'sales_manager', 'salesman', 'cashier', 'accounts'] as const;
 // At the office a bank transfer or Airtel payment is recorded without the customer there to sign.
 const OFFICE = ['admin', 'accounts', 'cashier'];
+// Who may cancel a payment recorded by mistake.
+export const CANCELLERS = ['admin', 'accounts'] as const;
 
 export const MODES = ['cash', 'bank', 'airtel'] as const;
 const IMAGE_MAX = 8 * 1024 * 1024;
@@ -42,6 +45,9 @@ const collectBody = z.object({
   // One id per form on the phone, so a retry after a lost answer does not make a second receipt.
   requestId: z.string().trim().min(1).max(64).optional(),
 });
+const cancelBody = z.object({
+  reason: z.string('Please say why the payment is cancelled.').trim().min(1, 'Please say why the payment is cancelled.').max(300),
+});
 const listQuery = z.object({
   company: z.string().optional(),
   customerId: z.coerce.number().int().positive().max(INT4_MAX).optional(),
@@ -64,22 +70,28 @@ async function collectionDetail(db: Db, user: AuthUser, collectionId: number) {
        c.wht::float8 as wht, c.wht_certificate as "whtCertificate", c.reference, c.note, c.received_by as "receivedBy",
        c.signature_file is not null as "hasSignature", c.proof_file is not null as "hasProof",
        u.name as "collectedBy", c.custody, h.number as "handoverNumber", c.created_at as "createdAt",
+       c.cancelled_at is not null as cancelled, xu.name as "cancelledBy", c.cancelled_at as "cancelledAt", c.cancel_reason as "cancelReason",
        coalesce((select json_agg(json_build_object('invoiceId', a.invoice_id, 'invoiceNumber', ai.number, 'amount', a.amount::float8) order by a.id)
          from collection_allocations a left join invoices ai on ai.id = a.invoice_id where a.collection_id = c.id), '[]') as allocations,
-       (c.amount - coalesce((select sum(a.amount) from collection_allocations a where a.collection_id = c.id), 0))::float8 as "onAccount",
+       case when c.cancelled_at is null
+         then c.amount - coalesce((select sum(a.amount) from collection_allocations a where a.collection_id = c.id), 0) else 0 end::float8 as "onAccount",
        ${CUSTOMER_OWES('c.customer_id', 'c.company_code')}::float8 as "owesNow"
      from collections c join customers cu on cu.id = c.customer_id join users u on u.id = c.collected_by
        left join invoices iv on iv.id = c.invoice_id left join handovers h on h.id = c.handover_id
+       left join users xu on xu.id = c.cancelled_by
      where c.id = $3 and ${visibleWhere(user)}`,
     [user.companies, user.id, collectionId],
   );
-  return rows[0] ?? null;
+  const c = rows[0];
+  if (!c) return null;
+  return { ...c, canCancel: (CANCELLERS as readonly string[]).includes(user.role) && !c.cancelled && !c.handoverNumber };
 }
 
 export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
   const auth = requireAuth(db);
   const collectors = requireRole(...COLLECTORS);
   const viewers = requireRole(...COLLECTION_VIEWERS);
+  const cancellers = requireRole(...CANCELLERS);
 
   // What the collect screen needs once a customer is picked: per company, what they owe and the invoices still open.
   app.get('/collections/customer/:id', { onRequest: auth, preHandler: collectors }, async (request) => {
@@ -246,7 +258,7 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
     const { rows } = await db.query(
       `select c.id, c.number, c.company_code as "companyCode", cu.name as "customerName", iv.number as "invoiceNumber", c.mode,
          c.amount::float8 as amount, c.discount::float8 as discount, c.wht::float8 as wht, c.reference, u.name as "collectedBy",
-         c.custody, c.created_at as "createdAt"
+         c.custody, c.created_at as "createdAt", c.cancelled_at is not null as cancelled
        from collections c join customers cu on cu.id = c.customer_id join users u on u.id = c.collected_by
          left join invoices iv on iv.id = c.invoice_id
        where ${where} order by c.id desc limit 500`,
@@ -277,5 +289,82 @@ export function collectionRoutes(app: FastifyInstance, db: Db, uploadDir: string
       if (!image) throw notFound(kind === 'proof' ? 'photo' : 'signature');
       return reply.type(image.type).header('cache-control', 'private, max-age=86400').send(image.bytes);
     });
+  }
+
+  // A payment recorded by mistake. It stays on record but no longer counts: what it paid is open again, its cash
+  // leaves the collector's hand and a waiting Airtel payment leaves the wallet. Once its cash is handed to the
+  // cashier, or the Airtel payment is ticked, the money is real and a debit note corrects the customer instead.
+  app.post('/collections/:id/cancel', { onRequest: auth, preHandler: cancellers }, async (request) => {
+    const { id: collectionId } = parse(idParams, request.params);
+    const body = parse(cancelBody, request.body ?? {});
+    const user = request.user;
+    const done = await inTransaction(db, async (client) => {
+      const { rows } = await client.query<{ number: string; cancelled: boolean; handedOver: boolean; mode: string; amount: number }>(
+        `select c.number, c.cancelled_at is not null as cancelled, c.handover_id is not null as "handedOver", c.mode,
+           c.amount::float8 as amount
+         from collections c where c.id = $3 and ${visibleWhere(user)} for update`,
+        [user.companies, user.id, collectionId],
+      );
+      const c = rows[0];
+      if (!c) throw notFound('payment');
+      if (c.cancelled) throw new HttpError(409, 'already_cancelled', 'This payment is already cancelled.');
+      if (c.handedOver) {
+        throw new HttpError(409, 'handed_over', 'The cash for this payment is already with the cashier. Please make a debit note instead.');
+      }
+      const { rows: ticked } = await client.query(
+        `select 1 from airtel_entries where collection_id = $1 and status <> 'waiting' limit 1`,
+        [collectionId],
+      );
+      if (ticked[0]) {
+        throw new HttpError(409, 'airtel_ticked', 'This Airtel Money payment is already ticked in the wallet. Please make a debit note instead.');
+      }
+      await client.query(`delete from airtel_entries where collection_id = $1 and status = 'waiting'`, [collectionId]);
+      await client.query('delete from collection_allocations where collection_id = $1', [collectionId]);
+      await client.query(
+        `update collections set cancelled_at = now(), cancelled_by = $2, cancel_reason = $3,
+           custody = case when custody = 'with' then 'na' else custody end
+         where id = $1`,
+        [collectionId, user.id, body.reason],
+      );
+      return c;
+    });
+    await audit(db, {
+      userId: user.id,
+      action: 'payment_cancelled',
+      details: { collectionId, number: done.number, mode: done.mode, amount: done.amount, reason: body.reason },
+    });
+    return collectionDetail(db, user, collectionId);
+  });
+}
+
+// Money a customer paid on account (more than they owed then) goes on what they owe later: the opening balance
+// first, then the oldest invoices. Call it inside the transaction that adds what they owe, such as new invoices.
+export async function applyOnAccount(client: PoolClient, customerId: number, companyCode: string) {
+  await client.query('select 1 from customer_companies where customer_id = $1 and company_code = $2 for update', [customerId, companyCode]);
+  const { rows: spare } = await client.query<{ id: number; left: number }>(
+    `select c.id, (c.amount - coalesce((select sum(a.amount) from collection_allocations a where a.collection_id = c.id), 0))::float8 as left
+     from collections c where c.customer_id = $1 and c.company_code = $2 and c.cancelled_at is null order by c.id`,
+    [customerId, companyCode],
+  );
+  const payments = spare.filter((p) => p.left > 0);
+  if (payments.length === 0) return;
+  const { rows: opening } = await client.query<{ left: number }>(`select ${OPENING_LEFT('$1::int', '$2::text')}::float8 as left`, [
+    customerId,
+    companyCode,
+  ]);
+  const { rows: open } = await client.query<{ id: number; balance: number }>(
+    `select iv.id, ${INVOICE_BALANCE('iv')}::float8 as balance from invoices iv
+     where iv.customer_id = $1 and iv.company_code = $2 order by iv.invoice_date, iv.id`,
+    [customerId, companyCode],
+  );
+  const owed = [{ id: null as number | null, balance: opening[0]!.left }, ...open].filter((o) => o.balance > 0);
+  for (const p of payments) {
+    for (const o of owed) {
+      const amount = Math.min(p.left, o.balance);
+      if (amount <= 0) continue;
+      await client.query('insert into collection_allocations (collection_id, invoice_id, amount) values ($1, $2, $3)', [p.id, o.id, amount]);
+      p.left -= amount;
+      o.balance -= amount;
+    }
   }
 }
