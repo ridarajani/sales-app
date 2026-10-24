@@ -322,9 +322,9 @@ export function returnRoutes(app: FastifyInstance, db: Db) {
       const ret = rows[0];
       if (!ret) throw notFound('return');
       if (ret.goods !== 'waiting') throw new HttpError(409, 'already_received', 'These goods are already back.');
-      const { rows: lines } = await client.query<{ id: number; productId: number; pieces: number; deliveryId: number | null }>(
-        `select l.id, l.product_id as "productId", l.pieces, i.delivery_id as "deliveryId"
-         from sales_return_lines l join invoice_lines il on il.id = l.invoice_line_id
+      const { rows: lines } = await client.query<{ id: number; productId: number; pieces: number; deliveryId: number | null; tripSaleId: number | null }>(
+        `select l.id, l.product_id as "productId", l.pieces, i.delivery_id as "deliveryId", iv.trip_sale_id as "tripSaleId"
+         from sales_return_lines l join invoice_lines il on il.id = l.invoice_line_id join invoices iv on iv.id = il.invoice_id
            left join loading_plan_items i on i.id = il.plan_item_id
          where l.return_id = $1 order by l.id`,
         [returnId],
@@ -335,12 +335,12 @@ export function returnRoutes(app: FastifyInstance, db: Db) {
         const damaged = body.damaged.includes(l.id);
         await client.query('update sales_return_lines set condition = $2 where id = $1', [l.id, damaged ? 'damaged' : 'good']);
         if (damaged) continue;
-        // The batches this product left in, newest expiry first, each up to what it gave.
+        // The batches this product left in (on a vehicle's delivery or sold on a trip), newest expiry first, each up to what it gave.
         const { rows: batches } = await client.query<{ batchId: number; pieces: number }>(
           `select m.batch_id as "batchId", -sum(m.change)::int as pieces from stock_movements m join stock_batches b on b.id = m.batch_id
-           where m.delivery_id = $1 and m.kind = 'delivered' and b.product_id = $2
+           where (m.delivery_id = $1 or m.trip_sale_id = $3) and m.kind = 'delivered' and b.product_id = $2
            group by m.batch_id, b.expiry_date order by b.expiry_date desc, m.batch_id desc`,
-          [l.deliveryId, l.productId],
+          [l.deliveryId, l.productId, l.tripSaleId],
         );
         await client.query('select id from stock_batches where id = any($1) order by id for update', [batches.map((b) => b.batchId)]);
         if (batches.length === 0) throw invalid('The batch these goods came from was not found. Please receive them as a stock receipt.');

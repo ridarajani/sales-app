@@ -179,7 +179,7 @@ test('the salesman hands over one total; the cashier counts it and any differenc
   const h = await post(app, seller, '/handovers');
   expect(h.statusCode).toBe(201);
   expect(h.json()).toMatchObject({ number: 'HO-000001', cash: 55000, expenses: 5000, net: 50000, status: 'handed', canCount: false });
-  expect(h.json().companies).toEqual([{ code: 'LV', cash: 55000, withdrawals: 0, expenses: 5000, net: 50000 }]);
+  expect(h.json().companies).toEqual([{ code: 'LV', cash: 55000, withdrawals: 0, floats: 0, expenses: 5000, net: 50000 }]);
   expect((await post(app, seller, '/handovers')).json().error).toBe('nothing_to_hand_over');
   expect((await get(app, seller, '/cash/mine')).json()).toMatchObject({ net: 0, collections: [] });
 

@@ -32,7 +32,10 @@ const listQuery = z.object({
 function visibleWhere(user: AuthUser) {
   const mine = `iv.company_code = any($1::text[])`;
   if (user.role === 'salesman') return `${mine} and iv.salesman_id = $2::int`;
-  if (user.role === 'driver') return `${mine} and exists (select 1 from loading_plans x where x.id = iv.plan_id and x.driver_id = $2::int)`;
+  if (user.role === 'driver') {
+    return `${mine} and (exists (select 1 from loading_plans x where x.id = iv.plan_id and x.driver_id = $2::int)
+      or exists (select 1 from trip_sales xs join trips xt on xt.id = xs.trip_id where xs.id = iv.trip_sale_id and xt.driver_id = $2::int))`;
+  }
   return `${mine} and $2::int is not null`;
 }
 
@@ -64,8 +67,9 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
        coalesce((select sum(c.discount) from collections c where c.invoice_id = iv.id and c.cancelled_at is null), 0)::float8 as discount,
        coalesce((select sum(c.wht) from collections c where c.invoice_id = iv.id and c.cancelled_at is null), 0)::float8 as wht,
        iv.created_at as "createdAt", cb.name as "createdBy", s.name as "salesmanName",
-       lp.number as "planNumber", lp.delivery_note_no as "deliveryNoteNo", v.plate as "vehiclePlate",
-       (select d.confirmed_at from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as "deliveredAt",
+       lp.number as "planNumber", lp.delivery_note_no as "deliveryNoteNo", coalesce(v.plate, tv.plate) as "vehiclePlate",
+       tr.id as "tripId", tr.number as "tripNumber", ts.stop as "tripStop",
+       coalesce((select d.confirmed_at from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id), ts.sold_at) as "deliveredAt",
        json_build_object('id', c.id, 'name', c.name, 'address', c.address, 'city', c.city, 'area', c.area, 'regNo', c.reg_no,
          'tpin', c.tpin) as customer,
        json_build_object('code', co.code, 'name', co.name, 'address', co.address, 'phone', co.phone, 'email', co.email,
@@ -83,12 +87,13 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
            'delivered', case when il.plan_item_id is null then il.pieces else pi.delivered end,
            'returned', coalesce((select sum(rl.pieces) from sales_return_lines rl join sales_returns rr on rr.id = rl.return_id
              where rl.invoice_line_id = il.id and rr.kind = 'after'), 0)) order by il.id)
-         from invoice_lines il join products p on p.id = il.product_id join order_lines l on l.id = il.order_line_id
-           join orders o on o.id = l.order_id left join loading_plan_items pi on pi.id = il.plan_item_id
+         from invoice_lines il join products p on p.id = il.product_id left join order_lines l on l.id = il.order_line_id
+           left join orders o on o.id = l.order_id left join loading_plan_items pi on pi.id = il.plan_item_id
          where il.invoice_id = iv.id), '[]') as lines
      from invoices iv join customers c on c.id = iv.customer_id join companies co on co.code = iv.company_code
        join users cb on cb.id = iv.created_by left join users s on s.id = iv.salesman_id
        left join loading_plans lp on lp.id = iv.plan_id left join vehicles v on v.id = lp.vehicle_id
+       left join trip_sales ts on ts.id = iv.trip_sale_id left join trips tr on tr.id = ts.trip_id left join vehicles tv on tv.id = tr.vehicle_id
      where iv.id = $3 and ${visibleWhere(user)}`,
     [user.companies, user.id, invoiceId],
   );
@@ -210,10 +215,12 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
       `select iv.id, iv.number, iv.company_code as "companyCode", iv.invoice_type as "invoiceType", iv.customer_id as "customerId",
          c.name as "customerName", c.area, iv.lpo_no as "lpoNo", to_char(iv.invoice_date, 'YYYY-MM-DD') as "invoiceDate",
          to_char(iv.due_date, 'YYYY-MM-DD') as "dueDate", iv.subtotal::float8 as subtotal, iv.vat::float8 as vat, iv.total::float8 as total,
-         ${INVOICE_BALANCE('iv')}::float8 as balance, s.name as "salesmanName", v.plate as "vehiclePlate",
-         exists (select 1 from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as delivered
+         ${INVOICE_BALANCE('iv')}::float8 as balance, s.name as "salesmanName", coalesce(v.plate, tv.plate) as "vehiclePlate",
+         tr.number as "tripNumber",
+         iv.trip_sale_id is not null or exists (select 1 from deliveries d where d.plan_id = iv.plan_id and d.customer_id = iv.customer_id) as delivered
        from invoices iv join customers c on c.id = iv.customer_id left join users s on s.id = iv.salesman_id
          left join loading_plans lp on lp.id = iv.plan_id left join vehicles v on v.id = lp.vehicle_id
+         left join trip_sales ts on ts.id = iv.trip_sale_id left join trips tr on tr.id = ts.trip_id left join vehicles tv on tv.id = tr.vehicle_id
        where ${where} order by iv.id desc limit 500`,
       params,
     );

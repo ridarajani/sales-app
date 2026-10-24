@@ -126,7 +126,7 @@ test('money taken out of the wallet is cash the holder hands to the cashier', as
   const h = await post(app, manager, '/handovers');
   expect(h.statusCode).toBe(201);
   expect(h.json()).toMatchObject({ withdrawals: 30000, net: 30000 });
-  expect(h.json().companies).toEqual([{ code: 'LV', cash: 0, withdrawals: 30000, expenses: 0, net: 30000 }]);
+  expect(h.json().companies).toEqual([{ code: 'LV', cash: 0, withdrawals: 30000, floats: 0, expenses: 0, net: 30000 }]);
   expect((await get(app, other, '/handovers')).json()).toEqual([]);
   expect((await post(app, cashier, `/handovers/${h.json().id}/count`, { counted: 30000 })).json().status).toBe('counted');
   const w = await wallet();
