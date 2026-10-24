@@ -67,6 +67,8 @@ import com.salesapp.resources.invoice_salesman
 import com.salesapp.resources.invoice_share
 import com.salesapp.resources.invoice_subtotal
 import com.salesapp.resources.invoice_total
+import com.salesapp.resources.invoice_trip
+import com.salesapp.resources.invoice_trip_plain
 import com.salesapp.resources.invoice_vat_at
 import com.salesapp.resources.invoice_vat_none
 import com.salesapp.resources.invoice_vehicle
@@ -233,6 +235,15 @@ private fun Header(invoice: InvoiceDetail) {
             )
             invoice.vehiclePlate?.takeIf { it.isNotBlank() }?.let {
                 Text(stringResource(Res.string.invoice_vehicle, it), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            // Phase 9: an invoice made on a trip names the trip and the stop it was sold at.
+            invoice.tripNumber?.takeIf { it.isNotBlank() }?.let { trip ->
+                val stop = invoice.tripStop?.takeIf { it.isNotBlank() }
+                Text(
+                    if (stop != null) stringResource(Res.string.invoice_trip, trip, stop) else stringResource(Res.string.invoice_trip_plain, trip),
+                    color = scheme.onSurface,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             invoice.deliveryNoteNo?.takeIf { it.isNotBlank() }?.let {
                 Text(stringResource(Res.string.invoice_delivery_note, it), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)

@@ -25,6 +25,7 @@ data class InvoiceListItem(
     val balance: Double = 0.0,
     val salesmanName: String? = null,
     val vehiclePlate: String? = null,
+    val tripNumber: String? = null,
     val delivered: Boolean = false,
 ) {
     val isVat: Boolean get() = invoiceType == "vat"
@@ -66,7 +67,8 @@ data class InvoiceLine(
     val quantity: String = "",
     val pricePerCarton: Double = 0.0,
     val amount: Double = 0.0,
-    val orderNumber: String = "",
+    // Empty on a trip invoice: there is no order behind it.
+    val orderNumber: String? = null,
     // Phase 8. delivered is null until the drop is confirmed; canReturn is the most that can still
     // come back after delivery (delivered less what already came back).
     val delivered: Int? = null,
@@ -105,6 +107,10 @@ data class InvoiceDetail(
     val deliveryNoteNo: String? = null,
     val vehiclePlate: String? = null,
     val deliveredAt: String? = null,
+    // Phase 9: an invoice made on a trip has no order behind it; it names the trip and the stop.
+    val tripId: Int? = null,
+    val tripNumber: String? = null,
+    val tripStop: String? = null,
     val customer: InvoiceCustomer = InvoiceCustomer(),
     val company: InvoiceCompany = InvoiceCompany(),
     val lines: List<InvoiceLine> = emptyList(),

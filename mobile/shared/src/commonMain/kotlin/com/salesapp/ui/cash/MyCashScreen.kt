@@ -31,6 +31,7 @@ import com.salesapp.resources.Res
 import com.salesapp.resources.cash_company_row
 import com.salesapp.resources.cash_expenses_list
 import com.salesapp.resources.cash_from_airtel
+import com.salesapp.resources.cash_from_floats
 import com.salesapp.resources.cash_from_payments
 import com.salesapp.resources.cash_hand_over
 import com.salesapp.resources.cash_handed_over
@@ -97,6 +98,8 @@ fun MyCashScreen(state: MyCashState, onEvent: (MyCashEvent) -> Unit, onBack: () 
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 MoneyRow(stringResource(Res.string.cash_from_payments), held.cash)
                                 if (held.withdrawalsTotal > 0) MoneyRow(stringResource(Res.string.cash_from_airtel), held.withdrawalsTotal)
+                                // Phase 9: a trip float is cash in hand too.
+                                if (held.floatsTotal > 0) MoneyRow(stringResource(Res.string.cash_from_floats), held.floatsTotal)
                                 if (held.expensesTotal > 0) {
                                     MoneyRow(stringResource(Res.string.cash_less_expenses), held.expensesTotal, negative = true)
                                 }
@@ -148,7 +151,7 @@ private fun CompanyCash(company: CashCompany) {
         Text(
             stringResource(
                 Res.string.cash_company_row,
-                formatMwk(company.cash.toLong()),
+                formatMwk((company.cash + company.floats).toLong()),
                 formatMwk(company.withdrawals.toLong()),
                 formatMwk(company.expenses.toLong()),
             ),
@@ -177,6 +180,14 @@ private fun Lists(held: CashHeld) {
             }
         }
     }
+    if (held.floats.isNotEmpty()) {
+        SectionLabel(stringResource(Res.string.cash_from_floats))
+        ListCard(onClick = null) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                held.floats.forEach { float -> FloatRow(float) }
+            }
+        }
+    }
     if (held.expenses.isNotEmpty()) {
         SectionLabel(stringResource(Res.string.cash_expenses_list))
         ListCard(onClick = null) {
@@ -196,6 +207,19 @@ private fun HeldRow(payment: HeldCollection) {
             Text("${payment.number} · ${payment.companyCode}", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
         }
         Text(formatMwk(payment.amount.toLong()), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+// A trip's float, with the trip it belongs to.
+@Composable
+private fun FloatRow(float: com.salesapp.data.HeldFloat) {
+    val scheme = MaterialTheme.colorScheme
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(float.route.ifBlank { float.number }, color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+            Text("${float.number} · ${float.companyCode}", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+        }
+        Text(formatMwk(float.amount.toLong()), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -266,10 +290,12 @@ private val sampleHeld = CashHeld(
         CashCompany(code = "LV", cash = 700_000.0, withdrawals = 200_000.0, expenses = 45_000.0, net = 855_000.0),
         CashCompany(code = "ZT", cash = 96_000.0, net = 96_000.0),
     ),
+    floats = listOf(com.salesapp.data.HeldFloat(id = 2, number = "TRP-000002", companyCode = "LV", route = "Salima and Nkhotakota", amount = 100_000.0)),
     cash = 796_000.0,
     withdrawalsTotal = 200_000.0,
+    floatsTotal = 100_000.0,
     expensesTotal = 45_000.0,
-    net = 951_000.0,
+    net = 1_051_000.0,
 )
 
 @Preview

@@ -1,6 +1,9 @@
 package com.salesapp.core
 
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import java.util.TimeZone
 
 actual fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -13,3 +16,8 @@ actual fun todayIsoDate(): String {
 }
 
 actual fun currentUtcOffsetMinutes(): Int = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
+
+actual fun nowUtcTimestamp(): String =
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(Date())
