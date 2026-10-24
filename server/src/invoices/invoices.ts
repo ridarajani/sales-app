@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
-import { INVOICE_BALANCE } from '../cash/balances.js';
+import { INVOICE_BALANCE, NOTE_SIGN } from '../cash/balances.js';
 import { HttpError, requireAuth, requireRole, type AuthUser } from '../auth/guard.js';
 import type { Db } from '../db/pool.js';
 import { logoPath } from '../files.js';
@@ -10,6 +10,7 @@ import { INVOICE_MAKERS, lockPlan, planDetail } from '../loading/loading.js';
 import { nextNumber } from '../numbering.js';
 import { addEvent, DEFAULT_VAT_RATE, lineAmount, qtyText } from '../orders/orders.js';
 import { invoicePdf } from '../print/pdf.js';
+import { ADJUSTERS } from '../returns/returns.js';
 import { inTransaction, TODAY } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
 
@@ -68,11 +69,21 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
          'tpin', c.tpin) as customer,
        json_build_object('code', co.code, 'name', co.name, 'address', co.address, 'phone', co.phone, 'email', co.email,
          'tpin', co.tpin) as company,
-       coalesce((select json_agg(json_build_object('productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
+       coalesce((select json_agg(json_build_object('id', r.id, 'number', r.number, 'kind', r.kind, 'reason', r.reason,
+           'total', r.total::float8, 'booked', r.booked_at is not null, 'goods', r.goods, 'at', r.created_at) order by r.id)
+         from sales_returns r where r.invoice_id = iv.id), '[]') as returns,
+       coalesce((select json_agg(json_build_object('id', n.id, 'number', n.number, 'kind', n.kind, 'reason', n.reason,
+           'amount', n.amount::float8, 'owesChange', (${NOTE_SIGN('n')} * n.amount)::float8, 'theirNumber', n.their_number,
+           'at', n.created_at) order by n.id)
+         from invoice_notes n where n.invoice_id = iv.id), '[]') as notes,
+       coalesce((select json_agg(json_build_object('lineId', il.id, 'productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
            'packSize', p.pack_size, 'piecesPerCarton', p.pieces_per_carton, 'pieces', il.pieces, 'pricePerCarton', il.price_per_carton,
-           'amount', il.amount::float8, 'orderNumber', o.number) order by il.id)
+           'amount', il.amount::float8, 'orderNumber', o.number,
+           'delivered', case when il.plan_item_id is null then il.pieces else pi.delivered end,
+           'returned', coalesce((select sum(rl.pieces) from sales_return_lines rl join sales_returns rr on rr.id = rl.return_id
+             where rl.invoice_line_id = il.id and rr.kind = 'after'), 0)) order by il.id)
          from invoice_lines il join products p on p.id = il.product_id join order_lines l on l.id = il.order_line_id
-           join orders o on o.id = l.order_id
+           join orders o on o.id = l.order_id left join loading_plan_items pi on pi.id = il.plan_item_id
          where il.invoice_id = iv.id), '[]') as lines
      from invoices iv join customers c on c.id = iv.customer_id join companies co on co.code = iv.company_code
        join users cb on cb.id = iv.created_by left join users s on s.id = iv.salesman_id
@@ -84,7 +95,13 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
   if (!iv) return null;
   return {
     ...iv,
-    lines: (iv.lines as { pieces: number; piecesPerCarton: number }[]).map((l) => ({ ...l, quantity: qtyText(l.pieces, l.piecesPerCarton) })),
+    // The most that can still come back after delivery; null until the drop is confirmed.
+    lines: (iv.lines as { pieces: number; piecesPerCarton: number; delivered: number | null; returned: number }[]).map((l) => ({
+      ...l,
+      quantity: qtyText(l.pieces, l.piecesPerCarton),
+      canReturn: l.delivered === null ? null : l.delivered - l.returned,
+    })),
+    canAdjust: (ADJUSTERS as readonly string[]).includes(user.role),
   };
 }
 

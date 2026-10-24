@@ -226,6 +226,12 @@ erDiagram
     collections ||--o| airtel_entries : "paid in"
     expenses ||--o| airtel_entries : "paid out"
     handovers ||--o{ airtel_entries : "withdrawn cash"
+    invoices ||--o{ sales_returns : "returned"
+    deliveries ||--o{ sales_returns : "not taken"
+    sales_returns ||--o{ sales_return_lines : "lists"
+    invoice_lines ||--o{ sales_return_lines : "came back"
+    sales_returns ||--o{ stock_movements : "back on the shelf"
+    invoices ||--o{ invoice_notes : "adjusted by"
     loading_plans {
         int id PK
         text number "LP-000123"
@@ -371,6 +377,35 @@ erDiagram
         int handover_id FK
         int created_by FK
     }
+    sales_returns {
+        int id PK
+        text number UK "LV-SR-000001"
+        int invoice_id FK
+        text kind "delivery, after"
+        text reason
+        bigint subtotal
+        bigint vat
+        bigint total
+        timestamptz booked_at
+        text goods "waiting, received"
+    }
+    sales_return_lines {
+        int id PK
+        int return_id FK
+        int invoice_line_id FK
+        int pieces
+        bigint amount
+        text condition "good, damaged"
+    }
+    invoice_notes {
+        int id PK
+        text number UK "LV-CN-000001"
+        int invoice_id FK
+        text kind "credit_issued, debit_issued, debit_received, credit_received"
+        bigint amount
+        text reason
+        text their_number
+    }
     airtel_checks {
         int id PK
         int wallet_id FK
@@ -424,6 +459,9 @@ erDiagram
 | `airtel_wallet_companies` | Phase 7 | Which companies' Airtel payments go into which wallet |
 | `airtel_entries` | Phase 7 | Every movement in a wallet: payments in, expenses, withdrawals and their charges |
 | `airtel_checks` | Phase 7 | The holder's checks of the real wallet balance against the app |
+| `sales_returns` | Phase 8 | Goods that came back, booked against their invoice |
+| `sales_return_lines` | Phase 8 | The products on each return, and whether they came back good or damaged |
+| `invoice_notes` | Phase 8 | Credit and debit notes on an invoice, issued or received |
 
 ## Phase 1 notes
 
@@ -519,3 +557,16 @@ erDiagram
 - **Saving twice** (migration 020): the phone sends a `requestId` with each payment and expense form. If the same person sends the same id again (a retry after the answer was lost on a slow line), the server returns the first record with status 200 instead of making a second receipt. The wallet detail also says `canTakeOut`, true only for the holder, since admin may tick and check a wallet but not take money out of it.
 - **Not yet:** cancelling a wrong payment, credit notes and the customer ledger card come in Phase 8; money on account is not put on later invoices automatically until then.
 - **Audit actions:** `payment_collected`, `expense_recorded`, `cash_handed_over`, `cash_counted`, `airtel_wallet_set_up`, `airtel_wallet_changed`, `airtel_payment_ticked`, `airtel_withdrawal`, `airtel_wallet_checked`.
+
+## Phase 8 notes
+
+- **Sales returns** are numbered per company (`LV-SR-000001`), with VAT at the invoice's rate. There are two kinds:
+  - **Not taken at delivery:** when the driver confirms a drop short, the server makes one return per invoice for what was not taken. The goods never left the vehicle and are on the shelf again already (Phase 6), so the return shows as received. The sales team books it (`POST /returns/:id/book`) to take it off the invoice; until then the invoice still owes the full amount.
+  - **Given back after delivery:** `POST /invoices/:id/returns` with the products, cartons and pieces, and a reason from the prototype's list. At most what was delivered less what already came back. It is booked when it is saved, so the invoice and what the customer owes go down at once. The warehouse then receives the goods (`POST /returns/:id/receive`), marking any damaged lines: good goods go back on the shelf in the batches they were delivered from (movement kind `returned`); damaged ones do not.
+- **Credit and debit notes** (`POST /invoices/:id/notes`) are mostly for a price difference; stock does not change. Four kinds, each its own series: credit note issued `LV-CN-` (owes less), debit note issued `LV-DN-` (owes more), debit note received from the customer `LV-RDN-` (owes less) and credit note received `LV-RCN-` (owes more). A received note needs the customer's own number. The amount typed is what the customer owes less or more, VAT included.
+- **What is owed** is now the opening balance plus invoices, less payments, discounts, withholding tax and booked returns, plus or minus notes. The invoice detail lists its returns and notes, and per line what can still come back (`canReturn`).
+- **Customer ledger** (`GET /customers/:id/ledger?company=LV&from=&to=`): every invoice, payment, discount, withholding tax, booked return and note with that company, oldest first, with the balance after each; movements before `from` make up the opening line. `GET /customers/:id/statement.pdf` prints the same as a statement of account with the company's logo.
+- **Who:** Admin, Management, sales managers and Accounts book returns and make notes. The warehouse (and Admin) receives returned goods and sees returns without their money. Salesmen see the returns and notes of their own invoices and the ledgers of their companies' customers, but cannot change them.
+- **Saving twice:** returns and notes take a `requestId` like payments do.
+- **Not yet:** cancelling a wrong payment, and putting money on account onto later invoices, come in the next pull request.
+- **Audit actions:** `sales_return_booked`, `returned_goods_received`, `invoice_note_made`.
