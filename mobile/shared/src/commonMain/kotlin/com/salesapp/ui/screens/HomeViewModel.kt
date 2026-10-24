@@ -5,13 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesapp.core.currentHour
 import com.salesapp.data.Api
+import com.salesapp.core.formatMwk
+import com.salesapp.data.AirtelRepository
 import com.salesapp.data.AppState
+import com.salesapp.data.CashRepository
 import com.salesapp.data.LoadingRepository
 import com.salesapp.data.PendingAdjustment
 import com.salesapp.data.ShortDatedBatch
 import com.salesapp.data.StockRepository
 import com.salesapp.data.canApproveStock
+import com.salesapp.data.canCountCash
 import com.salesapp.data.canSeePlans
+import com.salesapp.data.canSeeWallets
+import com.salesapp.data.holdsCash
 import com.salesapp.data.canSeeStock
 import com.salesapp.data.seesPlanChanges
 import com.salesapp.resources.Res
@@ -42,6 +48,16 @@ import com.salesapp.resources.tile_expiring_count
 import com.salesapp.resources.tile_expiring_mixed
 import com.salesapp.resources.tile_expiring_loading
 import com.salesapp.resources.tile_expiring_none
+import com.salesapp.resources.airtel_tile_ledger
+import com.salesapp.resources.airtel_tile_many
+import com.salesapp.resources.airtel_tile_one
+import com.salesapp.resources.cash_tile_amount
+import com.salesapp.resources.cash_tile_nothing
+import com.salesapp.resources.count_tile_many
+import com.salesapp.resources.count_tile_nothing
+import com.salesapp.resources.count_tile_one
+import com.salesapp.resources.tile_expenses
+import com.salesapp.resources.tile_expenses_sub
 import com.salesapp.resources.tile_expiring_one
 import com.salesapp.resources.tile_hand_over_cash
 import com.salesapp.resources.tile_hand_over_cash_sub
@@ -59,6 +75,8 @@ import com.salesapp.resources.tile_loading_sub
 import com.salesapp.resources.tile_look_up
 import com.salesapp.resources.tile_more
 import com.salesapp.resources.tile_my_trips
+import com.salesapp.resources.tile_payments
+import com.salesapp.resources.tile_payments_sub
 import com.salesapp.resources.tile_my_trips_sub
 import com.salesapp.resources.tile_more_sub
 import com.salesapp.resources.tile_my_customers
@@ -100,7 +118,13 @@ import com.salesapp.ui.navigation.CompaniesRoute
 import com.salesapp.ui.navigation.CustomersRoute
 import com.salesapp.ui.navigation.ApprovalsRoute
 import com.salesapp.ui.navigation.ExpiringRoute
+import com.salesapp.ui.navigation.CollectMoneyRoute
+import com.salesapp.ui.navigation.CountCashRoute
+import com.salesapp.ui.navigation.ExpensesRoute
 import com.salesapp.ui.navigation.InvoicesRoute
+import com.salesapp.ui.navigation.MyCashRoute
+import com.salesapp.ui.navigation.PaymentsRoute
+import com.salesapp.ui.navigation.WalletsRoute
 import com.salesapp.ui.navigation.NewOrderRoute
 import com.salesapp.ui.navigation.OrdersRoute
 import com.salesapp.ui.navigation.PlansRoute
@@ -152,6 +176,25 @@ private fun ordersTile() = tile(Res.string.tile_orders, Res.string.tile_orders_s
 // The invoice register; the sub-line differs by role (share, register, print).
 private fun invoicesTile(sub: StringResource) = tile(Res.string.tile_invoices, sub, AppIcons.Receipt, InvoicesRoute)
 
+// Phase 7. Collecting money is called "Record a payment" at the office.
+private fun collectTile(sub: StringResource) = tile(Res.string.tile_collect_money, sub, AppIcons.Money, CollectMoneyRoute())
+
+private fun recordPaymentTile() = tile(Res.string.tile_record_payment, Res.string.tile_record_payment_sub, AppIcons.Money, CollectMoneyRoute())
+
+// The sub-line says how much is waiting to be handed over.
+private fun handOverTile(subText: String?) =
+    tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money, MyCashRoute, subText)
+
+private fun countCashTile(subText: String?, count: Int?) =
+    tile(Res.string.tile_count_cash, Res.string.tile_nothing_waiting, AppIcons.Money, CountCashRoute, subText, count)
+
+private fun airtelTile(sub: StringResource, subText: String?, count: Int?) =
+    tile(Res.string.tile_airtel, sub, AppIcons.Money, WalletsRoute, subText, count)
+
+private fun expensesTile() = tile(Res.string.tile_expenses, Res.string.tile_expenses_sub, AppIcons.Receipt, ExpensesRoute)
+
+private fun paymentsTile() = tile(Res.string.tile_payments, Res.string.tile_payments_sub, AppIcons.Receipt, PaymentsRoute)
+
 // Loading plans; count is how many changes from the other side wait to be seen.
 private fun loadingTile(count: Int?) = tile(Res.string.tile_loading, Res.string.tile_loading_sub, AppIcons.Truck, PlansRoute, count = count)
 
@@ -166,6 +209,11 @@ internal fun tilesFor(
     expiringSub: String? = null,
     approvalsSub: String? = null,
     loadingCount: Int? = null,
+    cashSub: String? = null,
+    countSub: String? = null,
+    countCount: Int? = null,
+    airtelSub: String? = null,
+    airtelCount: Int? = null,
 ): List<TileDef> = when (role) {
     "admin" -> listOf(
         newOrderTile(),
@@ -180,6 +228,12 @@ internal fun tilesFor(
         expiringTile(expiringSub),
         approvalsTile(approvalsSub),
         invoicesTile(Res.string.tile_invoices_register_print),
+        recordPaymentTile(),
+        paymentsTile(),
+        expensesTile(),
+        handOverTile(cashSub),
+        countCashTile(countSub, countCount),
+        airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
         tile(Res.string.tile_audit, Res.string.tile_audit_sub, AppIcons.List),
         tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
         more(),
@@ -189,7 +243,8 @@ internal fun tilesFor(
         ordersTile(),
         approvalsTile(approvalsSub),
         loadingTile(loadingCount),
-        tile(Res.string.tile_airtel, Res.string.tile_airtel_both, AppIcons.Money),
+        airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
+        paymentsTile(),
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
         tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
         expiringTile(expiringSub),
@@ -203,9 +258,10 @@ internal fun tilesFor(
     "sales_manager" -> listOf(
         newOrderTile(),
         loadingTile(loadingCount),
-        tile(Res.string.tile_collect_money, Res.string.tile_collect_money_sub, AppIcons.Money),
-        tile(Res.string.tile_airtel, Res.string.tile_airtel_ledger, AppIcons.Money),
-        tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
+        collectTile(Res.string.tile_collect_money_sub),
+        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
+        handOverTile(cashSub),
+        expensesTile(),
         tile(Res.string.tile_my_salesmen, Res.string.tile_my_salesmen_sub, AppIcons.People, UsersRoute),
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
@@ -216,8 +272,9 @@ internal fun tilesFor(
     )
     "salesman" -> listOf(
         newOrderTile(),
-        tile(Res.string.tile_collect_money, Res.string.tile_collect_money_sub, AppIcons.Money),
-        tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
+        collectTile(Res.string.tile_collect_money_sub),
+        handOverTile(cashSub),
+        expensesTile(),
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         invoicesTile(Res.string.tile_invoices_share),
@@ -244,10 +301,12 @@ internal fun tilesFor(
         more(),
     )
     "cashier" -> listOf(
-        tile(Res.string.tile_count_cash, Res.string.tile_nothing_waiting, AppIcons.Money),
+        countCashTile(countSub, countCount),
         ordersTile(),
         loadingTile(loadingCount),
-        tile(Res.string.tile_record_payment, Res.string.tile_record_payment_sub, AppIcons.Money),
+        recordPaymentTile(),
+        paymentsTile(),
+        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
         tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         invoicesTile(Res.string.tile_invoices_register_print),
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
@@ -255,6 +314,10 @@ internal fun tilesFor(
     )
     "accounts" -> listOf(
         invoicesTile(Res.string.tile_invoices_register_print),
+        recordPaymentTile(),
+        paymentsTile(),
+        handOverTile(cashSub),
+        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
         ordersTile(),
         loadingTile(loadingCount),
         tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
@@ -284,6 +347,12 @@ data class HomeState(
     val expiringSub: String? = null,
     val approvalsSub: String? = null,
     val loadingCount: Int? = null,
+    // Phase 7: what this person holds, what waits to be counted, and what waits to be ticked.
+    val cashSub: String? = null,
+    val countSub: String? = null,
+    val countCount: Int? = null,
+    val airtelSub: String? = null,
+    val airtelCount: Int? = null,
 )
 
 sealed interface HomeEvent {
@@ -302,6 +371,8 @@ class HomeViewModel(
     private val app: AppState,
     private val stockRepository: StockRepository,
     private val loadingRepository: LoadingRepository,
+    private val cashRepository: CashRepository,
+    private val airtelRepository: AirtelRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
@@ -312,6 +383,11 @@ class HomeViewModel(
     private var expiringLoading = false
     private var approvalsLoading = false
     private var loadingLoading = false
+    private var moneyLoading = false
+
+    // Every tile list is built from the state, so a new sub-line is never forgotten.
+    private fun tilesOf(s: HomeState, role: String = s.role): List<TileDef> =
+        tilesFor(role, s.expiringSub, s.approvalsSub, s.loadingCount, s.cashSub, s.countSub, s.countCount, s.airtelSub, s.airtelCount)
 
     init {
         viewModelScope.launch {
@@ -321,12 +397,13 @@ class HomeViewModel(
                         name = user?.name ?: "",
                         firstName = user?.name?.trim()?.substringBefore(' ') ?: "",
                         role = user?.role ?: "",
-                        tiles = if (user != null) tilesFor(user.role, it.expiringSub, it.approvalsSub, it.loadingCount) else emptyList(),
+                        tiles = if (user != null) tilesOf(it, user.role) else emptyList(),
                     )
                 }
                 loadExpiring()
                 loadApprovals()
                 loadLoading()
+                loadMoney()
             }
         }
     }
@@ -356,6 +433,7 @@ class HomeViewModel(
                 loadExpiring()
                 loadApprovals()
                 loadLoading()
+                loadMoney()
             }
         }
     }
@@ -368,7 +446,7 @@ class HomeViewModel(
         viewModelScope.launch {
             try {
                 val sub = expiringSubText(stockRepository.shortDated(days = 90))
-                _state.update { it.copy(expiringSub = sub, tiles = tilesFor(it.role, sub, it.approvalsSub, it.loadingCount)) }
+                _state.update { val next = it.copy(expiringSub = sub); next.copy(tiles = tilesOf(next)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -387,7 +465,7 @@ class HomeViewModel(
         viewModelScope.launch {
             try {
                 val sub = approvalsSubText(stockRepository.pendingAdjustments())
-                _state.update { it.copy(approvalsSub = sub, tiles = tilesFor(it.role, it.expiringSub, sub, it.loadingCount)) }
+                _state.update { val next = it.copy(approvalsSub = sub); next.copy(tiles = tilesOf(next)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -407,13 +485,57 @@ class HomeViewModel(
         viewModelScope.launch {
             try {
                 val count = if (user.seesPlanChanges()) loadingRepository.newChangesTotal() else null
-                _state.update { it.copy(loadingCount = count, tiles = tilesFor(it.role, it.expiringSub, it.approvalsSub, count)) }
+                _state.update { val next = it.copy(loadingCount = count); next.copy(tiles = tilesOf(next)) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Keep the tile without a number until it loads.
             } finally {
                 loadingLoading = false
+            }
+        }
+    }
+
+    // Phase 7 sub-lines. Each one only runs for the roles that have that tile.
+    private fun loadMoney() {
+        val user = app.user ?: return
+        if (moneyLoading) return
+        moneyLoading = true
+        viewModelScope.launch {
+            try {
+                if (user.holdsCash()) {
+                    val net = cashRepository.myCash().net.toLong()
+                    val sub = if (net > 0) {
+                        getString(Res.string.cash_tile_amount, formatMwk(net))
+                    } else {
+                        getString(Res.string.cash_tile_nothing)
+                    }
+                    _state.update { val next = it.copy(cashSub = sub); next.copy(tiles = tilesOf(next)) }
+                }
+                if (user.canCountCash()) {
+                    val waiting = cashRepository.handovers("handed").size
+                    val sub = when (waiting) {
+                        0 -> getString(Res.string.count_tile_nothing)
+                        1 -> getString(Res.string.count_tile_one)
+                        else -> getString(Res.string.count_tile_many, waiting)
+                    }
+                    _state.update { val next = it.copy(countSub = sub, countCount = waiting); next.copy(tiles = tilesOf(next)) }
+                }
+                if (user.canSeeWallets()) {
+                    val waiting = airtelRepository.waitingTotal()
+                    val sub = when (waiting) {
+                        0 -> getString(Res.string.airtel_tile_ledger)
+                        1 -> getString(Res.string.airtel_tile_one)
+                        else -> getString(Res.string.airtel_tile_many, waiting)
+                    }
+                    _state.update { val next = it.copy(airtelSub = sub, airtelCount = waiting); next.copy(tiles = tilesOf(next)) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Keep the tiles without their numbers until they load.
+            } finally {
+                moneyLoading = false
             }
         }
     }

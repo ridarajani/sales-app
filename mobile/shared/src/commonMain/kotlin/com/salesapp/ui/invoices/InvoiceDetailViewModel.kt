@@ -6,6 +6,7 @@ import com.salesapp.core.Documents
 import com.salesapp.data.AppState
 import com.salesapp.data.InvoiceDetail
 import com.salesapp.data.InvoiceRepository
+import com.salesapp.data.canCollect
 import com.salesapp.data.canSeeInvoices
 import com.salesapp.resources.Res
 import com.salesapp.resources.invoice_no_viewer
@@ -20,6 +21,8 @@ import org.jetbrains.compose.resources.getString
 data class InvoiceDetailState(
     val loading: Boolean = true,
     val allowed: Boolean = true,
+    // Phase 7: whoever may record a payment gets a "Collect money" button.
+    val canCollect: Boolean = false,
     val invoice: InvoiceDetail? = null,
     val error: String? = null,
     // The PDF is being fetched; both buttons are off.
@@ -29,6 +32,8 @@ data class InvoiceDetailState(
 
 sealed interface InvoiceDetailEvent {
     data object Retry : InvoiceDetailEvent
+    // A payment may have changed the balance while this screen was away.
+    data object Refresh : InvoiceDetailEvent
     // Opens the PDF in the phone's viewer, which is where Print and Save live.
     data object Print : InvoiceDetailEvent
     // Opens the phone's share sheet, where WhatsApp is.
@@ -41,7 +46,9 @@ class InvoiceDetailViewModel(
     private val documents: Documents,
     private val app: AppState,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(InvoiceDetailState(allowed = app.user?.canSeeInvoices() == true))
+    private val _state = MutableStateFlow(
+        InvoiceDetailState(allowed = app.user?.canSeeInvoices() == true, canCollect = app.user?.canCollect() == true),
+    )
     val state: StateFlow<InvoiceDetailState> = _state.asStateFlow()
 
     init {
@@ -52,6 +59,7 @@ class InvoiceDetailViewModel(
         if (!_state.value.allowed) return
         when (event) {
             InvoiceDetailEvent.Retry -> load()
+            InvoiceDetailEvent.Refresh -> if (_state.value.invoice != null && !_state.value.busy) load(showSpinner = false)
             InvoiceDetailEvent.Print -> sendPdf(share = false)
             InvoiceDetailEvent.Share -> sendPdf(share = true)
         }
@@ -76,9 +84,9 @@ class InvoiceDetailViewModel(
         }
     }
 
-    private fun load() {
+    private fun load(showSpinner: Boolean = true) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
+            if (showSpinner) _state.update { it.copy(loading = true, error = null) }
             try {
                 val invoice = repository.invoice(id)
                 _state.update { it.copy(loading = false, invoice = invoice, error = null) }

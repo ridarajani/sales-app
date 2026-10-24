@@ -67,3 +67,23 @@ fun User.isDriver(): Boolean = role == "driver"
 // Invoices (Phase 6). Warehouse staff never see them; everyone else sees their own companies'
 // (a salesman only his own, a driver only his vehicles'). Same as INVOICE_VIEWERS on the server.
 fun User.canSeeInvoices(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "driver", "cashier", "accounts")
+
+// Phase 7: money. These mirror COLLECTORS, COLLECTION_VIEWERS, EXPENSE_MAKERS, CASH_HOLDERS,
+// CASH_COUNTERS and the wallet viewers on the server.
+fun User.canCollect(): Boolean = role in setOf("admin", "sales_manager", "salesman", "accounts", "cashier")
+
+fun User.canSeePayments(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "cashier", "accounts")
+
+fun User.canRecordExpenses(): Boolean = role == "admin" || role == "sales_manager" || role == "salesman"
+
+fun User.holdsCash(): Boolean = role in setOf("admin", "sales_manager", "salesman", "accounts")
+
+fun User.canCountCash(): Boolean = role == "admin" || role == "cashier"
+
+fun User.canSeeWallets(): Boolean = role in setOf("admin", "management", "sales_manager", "cashier", "accounts")
+
+// Only admin sets up who holds which wallet.
+fun User.canSetUpWallets(): Boolean = role == "admin"
+
+// At the office a transfer is recorded without the customer there, so no signature is asked for.
+fun User.isOfficeCollector(): Boolean = role == "admin" || role == "accounts" || role == "cashier"

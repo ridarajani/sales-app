@@ -19,24 +19,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.salesapp.core.formatIsoDate
+import com.salesapp.core.localIsoDateFromUtcTimestamp
 import com.salesapp.core.formatMwk
 import com.salesapp.data.InvoiceCompany
 import com.salesapp.data.InvoiceCustomer
 import com.salesapp.data.InvoiceDetail
 import com.salesapp.data.InvoiceLine
 import com.salesapp.resources.Res
+import com.salesapp.resources.invoice_balance
+import com.salesapp.resources.invoice_collect
 import com.salesapp.resources.invoice_date
 import com.salesapp.resources.invoice_delivered
 import com.salesapp.resources.invoice_delivery_note
 import com.salesapp.resources.invoice_due
 import com.salesapp.resources.invoice_getting
 import com.salesapp.resources.invoice_line_price
+import com.salesapp.resources.invoice_less_discount
+import com.salesapp.resources.invoice_less_wht
 import com.salesapp.resources.invoice_lines
 import com.salesapp.resources.invoice_list_no_access
 import com.salesapp.resources.invoice_list_plain
 import com.salesapp.resources.invoice_list_vat
 import com.salesapp.resources.invoice_lpo
+import com.salesapp.resources.invoice_paid_off
+import com.salesapp.resources.invoice_payment_row
+import com.salesapp.resources.invoice_payments
 import com.salesapp.resources.invoice_print
 import com.salesapp.resources.invoice_salesman
 import com.salesapp.resources.invoice_share
@@ -57,6 +66,7 @@ import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.SalesTheme
+import com.salesapp.ui.cash.modeLabel
 import com.salesapp.ui.theme.caption
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -66,16 +76,27 @@ import org.koin.core.parameter.parametersOf
 fun InvoiceDetailPage(
     id: Int,
     onBack: () -> Unit,
+    onCollect: (customerId: Int, companyCode: String, invoiceId: Int) -> Unit,
     viewModel: InvoiceDetailViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    InvoiceDetailScreen(state, viewModel::onEvent, onBack)
+    // A payment changes the balance, so the invoice is read again on the way back.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onEvent(InvoiceDetailEvent.Refresh)
+        onPauseOrDispose {}
+    }
+    InvoiceDetailScreen(state, viewModel::onEvent, onBack, onCollect)
 }
 
 // One invoice: who it is for, what is on it, and the totals. Print or save opens it in the phone's
 // own PDF viewer; Share on WhatsApp opens the share sheet.
 @Composable
-fun InvoiceDetailScreen(state: InvoiceDetailState, onEvent: (InvoiceDetailEvent) -> Unit, onBack: () -> Unit) {
+fun InvoiceDetailScreen(
+    state: InvoiceDetailState,
+    onEvent: (InvoiceDetailEvent) -> Unit,
+    onBack: () -> Unit,
+    onCollect: (customerId: Int, companyCode: String, invoiceId: Int) -> Unit = { _, _, _ -> },
+) {
     val invoice = state.invoice
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(invoice?.number ?: "", onBack = onBack)
@@ -89,6 +110,14 @@ fun InvoiceDetailScreen(state: InvoiceDetailState, onEvent: (InvoiceDetailEvent)
                     Header(invoice)
                     Lines(invoice)
                     Totals(invoice)
+                    Payments(invoice)
+                    if (state.canCollect && invoice.balance > 0) {
+                        SecondaryButton(
+                            stringResource(Res.string.invoice_collect),
+                            onClick = { onCollect(invoice.customer.id, invoice.companyCode, invoice.id) },
+                            enabled = !state.busy,
+                        )
+                    }
                     state.actionError?.let { Say(it, error = true) }
                     if (state.busy) {
                         Text(
@@ -219,6 +248,55 @@ private fun Totals(invoice: InvoiceDetail) {
                 formatMwk(invoice.vat.toLong()),
             )
             TotalRow(stringResource(Res.string.invoice_total), formatMwk(invoice.total.toLong()), strong = true)
+            // Phase 7: what came off the invoice and what is still owed on it.
+            if (invoice.discount > 0) TotalRow(stringResource(Res.string.invoice_less_discount), formatMwk(invoice.discount.toLong()))
+            if (invoice.wht > 0) TotalRow(stringResource(Res.string.invoice_less_wht), formatMwk(invoice.wht.toLong()))
+            TotalRow(stringResource(Res.string.invoice_balance), formatMwk(invoice.balance.toLong()), strong = true)
+        }
+    }
+}
+
+// The payments that went against this invoice.
+@Composable
+private fun Payments(invoice: InvoiceDetail) {
+    val scheme = MaterialTheme.colorScheme
+    if (invoice.payments.isEmpty()) {
+        if (invoice.balance <= 0) {
+            Text(stringResource(Res.string.invoice_paid_off), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(Res.string.invoice_payments))
+        ListCard(onClick = null) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                invoice.payments.forEach { payment ->
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(payment.number, color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                stringResource(
+                                    Res.string.invoice_payment_row,
+                                    modeLabel(payment.mode),
+                                    formatIsoDate(localIsoDateFromUtcTimestamp(payment.at)),
+                                ),
+                                color = scheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.caption,
+                            )
+                        }
+                        Text(
+                            formatMwk(payment.amount.toLong()),
+                            color = scheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End,
+                        )
+                    }
+                }
+                if (invoice.balance <= 0) {
+                    Text(stringResource(Res.string.invoice_paid_off), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
     }
 }

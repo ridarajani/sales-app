@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Airtel Money wallets -->
+    <string name="airtel_title">Airtel Money</string>
+    <string name="airtel_no_access">You cannot see Airtel Money wallets.</string>
+    <string name="airtel_no_wallets">No Airtel Money wallet is set up yet.</string>
+    <string name="airtel_holder">%1$s\'s wallet</string>
+    <string name="airtel_balance">Balance in the app</string>
+    <string name="airtel_waiting_one">1 payment to tick</string>
+    <string name="airtel_waiting_many">%1$d payments to tick</string>
+    <string name="airtel_waiting_none">Everything is ticked</string>
+    <string name="airtel_off">Off</string>
+    <string name="airtel_tile_one">1 to tick</string>
+    <string name="airtel_tile_many">%1$d to tick</string>
+    <string name="airtel_tile_ledger">Wallet ledger</string>
+    <string name="airtel_opening">Opening balance %1$s</string>
+
+    <!-- The ledger -->
+    <string name="airtel_entries">Ledger</string>
+    <string name="airtel_no_entries">Nothing in this wallet yet.</string>
+    <string name="airtel_entry_waiting">Waiting</string>
+    <string name="airtel_entry_payment">Payment in</string>
+    <string name="airtel_entry_expense">Expense</string>
+    <string name="airtel_entry_withdrawal">Taken out as cash</string>
+    <string name="airtel_entry_charge">Airtel charge</string>
+    <string name="airtel_balance_after">Balance %1$s</string>
+    <string name="airtel_entry_reference">Reference %1$s</string>
+    <string name="airtel_tick">Tick: money is in</string>
+    <string name="airtel_ticking">Ticking...</string>
+    <string name="airtel_only_holder">Only the wallet holder ticks payments and takes money out.</string>
+
+    <!-- Taking cash out -->
+    <string name="airtel_withdraw">Take out cash</string>
+    <string name="airtel_withdraw_title">Take money out of the wallet</string>
+    <string name="airtel_withdraw_help">The money becomes cash in your hand and goes to the cashier with your next handover.</string>
+    <string name="airtel_withdraw_company">Which company\'s money?</string>
+    <string name="airtel_withdraw_amount">Amount taken out (MWK)</string>
+    <string name="airtel_withdraw_charge">Airtel charge for this (MWK)</string>
+    <string name="airtel_withdraw_save">Save</string>
+    <string name="airtel_withdraw_need_amount">Please type the amount taken out.</string>
+    <string name="airtel_withdrew">Taken out of the wallet.</string>
+
+    <!-- Checking against the phone -->
+    <string name="airtel_check">Check balance</string>
+    <string name="airtel_check_title">Check against the real wallet</string>
+    <string name="airtel_check_actual">Balance shown on the Airtel phone (MWK)</string>
+    <string name="airtel_check_note">Note</string>
+    <string name="airtel_check_save">Compare</string>
+    <string name="airtel_check_need">Please type the balance on the phone.</string>
+    <string name="airtel_checks">Checked against the phone</string>
+    <string name="airtel_check_row">Phone %1$s · app %2$s</string>
+    <string name="airtel_check_same">Matches</string>
+    <string name="airtel_check_diff">%1$s different</string>
+    <string name="airtel_checked_by">%1$s · %2$s</string>
+
+    <!-- Admin: setting up a wallet -->
+    <string name="airtel_admin_title">Airtel Money wallets</string>
+    <string name="airtel_admin_new">Set up a wallet</string>
+    <string name="airtel_admin_edit">Change the wallet</string>
+    <string name="airtel_admin_holder">Who holds the wallet?</string>
+    <string name="airtel_admin_holder_help">The holder must be a sales manager.</string>
+    <string name="airtel_admin_opening">Opening balance (MWK)</string>
+    <string name="airtel_admin_companies">Which companies use it?</string>
+    <string name="airtel_admin_active">Wallet is in use</string>
+    <string name="airtel_admin_save">Save wallet</string>
+    <string name="airtel_admin_saving">Saving...</string>
+    <string name="airtel_admin_saved">Wallet saved.</string>
+    <string name="airtel_admin_need_holder">Pick who holds the wallet.</string>
+    <string name="airtel_admin_need_company">Pick the companies that use this wallet.</string>
+</resources>
