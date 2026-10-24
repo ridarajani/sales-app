@@ -1,6 +1,7 @@
 package com.salesapp.di
 
 import com.salesapp.data.LedgerRepository
+import com.salesapp.data.LedgerSource
 import com.salesapp.data.ReturnsRepository
 import com.salesapp.ui.ledger.LedgerViewModel
 import com.salesapp.ui.returns.NewNoteViewModel
@@ -13,7 +14,7 @@ import org.koin.dsl.module
 // Phase 8: sales returns, credit and debit notes, and the customer ledger.
 val returnsModule = module {
     single { ReturnsRepository(get(), get()) }
-    single { LedgerRepository(get(), get()) }
+    single<LedgerSource> { LedgerRepository(get(), get()) }
     viewModel { ReturnsViewModel(get(), get()) }
     viewModel { (id: Int) -> ReturnDetailViewModel(id, get(), get()) }
     viewModel { (invoiceId: Int) -> NewReturnViewModel(invoiceId, get(), get(), get()) }

@@ -10,7 +10,7 @@ import com.salesapp.data.AppState
 import com.salesapp.data.Company
 import com.salesapp.data.Customer
 import com.salesapp.data.Ledger
-import com.salesapp.data.LedgerRepository
+import com.salesapp.data.LedgerSource
 import com.salesapp.data.canSeeLedger
 import com.salesapp.resources.Res
 import com.salesapp.resources.invoice_no_viewer
@@ -58,7 +58,7 @@ sealed interface LedgerEvent {
 class LedgerViewModel(
     customerId: Int?,
     companyCode: String?,
-    private val repository: LedgerRepository,
+    private val repository: LedgerSource,
     private val documents: Documents,
     private val app: AppState,
 ) : ViewModel() {
@@ -68,6 +68,10 @@ class LedgerViewModel(
     val state: StateFlow<LedgerState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+
+    // The ledger being fetched. Switching company, period or shop cancels the one before, so a
+    // slower earlier answer can never land on top of a newer one.
+    private var loadJob: Job? = null
 
     init {
         if (!_state.value.allowed) {
@@ -91,6 +95,7 @@ class LedgerViewModel(
             }
             is LedgerEvent.CustomerChosen -> pick(event.id)
             LedgerEvent.ChangeCustomer -> {
+                loadJob?.cancel()
                 _state.update { LedgerState(allowed = true, query = it.query, customers = it.customers) }
                 search()
             }
@@ -136,14 +141,20 @@ class LedgerViewModel(
     }
 
     private fun pick(customerId: Int, keepCompany: String? = null) {
+        loadJob?.cancel()
         _state.update { it.copy(loading = true, error = null) }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
                 val customer = repository.customer(customerId)
                 val companies = repository.companiesOf(customer)
                 val code = keepCompany?.takeIf { c -> companies.any { it.code == c } } ?: companies.firstOrNull()?.code
                 _state.update { it.copy(customer = customer, companies = companies, companyCode = code) }
-                if (code != null) load() else _state.update { it.copy(loading = false) }
+                if (code == null) {
+                    _state.update { it.copy(loading = false) }
+                    return@launch
+                }
+                // Part of the same job, so changing shop cancels the ledger it had started fetching.
+                fetch(customer.id, code, _state.value.period)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -157,11 +168,11 @@ class LedgerViewModel(
         val s = _state.value
         val customer = s.customer ?: return
         val company = s.companyCode ?: return
+        loadJob?.cancel()
         _state.update { it.copy(loading = true, error = null) }
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
-                val ledger = repository.ledger(customer.id, company, fromDate(s.period))
-                _state.update { it.copy(loading = false, ledger = ledger, error = null) }
+                fetch(customer.id, company, s.period)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -169,6 +180,13 @@ class LedgerViewModel(
                 _state.update { it.copy(loading = false, error = message) }
             }
         }
+    }
+
+    // The one place the ledger is fetched. The caller owns the job, so cancelling it stops the
+    // answer being applied.
+    private suspend fun fetch(customerId: Int, company: String, period: LedgerPeriod) {
+        val ledger = repository.ledger(customerId, company, fromDate(period))
+        _state.update { it.copy(loading = false, ledger = ledger, error = null) }
     }
 
     // The statement for the company and period on screen, handed to the phone's share sheet.
