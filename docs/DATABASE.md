@@ -232,6 +232,16 @@ erDiagram
     invoice_lines ||--o{ sales_return_lines : "came back"
     sales_returns ||--o{ stock_movements : "back on the shelf"
     invoices ||--o{ invoice_notes : "adjusted by"
+    facilities ||--o{ trips : "sends"
+    users ||--o{ trips : "leads"
+    trips ||--o{ trip_lines : "carries"
+    trip_lines ||--o{ trip_line_batches : "from"
+    stock_batches ||--o{ trip_line_batches : "loaded"
+    trips ||--o{ trip_sales : "sells"
+    customers ||--o{ trip_sales : "buys"
+    trip_sales ||--o{ invoices : "makes"
+    trip_sales ||--o{ collections : "paid by"
+    trips ||--o{ expenses : "spends"
     loading_plans {
         int id PK
         text number "LP-000123"
@@ -397,6 +407,56 @@ erDiagram
         bigint amount
         text condition "good, damaged"
     }
+    trips {
+        int id PK
+        text number UK "TRP-000001"
+        text kind "minibus, upcountry"
+        text facility_code FK
+        text company_code FK "float and expenses"
+        date trip_date
+        text route
+        text_array stops
+        int vehicle_id FK
+        int driver_id FK
+        int leader_id FK
+        bigint float_amount
+        text float_custody "with, handed, counted, na"
+        int float_handover_id FK
+        text status "planned, out, closed"
+        text gate_pass_no UK
+        bigint cash_expected
+        bigint cash_counted
+        bigint cash_difference
+    }
+    trip_lines {
+        int id PK
+        int trip_id FK
+        int product_id FK
+        int planned
+        int loaded
+        int sold
+        int returned
+        int missing
+    }
+    trip_line_batches {
+        int line_id PK
+        int batch_id PK
+        int pieces
+        int sold
+    }
+    trip_sales {
+        int id PK
+        int trip_id FK
+        int customer_id FK
+        text stop
+        text payment "cash, airtel, credit"
+        bigint total
+        text received_by
+        text signature_file
+        text proof_file
+        timestamptz sold_at
+        text request_id
+    }
     invoice_notes {
         int id PK
         text number UK "LV-CN-000001"
@@ -462,6 +522,10 @@ erDiagram
 | `sales_returns` | Phase 8 | Goods that came back, booked against their invoice |
 | `sales_return_lines` | Phase 8 | The products on each return, and whether they came back good or damaged |
 | `invoice_notes` | Phase 8 | Credit and debit notes on an invoice, issued or received |
+| `trips` | Phase 9 | Minibus routes and upcountry trips: vehicle, leader, float, gate pass and the cash counted at close |
+| `trip_lines` | Phase 9 | Products on a trip: planned, loaded, sold, brought back and missing |
+| `trip_line_batches` | Phase 9 | Which batches each product was loaded from, and how much of each is sold |
+| `trip_sales` | Phase 9 | Each sale at a stop: customer, payment, signature and the phone's time |
 
 ## Phase 1 notes
 
@@ -571,3 +635,16 @@ erDiagram
 - **Cancelling a payment** (migration 022): Accounts or Admin cancel a payment recorded by mistake with `POST /collections/:id/cancel` and a reason. It stays on record but no longer counts: what it paid is open again, its cash leaves the collector's hand, and a waiting Airtel payment leaves the wallet. Once the cash is handed to the cashier, or the Airtel payment is ticked, the money is real and it cannot be cancelled; a debit note corrects the customer instead. Cash the cashier took directly can still be cancelled. The ledger shows the payment and its cancellation.
 - **Money on account:** what a customer paid beyond what they owed goes on what they owe later, automatically: when new invoices are made, and when a debit note (or a credit note received from them) makes them owe more. It goes on the opening balance first, then the oldest invoices.
 - **Audit actions:** `sales_return_booked`, `returned_goods_received`, `invoice_note_made`, `payment_cancelled`.
+
+## Phase 9 notes
+
+- **Trips** (migration 023) are minibus routes and weekly upcountry trips. A manager plans one with `POST /trips`: minibus or upcountry, the warehouse, date, route and stops, vehicle, driver, the leader (the salesman or sales manager who sells and holds the cash), the float and the cartons of each product to take. Numbered in one series for both companies of the warehouse (`TRP-000001`). It can be changed (`PUT /trips/:id`) or deleted until it is loaded.
+- **Loading** (`POST /trips/:id/load`, warehouse): only free stock goes on, never what is set aside for orders, oldest expiry first with enough shelf life for the channel (minibus 30 days, upcountry 60). The warehouse can type less or more than planned; what is not on the shelves is listed as not loaded. The vehicle leaves at once with a gate pass (`GP-`), the stock is in transit until sold, and the float becomes cash the leader holds.
+- **Selling at a stop** (`POST /trips/:id/sales`, the leader only): one customer, the cartons and pieces with a typed price per carton, VAT or plain (the customer's last choice unless picked), paid by cash, Airtel Money or on account, and always signed. It makes one invoice per company, dated the day of the sale, due at once unless on account. Cash and Airtel Money are recorded as payments of each invoice (`RCT-`); Airtel goes into the company's wallet waiting to be ticked. Sold stock leaves the vehicle and the books, oldest expiry first. Cash-only customers cannot buy on account; no more can be sold than is left on the vehicle.
+- **Trip expenses** (`POST /trips/:id/expenses`, the leader): fuel, lodging and so on, in cash from the float, with a bill photo. They are normal expenses linked to the trip (`EXP-`), so they come off the cash handed over.
+- **Offline:** the phone keeps `GET /trips/:id/pack` (the trip, its channel's customers with what they owe and their last prices, and the expense kinds). Every sale and expense carries a `requestId` made on the phone and the sale its `soldAt` time. `POST /trips/:id/sync` sends what was saved offline in one go; each item is saved on its own and its result reported, and anything sent again comes back as a repeat. Invoice numbers are given when a sale reaches the server, so the phone sends everything before closing.
+- **Closing** (`POST /trips/:id/close`, the leader or a sales manager or Admin): the cartons that came back of each product and the cash counted. What came back goes on the shelf again; what is neither sold nor back is missing and comes off the books (adjusted, reason lost). The cash expected is cash sales plus the float less cash expenses; a cash difference or missing stock needs a note. The cash, float included, stays with the leader until handed to the cashier, where handovers now show `floats`.
+- **Invoices** from a trip have no order behind them (`invoice_lines.order_line_id` is empty); the invoice shows the trip, the stop and the vehicle, and the ledger says "trip TRP-000001". Goods from a trip invoice that are given back later go into the batches they were sold from.
+- **Who:** Admin, Management and sales managers plan; the warehouse loads and sees no money; salesmen see only the trips they lead; drivers see their own trips once loaded.
+- **Not yet:** advance orders on a trip (confirmed orders delivered at a stop) come in Phase 9 part 2.
+- **Audit actions:** `trip_planned`, `trip_changed`, `trip_deleted`, `trip_loaded`, `trip_sale`, `trip_expense`, `trip_closed`.

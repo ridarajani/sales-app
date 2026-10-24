@@ -22,6 +22,7 @@ import { cashRoutes } from './cash/cash.js';
 import { airtelRoutes } from './cash/airtel.js';
 import { returnRoutes } from './returns/returns.js';
 import { ledgerRoutes } from './returns/ledger.js';
+import { tripRoutes } from './trips/trips.js';
 
 export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string; brandingDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -84,6 +85,7 @@ export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string;
   airtelRoutes(app, db);
   returnRoutes(app, db);
   ledgerRoutes(app, db, options.brandingDir ?? config.brandingDir);
+  tripRoutes(app, db, options.uploadDir ?? config.uploadDir);
 
   return app;
 }

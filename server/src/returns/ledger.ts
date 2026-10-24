@@ -54,9 +54,11 @@ async function ledger(db: Db, user: AuthUser, customerId: number, query: z.infer
      union all
        select to_char(iv.invoice_date, 'YYYY-MM-DD'), iv.created_at, iv.number,
          'Invoice' || case when iv.lpo_no <> '' then ' · LPO ' || iv.lpo_no else '' end
-           || coalesce(' · delivery note ' || lp.delivery_note_no, ''),
+           || coalesce(' · delivery note ' || lp.delivery_note_no, '') || coalesce(' · trip ' || tr.number, ''),
          iv.total::float8, 0, iv.id
-       from invoices iv left join loading_plans lp on lp.id = iv.plan_id where iv.customer_id = $1 and iv.company_code = $2
+       from invoices iv left join loading_plans lp on lp.id = iv.plan_id
+         left join trip_sales ts on ts.id = iv.trip_sale_id left join trips tr on tr.id = ts.trip_id
+       where iv.customer_id = $1 and iv.company_code = $2
      union all
        select ${LOCAL_DATE('c.created_at')}, c.created_at, c.number,
          'Payment · ' || case c.mode when 'cash' then 'Cash' when 'bank' then 'Bank transfer' else 'Airtel Money' end
