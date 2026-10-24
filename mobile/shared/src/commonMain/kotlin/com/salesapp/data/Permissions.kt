@@ -63,3 +63,7 @@ fun User.isNewFor(byWarehouse: Boolean): Boolean = when (role) {
 }
 
 fun User.isDriver(): Boolean = role == "driver"
+
+// Invoices (Phase 6). Warehouse staff never see them; everyone else sees their own companies'
+// (a salesman only his own, a driver only his vehicles'). Same as INVOICE_VIEWERS on the server.
+fun User.canSeeInvoices(): Boolean = role in setOf("admin", "management", "sales_manager", "salesman", "driver", "cashier", "accounts")

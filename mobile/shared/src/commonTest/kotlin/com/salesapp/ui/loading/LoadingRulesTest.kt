@@ -38,6 +38,13 @@ class LoadingRulesTest {
         assertEquals(WarehousePlanRoute(3), planRouteFor(user("admin"), 3, "loaded", sent = true))
     }
 
+    // Phase 6: the deliveries are on the trip screen, so that is where admin goes once it is out.
+    @Test
+    fun adminFollowsTheDeliveriesOnTheTrip() {
+        assertEquals(TripRoute(3), planRouteFor(user("admin"), 3, "out", sent = true))
+        assertEquals(TripRoute(3), planRouteFor(user("admin"), 3, "done", sent = true))
+    }
+
     @Test
     fun everyoneElseSeesTheTrip() {
         for (role in listOf("driver", "accounts", "cashier", "salesman")) {

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="updates" path="updates/" />
+    <!-- Invoices, delivery notes and gate passes handed to a PDF viewer or the share sheet. -->
+    <cache-path name="docs" path="docs/" />
+    <!-- Where the camera writes a delivery photo before it is shrunk. -->
+    <cache-path name="photos" path="photos/" />
 </paths>

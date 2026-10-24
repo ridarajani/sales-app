@@ -15,6 +15,6 @@ val loadingModule = module {
     viewModel { PlansViewModel(get(), get()) }
     viewModel { NewPlanViewModel(get(), get()) }
     viewModel { (id: Int) -> PlannerPlanViewModel(id, get(), get()) }
-    viewModel { (id: Int) -> WarehousePlanViewModel(id, get(), get()) }
-    viewModel { (id: Int) -> TripViewModel(id, get(), get()) }
+    viewModel { (id: Int) -> WarehousePlanViewModel(id, get(), get(), get()) }
+    viewModel { (id: Int) -> TripViewModel(id, get(), get(), get()) }
 }

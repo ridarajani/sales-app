@@ -64,6 +64,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.core.ktx)
+            // The camera needs the activity on screen to give its answer back.
+            implementation(libs.androidx.activity.compose)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

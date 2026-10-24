@@ -53,4 +53,19 @@ class LoadingRepository(private val api: Api, private val app: AppState) {
 
     // How many changes from the other side wait to be seen, over all plans this user can see.
     suspend fun newChangesTotal(): Int = plans(null).sumOf { it.newChanges }
+
+    // Phase 6.
+
+    // Makes the invoices for this user's companies. The plan comes back with `made` filled in.
+    suspend fun makeInvoices(id: Int): PlanDetail = api.makeInvoices(id)
+
+    suspend fun confirmDelivery(id: Int, request: DeliveryRequest): PlanDetail = api.confirmDelivery(id, request)
+
+    suspend fun deliveryNote(id: Int): ServerFile = api.deliveryNotePdf(id)
+
+    suspend fun gatePass(id: Int): ServerFile = api.gatePassPdf(id)
+
+    suspend fun signature(deliveryId: Int): ServerFile = api.deliverySignature(deliveryId)
+
+    suspend fun photo(deliveryId: Int): ServerFile = api.deliveryPhoto(deliveryId)
 }

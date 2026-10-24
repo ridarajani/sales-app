@@ -100,6 +100,7 @@ import com.salesapp.ui.navigation.CompaniesRoute
 import com.salesapp.ui.navigation.CustomersRoute
 import com.salesapp.ui.navigation.ApprovalsRoute
 import com.salesapp.ui.navigation.ExpiringRoute
+import com.salesapp.ui.navigation.InvoicesRoute
 import com.salesapp.ui.navigation.NewOrderRoute
 import com.salesapp.ui.navigation.OrdersRoute
 import com.salesapp.ui.navigation.PlansRoute
@@ -148,6 +149,9 @@ private fun newOrderTile() = tile(Res.string.tile_new_order, Res.string.tile_new
 
 private fun ordersTile() = tile(Res.string.tile_orders, Res.string.tile_orders_sub, AppIcons.Receipt, OrdersRoute)
 
+// The invoice register; the sub-line differs by role (share, register, print).
+private fun invoicesTile(sub: StringResource) = tile(Res.string.tile_invoices, sub, AppIcons.Receipt, InvoicesRoute)
+
 // Loading plans; count is how many changes from the other side wait to be seen.
 private fun loadingTile(count: Int?) = tile(Res.string.tile_loading, Res.string.tile_loading_sub, AppIcons.Truck, PlansRoute, count = count)
 
@@ -175,6 +179,7 @@ internal fun tilesFor(
         tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
         expiringTile(expiringSub),
         approvalsTile(approvalsSub),
+        invoicesTile(Res.string.tile_invoices_register_print),
         tile(Res.string.tile_audit, Res.string.tile_audit_sub, AppIcons.List),
         tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
         more(),
@@ -188,7 +193,7 @@ internal fun tilesFor(
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
         tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
         expiringTile(expiringSub),
-        tile(Res.string.tile_invoices, Res.string.tile_invoices_register, AppIcons.Receipt),
+        invoicesTile(Res.string.tile_invoices_register),
         tile(Res.string.tile_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
         tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
@@ -205,7 +210,7 @@ internal fun tilesFor(
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_invoices, Res.string.tile_invoices_share, AppIcons.Receipt),
+        invoicesTile(Res.string.tile_invoices_share),
         tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
         more(),
     )
@@ -215,6 +220,7 @@ internal fun tilesFor(
         tile(Res.string.tile_hand_over_cash, Res.string.tile_hand_over_cash_sub, AppIcons.Money),
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
+        invoicesTile(Res.string.tile_invoices_share),
         more(),
     )
     "warehouse" -> listOf(
@@ -234,6 +240,7 @@ internal fun tilesFor(
         myTripsTile(),
         tile(Res.string.tile_hand_over_goods, Res.string.tile_hand_over_goods_sub, AppIcons.Box),
         tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
+        invoicesTile(Res.string.tile_invoices_register),
         more(),
     )
     "cashier" -> listOf(
@@ -242,12 +249,12 @@ internal fun tilesFor(
         loadingTile(loadingCount),
         tile(Res.string.tile_record_payment, Res.string.tile_record_payment_sub, AppIcons.Money),
         tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
-        tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
+        invoicesTile(Res.string.tile_invoices_register_print),
         tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
         more(),
     )
     "accounts" -> listOf(
-        tile(Res.string.tile_invoices, Res.string.tile_invoices_register_print, AppIcons.Receipt),
+        invoicesTile(Res.string.tile_invoices_register_print),
         ordersTile(),
         loadingTile(loadingCount),
         tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),

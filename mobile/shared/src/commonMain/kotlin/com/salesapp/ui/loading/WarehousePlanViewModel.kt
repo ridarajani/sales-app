@@ -2,16 +2,20 @@ package com.salesapp.ui.loading
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.salesapp.core.Documents
 import com.salesapp.data.AppState
 import com.salesapp.data.LoadingRepository
+import com.salesapp.data.MadeInvoice
 import com.salesapp.data.NotLoaded
 import com.salesapp.data.PlanDetail
 import com.salesapp.data.PlanProduct
 import com.salesapp.data.ProductQty
+import com.salesapp.data.ServerFile
 import com.salesapp.data.User
 import com.salesapp.data.WarehouseChangeRequest
 import com.salesapp.data.canSeePlans
 import com.salesapp.resources.Res
+import com.salesapp.resources.invoice_no_viewer
 import com.salesapp.resources.loading_wh_change_saved
 import com.salesapp.resources.loading_wh_reason_needed
 import kotlinx.coroutines.CancellationException
@@ -58,8 +62,13 @@ data class WarehousePlanState(
     val notFit: List<NotFit> = emptyList(),
     // From the Loaded reply; a refresh does not send it again, so it is kept here.
     val notLoaded: List<NotLoaded> = emptyList(),
+    // Phase 6: what the last "Make invoices" made.
+    val made: List<MadeInvoice> = emptyList(),
 ) {
     val editing: Boolean get() = edit != null
+
+    // The delivery note and gate pass exist once the vehicle is loaded.
+    val hasDocuments: Boolean get() = plan?.deliveryNoteNo?.isNotBlank() == true
 }
 
 sealed interface WarehousePlanEvent {
@@ -75,11 +84,16 @@ sealed interface WarehousePlanEvent {
     data class Ask(val what: WarehouseAsk) : WarehousePlanEvent
     data object Confirm : WarehousePlanEvent
     data object Dismiss : WarehousePlanEvent
+    // Phase 6.
+    data object MakeInvoices : WarehousePlanEvent
+    data object DeliveryNote : WarehousePlanEvent
+    data object GatePass : WarehousePlanEvent
 }
 
 class WarehousePlanViewModel(
     private val id: Int,
     private val repository: LoadingRepository,
+    private val documents: Documents,
     private val app: AppState,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WarehousePlanState(user = app.user, allowed = app.user?.canSeePlans() == true))
@@ -122,6 +136,46 @@ class WarehousePlanViewModel(
                 }
             }
             WarehousePlanEvent.Dismiss -> _state.update { it.copy(asking = null) }
+            WarehousePlanEvent.MakeInvoices -> makeInvoices()
+            WarehousePlanEvent.DeliveryNote -> document("delivery-note") { repository.deliveryNote(id) }
+            WarehousePlanEvent.GatePass -> document("gate-pass") { repository.gatePass(id) }
+        }
+    }
+
+    // Admin is an invoice maker, and lands here while the vehicle is loaded.
+    private fun makeInvoices() {
+        val s = _state.value
+        if (s.busy || s.editing || s.plan?.canMakeInvoices != true) return
+        _state.update { it.copy(busy = true, actionError = null, made = emptyList(), notFit = emptyList()) }
+        viewModelScope.launch {
+            try {
+                val plan = repository.makeInvoices(id)
+                _state.update { it.copy(plan = plan, busy = false, made = plan.made) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = app.handleApiError(e)
+                _state.update { it.copy(busy = false, actionError = message) }
+            }
+        }
+    }
+
+    // One of the vehicle's documents, opened in the phone's own PDF viewer.
+    private fun document(name: String, fetch: suspend () -> ServerFile) {
+        val plan = _state.value.plan ?: return
+        if (_state.value.busy) return
+        _state.update { it.copy(busy = true, actionError = null) }
+        viewModelScope.launch {
+            try {
+                val file = fetch()
+                val opened = documents.open("${plan.number}-$name.pdf", file.bytes, file.contentType, share = false)
+                _state.update { it.copy(busy = false, actionError = if (opened) null else getString(Res.string.invoice_no_viewer)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = app.handleApiError(e)
+                _state.update { it.copy(busy = false, actionError = message) }
+            }
         }
     }
 

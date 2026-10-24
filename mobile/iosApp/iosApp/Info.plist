@@ -29,6 +29,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of the goods handed over at a delivery.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Sales App needs to reach the sales server on your Wi-Fi.</string>
 	<key>UIApplicationSceneManifest</key>

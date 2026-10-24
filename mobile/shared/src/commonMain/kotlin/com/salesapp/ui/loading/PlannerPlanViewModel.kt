@@ -11,6 +11,7 @@ import com.salesapp.data.PlanDetail
 import com.salesapp.data.PlanItem
 import com.salesapp.data.PlanItemQty
 import com.salesapp.data.PlanItemsRequest
+import com.salesapp.data.Role
 import com.salesapp.data.User
 import com.salesapp.data.Vehicle
 import com.salesapp.data.canPlanLoading
@@ -70,12 +71,17 @@ data class PlannerPlanState(
         get() = picked.isNotEmpty() || (vehicleId != null && vehicleId != plan?.vehicleId) || (driverId != null && driverId != plan?.driverId)
 
     // Lines still on the plan whose order has since gone on hold or been closed, so they are no
-    // longer among the open lines. They have to come off before the plan can be sent.
+    // longer among the open lines. They have to come off before the plan can be sent. Only the
+    // user's own companies are listed, so one manager never sees another company's lines.
     val leftOut: List<PlanItem>
         get() {
             val plan = plan ?: return emptyList()
             val openIds = open.flatMap { it.lines }.map { it.lineId }.toSet()
-            return plan.products.flatMap { it.items }.filter { it.lineId !in openIds && it.pieces > 0 }
+            val seesAll = user?.let { Role.fromCode(it.role)?.seesAllCompanies } == true
+            return plan.products
+                .filter { product -> seesAll || product.companyCode in user?.companies.orEmpty() }
+                .flatMap { it.items }
+                .filter { it.lineId !in openIds && it.pieces > 0 }
         }
 
     val hasItems: Boolean get() = plan?.products?.any { it.pieces > 0 } == true

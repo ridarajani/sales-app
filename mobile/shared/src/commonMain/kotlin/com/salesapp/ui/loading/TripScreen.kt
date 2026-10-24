@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +29,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.salesapp.core.formatIsoDate
 import com.salesapp.core.localIsoDateFromUtcTimestamp
 import com.salesapp.data.PlanDetail
+import com.salesapp.data.PlanDelivery
 import com.salesapp.data.PlanDrop
+import com.salesapp.data.PlanInvoice
 import com.salesapp.data.PlanDropLine
 import com.salesapp.data.PlanProduct
 import com.salesapp.data.User
@@ -43,12 +46,18 @@ import com.salesapp.resources.loading_trip_line_lpo
 import com.salesapp.resources.loading_trip_no_drops
 import com.salesapp.resources.loading_trip_orders
 import com.salesapp.resources.loading_trip_products
+import com.salesapp.resources.delivery_confirm_open
+import com.salesapp.resources.delivery_not_invoiced
+import com.salesapp.resources.delivery_pill_delivered
 import com.salesapp.resources.loading_trip_shop_total
 import com.salesapp.resources.number_no_access
+import com.salesapp.ui.components.Badge
+import com.salesapp.ui.components.BadgeTone
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.ListCard
 import com.salesapp.ui.components.LoadingState
 import com.salesapp.ui.components.Say
+import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.theme.SalesTheme
@@ -62,10 +71,18 @@ import org.koin.core.parameter.parametersOf
 fun TripPage(
     id: Int,
     onBack: () -> Unit,
+    onOpen: (Any) -> Unit,
     viewModel: TripViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    // Coming back to the screen shows the plan as it is now.
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is TripEffect.Open -> onOpen(effect.route)
+            }
+        }
+    }
+    // Coming back to the screen shows the plan as it is now, with any new invoice or delivery.
     LifecycleResumeEffect(viewModel) {
         viewModel.onEvent(TripEvent.Refresh)
         onPauseOrDispose {}
@@ -92,11 +109,25 @@ fun TripScreen(state: TripState, onEvent: (TripEvent) -> Unit, onBack: () -> Uni
                         ChangesBanner(plan.changes, state.user, onSeen = { onEvent(TripEvent.Seen) }, busy = state.busy)
                     }
                     state.actionError?.let { Say(it, error = true) }
+                    // Phase 6: the sales team makes the invoices once the vehicle is loaded.
+                    MakeInvoices(
+                        canMake = plan.canMakeInvoices,
+                        busy = state.busy,
+                        made = state.made,
+                        onMake = { onEvent(TripEvent.MakeInvoices) },
+                    )
+                    if (state.hasDocuments) {
+                        VehicleDocuments(
+                            busy = state.busy,
+                            onDeliveryNote = { onEvent(TripEvent.DeliveryNote) },
+                            onGatePass = { onEvent(TripEvent.GatePass) },
+                        )
+                    }
                     SectionLabel(stringResource(Res.string.loading_trip_drops), modifier = Modifier.padding(top = 4.dp))
                     if (plan.drops.isEmpty()) {
                         Say(stringResource(Res.string.loading_trip_no_drops))
                     } else {
-                        plan.drops.forEachIndexed { index, drop -> DropCard(index + 1, drop) }
+                        plan.drops.forEachIndexed { index, drop -> DropCard(index + 1, drop, state, onEvent) }
                     }
                     if (state.showsProducts && plan.products.isNotEmpty()) {
                         SectionLabel(stringResource(Res.string.loading_trip_products), modifier = Modifier.padding(top = 4.dp))
@@ -149,10 +180,12 @@ private fun Header(plan: PlanDetail) {
     }
 }
 
-// One shop: its number in the drop order, name, area, orders, what to hand over and the shop's total.
+// One shop: its number in the drop order, name, area, orders, what to hand over and the shop's
+// total. From Phase 6 it also carries the invoices and, once confirmed, the delivery itself.
 @Composable
-private fun DropCard(number: Int, drop: PlanDrop) {
+private fun DropCard(number: Int, drop: PlanDrop, state: TripState, onEvent: (TripEvent) -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val delivery = drop.delivery
     ListCard(onClick = null) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -181,6 +214,7 @@ private fun DropCard(number: Int, drop: PlanDrop) {
                         )
                     }
                 }
+                if (delivery != null) Badge(stringResource(Res.string.delivery_pill_delivered), tone = BadgeTone.On)
             }
             drop.lines.forEach { DropLineRow(it) }
             Text(
@@ -189,6 +223,28 @@ private fun DropCard(number: Int, drop: PlanDrop) {
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 2.dp),
             )
+            DropInvoices(drop.invoices, onOpen = { onEvent(TripEvent.OpenInvoice(it)) })
+            if (delivery != null) {
+                DeliveredDetails(
+                    delivery = delivery,
+                    lines = drop.lines,
+                    perCarton = state.perCarton,
+                    signature = state.signatures[delivery.id],
+                    photo = state.photos[delivery.id],
+                    imagesFailed = state.imagesFailed,
+                )
+            } else if (state.plan?.canDeliver == true) {
+                // The driver cannot hand over before this shop's invoices are made.
+                if (!drop.invoiced) {
+                    Say(stringResource(Res.string.delivery_not_invoiced), error = true)
+                } else {
+                    SecondaryButton(
+                        stringResource(Res.string.delivery_confirm_open),
+                        onClick = { onEvent(TripEvent.OpenDrop(drop.customerId)) },
+                        enabled = !state.busy,
+                    )
+                }
+            }
         }
     }
 }
@@ -275,5 +331,63 @@ private val previewTrip = PlanDetail(
 private fun TripDriverPreview() {
     SalesTheme {
         TripScreen(TripState(loading = false, plan = previewTrip, user = previewDriver), onEvent = {}, onBack = {})
+    }
+}
+
+// Phase 6: the same trip with the invoices made, one drop still to hand over and one confirmed.
+private val previewInvoices = listOf(
+    PlanInvoice(id = 1, number = "LV-INV-000014", customerId = 1, companyCode = "LV", invoiceType = "vat", total = 564000.0),
+    PlanInvoice(id = 2, number = "ZT-INV-000009", customerId = 1, companyCode = "ZT", invoiceType = "plain", total = 96000.0),
+)
+
+private val previewPhase6 = previewTrip.copy(
+    deliveryNoteNo = "DN-000003",
+    gatePassNo = "GP-000003",
+    canDeliver = true,
+    invoices = previewInvoices,
+    drops = listOf(
+        previewTrip.drops[0].copy(
+            invoices = previewInvoices,
+            lines = previewTrip.drops[0].lines.mapIndexed { index, line ->
+                line.copy(itemId = index + 1, loaded = line.pieces, delivered = line.pieces)
+            },
+            delivery = PlanDelivery(
+                id = 1, customerId = 1, receivedBy = "Grace Banda",
+                confirmedAt = "2026-10-23T11:20:00.000Z", confirmedBy = "Yamikani Banda",
+            ),
+        ),
+        previewTrip.drops[1].copy(
+            lines = previewTrip.drops[1].lines.map { it.copy(itemId = 9, loaded = it.pieces) },
+        ),
+    ),
+)
+
+@Preview
+@Composable
+private fun TripDeliveriesPreview() {
+    SalesTheme {
+        TripScreen(TripState(loading = false, plan = previewPhase6, user = previewDriver), onEvent = {}, onBack = {})
+    }
+}
+
+@Preview
+@Composable
+private fun TripMakeInvoicesPreview() {
+    SalesTheme {
+        TripScreen(
+            TripState(
+                loading = false,
+                user = User(3, "Mr. Abbas", "0991000003", "sales_manager"),
+                plan = previewTrip.copy(
+                    status = "loaded",
+                    deliveryNoteNo = "DN-000003",
+                    gatePassNo = "GP-000003",
+                    canMakeInvoices = true,
+                    drops = previewTrip.drops.map { drop -> drop.copy(invoiced = false, lines = drop.lines.map { it.copy(loaded = it.pieces) }) },
+                ),
+            ),
+            onEvent = {},
+            onBack = {},
+        )
     }
 }
