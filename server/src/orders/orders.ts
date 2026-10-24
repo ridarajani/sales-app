@@ -22,6 +22,11 @@ export const ORDER_VIEWERS = ['admin', 'management', 'sales_manager', 'salesman'
 export const MIN_SHELF_DAYS: Record<Channel, number> = { supermarket: 90, wholesaler: 30, minibus: 30, upcountry: 60 };
 export const DEFAULT_VAT_RATE = 17.5;
 
+// VAT on the lines that are not VAT exempt, rounded once for the whole invoice.
+export function vatOn(lines: { amount: number; vatExempt: boolean }[], rate: number) {
+  return Math.round((lines.reduce((t, l) => t + (l.vatExempt ? 0 : l.amount), 0) * rate) / 100);
+}
+
 export const INVOICE_TYPES = ['vat', 'plain'] as const;
 const LIVE = ['open', 'hold'];
 
@@ -213,6 +218,7 @@ type LineRow = {
   packSize: string;
   companyCode: string;
   piecesPerCarton: number;
+  vatExempt: boolean;
   pieces: number;
   pricePerCarton: number;
   delivered: number;
@@ -234,7 +240,7 @@ export async function orderDetail(db: Db | PoolClient, user: AuthUser, orderId: 
          from order_companies oc join companies co on co.code = oc.company_code
          where oc.order_id = o.id and oc.company_code = any($1)), '[]') as companies,
        coalesce((select json_agg(json_build_object('id', l.id, 'productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
-           'packSize', p.pack_size, 'companyCode', p.company_code, 'piecesPerCarton', p.pieces_per_carton, 'pieces', l.pieces,
+           'packSize', p.pack_size, 'companyCode', p.company_code, 'piecesPerCarton', p.pieces_per_carton, 'vatExempt', p.vat_exempt, 'pieces', l.pieces,
            'pricePerCarton', l.price_per_carton, 'delivered', l.delivered, 'onVehicle', l.on_vehicle, 'planned', ${PLANNED_SQL('l.id')},
            'reserved', coalesce((select sum(a.pieces) from order_allocations a where a.line_id = l.id), 0)) order by l.id)
          from order_lines l join products p on p.id = l.product_id
@@ -256,8 +262,9 @@ export async function orderDetail(db: Db | PoolClient, user: AuthUser, orderId: 
     shortPieces: live ? Math.max(0, l.pieces - l.delivered - l.onVehicle - l.reserved) : 0,
   }));
   const companies = (o.companies as CompanyRow[]).map((c) => {
-    const subtotal = lines.filter((l) => l.companyCode === c.code).reduce((t, l) => t + l.amount, 0);
-    const vat = o.invoiceType === 'vat' ? Math.round((subtotal * Number(c.vatRate)) / 100) : 0;
+    const its = lines.filter((l) => l.companyCode === c.code);
+    const subtotal = its.reduce((t, l) => t + l.amount, 0);
+    const vat = o.invoiceType === 'vat' ? vatOn(its, Number(c.vatRate)) : 0;
     return { code: c.code, name: c.name, lpoNo: c.lpoNo, subtotal, vatRate: o.invoiceType === 'vat' ? Number(c.vatRate) : 0, vat, total: subtotal + vat };
   });
   const sum = (k: 'subtotal' | 'vat' | 'total') => companies.reduce((t, c) => t + c[k], 0);
@@ -455,7 +462,7 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
       number: string;
       status: string;
       invoiceType: string;
-      companies: { code: string; vatRate: number; lpoNo: string; subtotal: number }[];
+      companies: { code: string; vatRate: number; lpoNo: string; subtotal: number; taxable: number }[];
       shortPieces: number;
       onVehicle: number;
       planned: number;
@@ -467,7 +474,10 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
              'vatRate', coalesce(co.vat_rate, ${DEFAULT_VAT_RATE}),
              'subtotal', (select coalesce(sum(round(l.price_per_carton::numeric * l.pieces / p.pieces_per_carton)), 0)
                           from order_lines l join products p on p.id = l.product_id
-                          where l.order_id = o.id and p.company_code = oc.company_code)) order by co.sort_order)
+                          where l.order_id = o.id and p.company_code = oc.company_code),
+             'taxable', (select coalesce(sum(round(l.price_per_carton::numeric * l.pieces / p.pieces_per_carton)), 0)
+                          from order_lines l join products p on p.id = l.product_id
+                          where l.order_id = o.id and p.company_code = oc.company_code and not p.vat_exempt)) order by co.sort_order)
            from order_companies oc join companies co on co.code = oc.company_code
            where oc.order_id = o.id and oc.company_code = any($1)), '[]') as companies,
          case when o.status in ('open', 'hold') then
@@ -485,7 +495,7 @@ export function orderRoutes(app: FastifyInstance, db: Db) {
     return rows.map(({ companies, onVehicle, planned, delivered, ...o }) => {
       const total = companies.reduce((t, c) => {
         const subtotal = Number(c.subtotal);
-        return t + subtotal + (o.invoiceType === 'vat' ? Math.round((subtotal * Number(c.vatRate)) / 100) : 0);
+        return t + subtotal + (o.invoiceType === 'vat' ? Math.round((Number(c.taxable) * Number(c.vatRate)) / 100) : 0);
       }, 0);
       return { ...o, stage: stageOf(o.status, { onVehicle, planned, delivered }), companies: companies.map((c) => ({ code: c.code, lpoNo: c.lpoNo })), total };
     });

@@ -39,3 +39,16 @@ export function assertCanEditCompanies(user: AuthUser, companies: string[]) {
   if (user.role === 'sales_manager' && companies.every((c) => user.companies.includes(c))) return;
   throw notAllowed();
 }
+
+// Delete removes a row nothing refers to. One with history is marked deleted instead: switched off, hidden from the
+// lists and never switched on again, while old documents keep its name. Returns true when it was only marked.
+export async function deleteOrMark(db: Db, table: 'products' | 'customers' | 'vehicles' | 'users', id: number): Promise<boolean> {
+  try {
+    await db.query(`delete from ${table} where id = $1`, [id]);
+    return false;
+  } catch (e) {
+    if ((e as { code?: string }).code !== '23503') throw e;
+    await db.query(`update ${table} set deleted_at = now(), active = false, updated_at = now() where id = $1`, [id]);
+    return true;
+  }
+}

@@ -29,7 +29,7 @@ export async function seed(db: Db) {
     }
     const { rows: made } = await db.query<{ id: number }>(
       `insert into users (name, phone, role, pin_hash) values ('Admin', $1, 'admin', $2)
-       on conflict (phone) do nothing returning id`,
+       on conflict (phone) where deleted_at is null do nothing returning id`,
       [config.bootstrapAdminPhone, await hashPin(config.bootstrapAdminPin)],
     );
     if (made[0]) {

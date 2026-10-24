@@ -37,6 +37,7 @@ const COLUMNS: Record<Kind, Column[]> = {
     { header: 'Name', width: 28, example: 'Milk powder tin' },
     { header: 'Pack size', width: 16, example: '400g tin' },
     { header: 'Pieces per carton', width: 18, example: '24' },
+    { header: 'VAT exempt', width: 12, example: 'No', optional: true },
   ],
 };
 
@@ -54,6 +55,7 @@ const HELP: Record<Kind, string[]> = {
     'Every pack size is its own product with its own code.',
     'Company: LV, ZT, ZF or GL.',
     'Pieces per carton: a whole number.',
+    'VAT exempt: Yes for a product charged no VAT. Leave empty or No for the others.',
   ],
 };
 
@@ -147,7 +149,7 @@ async function companyLookup(db: Db): Promise<Map<string, string>> {
 
 async function checkCustomers(db: Db, rows: { row: number; values: Record<string, string> }[]) {
   const companies = await companyLookup(db);
-  const taken = new Set((await db.query<{ n: string }>('select lower(name) as n from customers')).rows.map((r) => r.n));
+  const taken = new Set((await db.query<{ n: string }>('select lower(name) as n from customers where deleted_at is null')).rows.map((r) => r.n));
   const seen = new Map<string, number>();
   const reports: RowReport[] = [];
   const good: CleanCustomer[] = [];
@@ -205,7 +207,7 @@ async function checkCustomers(db: Db, rows: { row: number; values: Record<string
 
 async function checkProducts(db: Db, rows: { row: number; values: Record<string, string> }[]) {
   const companies = await companyLookup(db);
-  const taken = new Set((await db.query<{ code: string }>('select code from products')).rows.map((r) => r.code));
+  const taken = new Set((await db.query<{ code: string }>('select code from products where deleted_at is null')).rows.map((r) => r.code));
   const seen = new Map<string, number>();
   const reports: RowReport[] = [];
   const good: NewProduct[] = [];
@@ -221,6 +223,8 @@ async function checkProducts(db: Db, rows: { row: number; values: Record<string,
     for (const field of ['Brand', 'Name', 'Pack size']) if (!values[field]) errors.push(`${field} is empty.`);
     const pieces = Number(values['Pieces per carton']);
     if (!Number.isInteger(pieces) || pieces <= 0) errors.push('Pieces per carton must be a whole number above 0.');
+    const vatExempt = values['VAT exempt'] ? yesNo(values['VAT exempt']) : false;
+    if (vatExempt === null) errors.push('VAT exempt must be Yes or No.');
     reports.push({ row, values, errors });
     if (errors.length === 0) {
       good.push({
@@ -230,6 +234,7 @@ async function checkProducts(db: Db, rows: { row: number; values: Record<string,
         name: values['Name']!,
         packSize: values['Pack size']!,
         piecesPerCarton: pieces,
+        vatExempt: vatExempt!,
       });
     }
   }

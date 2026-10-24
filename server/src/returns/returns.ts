@@ -8,7 +8,7 @@ import { applyOnAccount } from '../cash/collections.js';
 import type { Db } from '../db/pool.js';
 import { idParams, invalid, notFound } from '../lists/common.js';
 import { nextNumber } from '../numbering.js';
-import { lineAmount, qtyText } from '../orders/orders.js';
+import { lineAmount, qtyText, vatOn } from '../orders/orders.js';
 import { inTransaction, STOCK_KEEPERS } from '../stock/stock.js';
 import { parse } from '../users.js';
 
@@ -130,11 +130,15 @@ function withoutMoney<T extends { lines: { amount?: number }[] }>(r: T) {
   return { ...rest, lines: r.lines.map(({ amount: _a, ...l }) => l) };
 }
 
-async function amounts(client: PoolClient, invoiceId: number, lines: { pieces: number; pricePerCarton: number; piecesPerCarton: number }[]) {
+async function amounts(
+  client: PoolClient,
+  invoiceId: number,
+  lines: { pieces: number; pricePerCarton: number; piecesPerCarton: number; vatExempt: boolean }[],
+) {
   const { rows } = await client.query<{ vatRate: number }>('select vat_rate::float8 as "vatRate" from invoices where id = $1', [invoiceId]);
   const each = lines.map((l) => lineAmount(l.pieces, l.pricePerCarton, l.piecesPerCarton));
   const subtotal = each.reduce((t, a) => t + a, 0);
-  const vat = Math.round((subtotal * rows[0]!.vatRate) / 100);
+  const vat = vatOn(lines.map((l, i) => ({ amount: each[i]!, vatExempt: l.vatExempt })), rows[0]!.vatRate);
   return { each, subtotal, vat, total: subtotal + vat };
 }
 
@@ -150,11 +154,12 @@ export async function returnsForShortDelivery(client: PoolClient, deliveryId: nu
     pieces: number;
     pricePerCarton: number;
     piecesPerCarton: number;
+    vatExempt: boolean;
     reason: string | null;
   }>(
     `select il.invoice_id as "invoiceId", iv.company_code as "companyCode", iv.customer_id as "customerId", il.id as "invoiceLineId",
        il.product_id as "productId", i.loaded - i.delivered as pieces, il.price_per_carton as "pricePerCarton",
-       p.pieces_per_carton as "piecesPerCarton", i.short_reason as reason
+       p.pieces_per_carton as "piecesPerCarton", il.vat_exempt as "vatExempt", i.short_reason as reason
      from loading_plan_items i join invoice_lines il on il.plan_item_id = i.id join invoices iv on iv.id = il.invoice_id
        join products p on p.id = il.product_id
      where i.delivery_id = $1 and i.delivered < i.loaded order by il.invoice_id, il.id`,
@@ -232,12 +237,13 @@ export function returnRoutes(app: FastifyInstance, db: Db) {
           label: string;
           piecesPerCarton: number;
           pricePerCarton: number;
+          vatExempt: boolean;
           invoiced: number;
           delivered: number | null;
           returned: number;
         }>(
           `select il.id, il.product_id as "productId", p.brand || ' ' || p.name || ' ' || p.pack_size as label,
-             p.pieces_per_carton as "piecesPerCarton", il.price_per_carton as "pricePerCarton", il.pieces as invoiced,
+             p.pieces_per_carton as "piecesPerCarton", il.price_per_carton as "pricePerCarton", il.vat_exempt as "vatExempt", il.pieces as invoiced,
              case when il.plan_item_id is null then il.pieces else i.delivered end as delivered,
              coalesce((select sum(l.pieces) from sales_return_lines l join sales_returns r on r.id = l.return_id
                where l.invoice_line_id = il.id and r.kind = 'after'), 0)::int as returned
