@@ -213,6 +213,12 @@ erDiagram
     loading_plans ||--o{ deliveries : "drops"
     deliveries ||--o{ loading_plan_items : "confirms"
     deliveries ||--o{ stock_movements : "deducts"
+    customers ||--o{ collections : "pays"
+    invoices ||--o{ collections : "picked"
+    collections ||--o{ collection_allocations : "goes on"
+    invoices ||--o{ collection_allocations : "paid by"
+    handovers ||--o{ collections : "cash in"
+    handovers ||--o{ expenses : "spent"
     loading_plans {
         int id PK
         text number "LP-000123"
@@ -285,6 +291,53 @@ erDiagram
         int confirmed_by FK
         timestamptz confirmed_at
     }
+    collections {
+        int id PK
+        text number UK "LV-RCT-000001"
+        text company_code FK
+        int customer_id FK
+        int invoice_id FK
+        text mode "cash, bank, airtel"
+        bigint amount
+        bigint discount
+        bigint wht
+        text reference
+        text proof_file
+        text signature_file
+        int collected_by FK
+        text custody "with, handed, counted, na"
+        int handover_id FK
+    }
+    collection_allocations {
+        int id PK
+        int collection_id FK
+        int invoice_id FK "null = opening balance"
+        bigint amount
+    }
+    expenses {
+        int id PK
+        text number UK "LV-EXP-000001"
+        text company_code FK
+        bigint amount
+        text description
+        text mode "cash, airtel"
+        text photo_file
+        int spent_by FK
+        text custody
+        int handover_id FK
+    }
+    handovers {
+        int id PK
+        text number UK "HO-000001"
+        int handed_by FK
+        bigint cash
+        bigint expenses
+        bigint net
+        text status "handed, counted"
+        bigint counted
+        bigint difference
+        int counted_by FK
+    }
 ```
 
 | Table | Added in | What it holds |
@@ -321,6 +374,10 @@ erDiagram
 | `invoices` | Phase 6 | Invoices made for a loaded vehicle: one per customer, company, LPO and invoice type |
 | `invoice_lines` | Phase 6 | The products on each invoice, with the loaded quantity and typed price |
 | `deliveries` | Phase 6 | The driver's confirmation of each drop: who received it, signature and photo |
+| `collections` | Phase 7 | Payments from customers: cash, bank or Airtel Money, with discount, withholding tax, proof and signature |
+| `collection_allocations` | Phase 7 | Which invoices (or the opening balance) each payment paid |
+| `expenses` | Phase 7 | Money spent for a company, with the bill photo |
+| `handovers` | Phase 7 | Cash handed to the cashier and what the cashier counted |
 
 ## Phase 1 notes
 
@@ -401,3 +458,16 @@ erDiagram
 - **Shortages** do not change the invoice. The shortfall is credited with a sales return in Phase 8.
 - **What a customer owes**, shown when booking, is now the opening balance plus their invoices. Payments come off in Phase 7.
 - **Audit actions:** `invoices_made`, `delivery_confirmed`.
+
+## Phase 7 notes
+
+- **Payments** (`POST /collections`) are recorded by salesmen and sales managers in the field, and by Accounts, the cashier or Admin at the office. One payment is for one customer and one company, in cash, bank transfer or Airtel Money. Receipts are numbered per company (`LV-RCT-000001`). `GET /collections/customer/:id` gives what the customer owes each company and the invoices still open.
+- **Where the money goes:** first on the invoice picked, then on what is left of the opening balance, then on the oldest invoices. Anything over stays on account and shows as a balance below 0. `collection_allocations` keeps the split; an allocation with no invoice is the opening balance.
+- **Discount and withholding tax** are typed at collection and come off the invoice picked; they cannot be more than it owes. The WHT certificate number is kept.
+- **Proof and signature:** a bank or Airtel payment needs a photo of the proof, and Airtel needs its reference. The customer signs for every payment (client, 17 Oct), except a bank or Airtel payment recorded at the office by Admin, Accounts or the cashier, where the customer is not there.
+- **What is owed** is the opening balance plus invoices, less payments, discounts and withholding tax. The invoice register and detail now show each invoice's `balance`, and the booking screen uses the same figure.
+- **Expenses** (`POST /expenses`): Admin, sales managers and salesmen record money spent for a company, with an optional bill photo. Numbered per company (`LV-EXP-000001`). Cash expenses come off the next handover; Airtel Money expenses do not.
+- **Cash custody:** cash stays the collector's responsibility (`custody = 'with'`) until the cashier counts it. `GET /cash/mine` shows what a person holds per company. `POST /handovers` hands all of it over in one total (cash less cash expenses), numbered `HO-000001` across companies; behind the total each company's money is kept apart. The cashier (or Admin, never the person who handed it over) counts it with `POST /handovers/:id/count`; a difference needs a note and is kept. Cash the cashier takes directly is counted at once.
+- **Who sees what:** Admin, Management, the cashier and Accounts see every payment, expense and handover of their companies. Salesmen see their own payments; salesmen and sales managers see their own expenses and handovers. Warehouse and drivers see none.
+- **Not yet:** the Airtel Money wallet ledger (ticking payments in, withdrawals, wallet check) comes in the next pull request. Cancelling a wrong payment, credit notes and the customer ledger card come in Phase 8; money on account is not put on later invoices automatically until then.
+- **Audit actions:** `payment_collected`, `expense_recorded`, `cash_handed_over`, `cash_counted`.
