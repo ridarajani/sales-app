@@ -116,6 +116,13 @@ a.card:hover { border-color: var(--accent); }
 .alert .sub { font-size: 13px; color: var(--muted); }
 .alert .button { flex: none; }
 
+/* Import from Excel */
+.alert.good { border-left-color: var(--good); }
+.choices { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.choices .button.chosen { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.steps { margin: 12px 0 0; padding-left: 20px; }
+input[type=file] { padding: 9px 12px; }
+
 /* Unread trip sales */
 .fact { margin-bottom: 8px; }
 .fact label { margin: 0; }

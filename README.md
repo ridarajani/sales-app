@@ -6,6 +6,7 @@ In-house sales and distribution app for Lucky Ventures, Zoona Trading, Zangafee 
 - `server/` is the server and database (Node.js, TypeScript, PostgreSQL).
 - `mobile/` is the phone app for Android and iPhone (Kotlin Multiplatform, Compose Multiplatform). The screens live in `mobile/shared`.
 - `docs/PLAN.md` is the development plan, phase by phase.
+- `deploy/` runs the live server with HTTPS and nightly backups. `docs/GO-LIVE.md` has the go-live steps.
 
 ## Run the server
 
@@ -40,7 +41,7 @@ Server address:
 - The iPhone simulator reaches the server at `http://localhost:3000`.
 - On a real phone, tap **Server address** on the login screen and type the Mac's address, for example `http://192.168.1.10:3000`.
 
-Plain HTTP is allowed for now. HTTPS comes with go-live.
+Plain HTTP is allowed on your own computer. The live server uses HTTPS (see `docs/GO-LIVE.md`).
 
 ## Sign in
 
@@ -52,6 +53,8 @@ The app signs in with a phone number and a 4-digit PIN. There are eight roles: A
 - Every change is written to the audit log.
 
 ## Give staff a new Android version
+
+On the live server: `cd deploy && bash add-apk.sh <file>.apk <version code> <version name>` (see `docs/GO-LIVE.md`). On your own computer:
 
 1. Copy the new `.apk` file into `server/apk/`.
 2. Register it as an admin. First sign in with `POST /auth/login` (phone and PIN). The reply has a `token`. Then run this, replacing the placeholders in angle brackets:
