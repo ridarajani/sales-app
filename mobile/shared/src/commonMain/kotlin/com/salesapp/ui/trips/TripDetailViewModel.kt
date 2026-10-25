@@ -8,7 +8,7 @@ import com.salesapp.data.TripDetail
 import com.salesapp.data.TripLineQty
 import com.salesapp.data.TripOrder
 import com.salesapp.data.TripOutbox
-import com.salesapp.data.TripsRepository
+import com.salesapp.data.TripSource
 import com.salesapp.data.canLoadTrips
 import com.salesapp.data.canSeeTrips
 import com.salesapp.resources.Res
@@ -82,8 +82,12 @@ data class TripDetailState(
     // True when an order's delivery is sitting in the outbox, so the card says so.
     fun waitingOn(order: TripOrder): Boolean = outbox.sales.any { it.request.orderId == order.id }
 
+    // Sales this phone could not read, now with the office. The trip cannot close until Admin has
+    // looked at them, which the server also refuses.
+    val outboxProblemOpen: Boolean get() = (trip?.openOutboxProblems ?: 0) > 0
+
     // Closing is only allowed once everything on the phone has reached the server.
-    val canClose: Boolean get() = trip?.canClose == true && outbox.isEmpty
+    val canClose: Boolean get() = trip?.canClose == true && outbox.isEmpty && !outboxProblemOpen
 
     val blockedByOutbox: Boolean get() = trip?.canClose == true && !outbox.isEmpty
 }
@@ -102,7 +106,7 @@ sealed interface TripDetailEvent {
 
 class TripDetailViewModel(
     private val id: Int,
-    private val repository: TripsRepository,
+    private val repository: TripSource,
     private val app: AppState,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TripDetailState(allowed = app.user?.canSeeTrips() == true))
@@ -208,9 +212,19 @@ class TripDetailViewModel(
         loadJob = viewModelScope.launch {
             if (showSpinner) _state.update { it.copy(loading = true, error = null) }
             try {
-                val trip = repository.trip(id)
+                var trip = repository.trip(id)
                 // The leader of a trip on the road keeps everything needed to sell with no network.
                 if (trip.canSell) runCatching { repository.pack(id) }
+                // The network is up, so any sales file this phone could not read goes to the office
+                // now, and the files go only once the office has cleared them all.
+                if (repository.hasUnreadable(id)) {
+                    val sent = runCatching { repository.sendOutboxProblems(id) }.getOrDefault(0)
+                    // A file that has just gone up gives the trip an open problem, so it is asked
+                    // for again before the screen is drawn: otherwise Close trip would still be
+                    // offered for a trip the server would refuse to close.
+                    if (sent > 0) trip = runCatching { repository.trip(id) }.getOrDefault(trip)
+                    repository.forgetClearedProblems(id, trip.outboxProblems)
+                }
                 val vehicles = if (trip.canLoad) runCatching { repository.vehicles(trip.facilityCode) }.getOrDefault(emptyList()) else emptyList()
                 _state.update {
                     it.copy(

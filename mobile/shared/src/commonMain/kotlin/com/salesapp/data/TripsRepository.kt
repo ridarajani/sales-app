@@ -1,5 +1,37 @@
 package com.salesapp.data
 
+import com.salesapp.core.toBase64
+
+// What the trip screen needs, as an interface, so a test can stand in for the server: the order of
+// these calls is what keeps the screen honest about a trip that cannot be closed yet.
+interface TripSource {
+    suspend fun trip(id: Int): TripDetail
+
+    suspend fun pack(id: Int): TripPack
+
+    fun savedPack(id: Int): TripPack?
+
+    fun outboxOf(id: Int): TripOutbox
+
+    fun hasUnreadable(id: Int): Boolean
+
+    suspend fun sendOutboxProblems(tripId: Int): Int
+
+    fun forgetClearedProblems(tripId: Int, problems: List<TripOutboxProblem>)
+
+    suspend fun vehicles(facilityCode: String): List<Vehicle>
+
+    suspend fun load(id: Int, request: LoadTripRequest): TripDetail
+
+    suspend fun sync(tripId: Int): SyncOutcome
+
+    fun dropSale(tripId: Int, requestId: String): TripOutbox
+
+    fun dropExpense(tripId: Int, requestId: String): TripOutbox
+
+    fun forget(tripId: Int)
+}
+
 // Where the trip screens get their data. A sale or expense is tried on the server first; if that
 // fails for any reason other than the server refusing it, it goes to the outbox on the phone and is
 // sent later. Nothing is lost either way.
@@ -7,20 +39,36 @@ class TripsRepository(
     private val api: Api,
     private val outbox: TripOutboxStore,
     private val app: AppState,
-) {
+) : TripSource {
     suspend fun trips(status: String?, kind: String?): List<TripListItem> = api.trips(status, kind)
 
-    suspend fun trip(id: Int): TripDetail = api.trip(id)
+    override suspend fun trip(id: Int): TripDetail = api.trip(id)
 
     // The pack is kept on the phone, so the trip can be opened and sold from with no network.
-    suspend fun pack(id: Int): TripPack = api.tripPack(id).also { outbox.savePack(it) }
+    override suspend fun pack(id: Int): TripPack = api.tripPack(id).also { outbox.savePack(it) }
 
-    fun savedPack(id: Int): TripPack? = outbox.loadPack(id)
+    override fun savedPack(id: Int): TripPack? = outbox.loadPack(id)
 
-    fun outboxOf(id: Int): TripOutbox = outbox.load(id)
+    override fun outboxOf(id: Int): TripOutbox = outbox.load(id)
 
     // True when something saved on this phone could not be read and the office needs telling.
-    fun hasUnreadable(id: Int): Boolean = outbox.hasUnreadable(id)
+    override fun hasUnreadable(id: Int): Boolean = outbox.hasUnreadable(id)
+
+    // Sales this phone could not read go to the office, one file at a time, each only once. The
+    // file itself is never deleted to record that: the names that went up are kept beside it.
+    override suspend fun sendOutboxProblems(tripId: Int): Int =
+        outbox.sendKept(tripId) { name, text ->
+            // Both a first send (201) and a repeat (200) come back without an error, so both count.
+            api.reportOutboxProblem(
+                tripId,
+                OutboxProblemRequest(requestId = name, file = text.encodeToByteArray().toBase64(), fileName = name),
+            )
+        }
+
+    // Once the office has cleared every file this phone kept aside, the files can go.
+    override fun forgetClearedProblems(tripId: Int, problems: List<TripOutboxProblem>) {
+        outbox.forgetIfAllCleared(tripId, problems.filter { it.cleared }.map { it.requestId }.toSet())
+    }
 
     // Orders booked ahead that a trip may take. Passing the trip keeps its own orders in the list.
     suspend fun openOrders(facilityCode: String, tripId: Int?): List<OpenOrder> = api.openOrders(facilityCode, tripId)
@@ -31,11 +79,11 @@ class TripsRepository(
 
     suspend fun delete(id: Int) = api.deleteTrip(id)
 
-    suspend fun load(id: Int, request: LoadTripRequest): TripDetail = api.loadTrip(id, request)
+    override suspend fun load(id: Int, request: LoadTripRequest): TripDetail = api.loadTrip(id, request)
 
     suspend fun close(id: Int, request: CloseTripRequest): TripDetail = api.closeTrip(id, request)
 
-    suspend fun vehicles(facilityCode: String): List<Vehicle> =
+    override suspend fun vehicles(facilityCode: String): List<Vehicle> =
         api.vehicles().filter { it.active && (it.facilityCode == null || it.facilityCode == facilityCode) }
 
     suspend fun drivers(): List<Driver> = api.drivers()
@@ -77,7 +125,7 @@ class TripsRepository(
         }
 
     // Sends everything the phone is holding for this trip and keeps only what the server refused.
-    suspend fun sync(tripId: Int): SyncOutcome {
+    override suspend fun sync(tripId: Int): SyncOutcome {
         val waiting = outbox.load(tripId)
         if (waiting.isEmpty) return SyncOutcome(waiting, null, emptyList())
         val result = api.syncTrip(
@@ -89,12 +137,12 @@ class TripsRepository(
         return SyncOutcome(left, result.trip, refused)
     }
 
-    fun dropSale(tripId: Int, requestId: String): TripOutbox = outbox.removeSale(tripId, requestId)
+    override fun dropSale(tripId: Int, requestId: String): TripOutbox = outbox.removeSale(tripId, requestId)
 
-    fun dropExpense(tripId: Int, requestId: String): TripOutbox = outbox.removeExpense(tripId, requestId)
+    override fun dropExpense(tripId: Int, requestId: String): TripOutbox = outbox.removeExpense(tripId, requestId)
 
     // Once a trip is closed there is nothing left to keep on the phone.
-    fun forget(tripId: Int) {
+    override fun forget(tripId: Int) {
         outbox.clear(tripId)
         outbox.clearPack(tripId)
     }

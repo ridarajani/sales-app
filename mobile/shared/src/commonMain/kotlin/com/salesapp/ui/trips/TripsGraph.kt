@@ -5,6 +5,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.salesapp.ui.navigation.CloseTripRoute
+import com.salesapp.ui.navigation.OutboxProblemRoute
 import com.salesapp.ui.navigation.PlanTripRoute
 import com.salesapp.ui.navigation.TripDetailRoute
 import com.salesapp.ui.navigation.TripExpenseRoute
@@ -58,5 +59,9 @@ fun NavGraphBuilder.tripsGraph(nav: NavController) {
     }
     composable<CloseTripRoute> { entry ->
         CloseTripPage(tripId = entry.toRoute<CloseTripRoute>().tripId, onBack = { back() }, onClosed = { back() })
+    }
+    // Reached from an alert: sales a phone could not read, for Admin and Management.
+    composable<OutboxProblemRoute> { entry ->
+        OutboxProblemPage(id = entry.toRoute<OutboxProblemRoute>().id, onBack = { back() })
     }
 }

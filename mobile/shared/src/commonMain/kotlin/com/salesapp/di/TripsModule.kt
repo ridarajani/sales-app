@@ -2,6 +2,7 @@ package com.salesapp.di
 
 import com.salesapp.core.FileStore
 import com.salesapp.data.TripOutboxStore
+import com.salesapp.data.TripSource
 import com.salesapp.data.TripsRepository
 import com.salesapp.ui.trips.CloseTripViewModel
 import com.salesapp.ui.trips.PlanTripViewModel
@@ -17,6 +18,8 @@ val tripsModule = module {
     single { FileStore() }
     single { TripOutboxStore(get()) }
     single { TripsRepository(get(), get(), get()) }
+    // The trip screen works through the interface, so a test can stand in for the server.
+    single<TripSource> { get<TripsRepository>() }
     viewModel { TripsViewModel(get(), get()) }
     viewModel { (id: Int) -> TripDetailViewModel(id, get(), get()) }
     // Null when a new trip is being planned.

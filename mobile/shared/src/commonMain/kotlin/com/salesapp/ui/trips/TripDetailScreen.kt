@@ -83,6 +83,7 @@ import com.salesapp.resources.trip_outbox_failed
 import com.salesapp.resources.trip_outbox_help
 import com.salesapp.resources.trip_outbox_one
 import com.salesapp.resources.trip_outbox_sales
+import com.salesapp.resources.trip_outbox_sent
 import com.salesapp.resources.trip_outbox_unreadable
 import com.salesapp.resources.trip_overspent
 import com.salesapp.resources.trip_record_sale
@@ -176,9 +177,13 @@ fun TripDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Header(trip, state.fromPhone)
-                    // Sales already paid for in cash that the phone cannot read: the office has to
-                    // be told, and the file is kept aside for them.
-                    if (state.hasUnreadable) Say(stringResource(Res.string.trip_outbox_unreadable), error = true)
+                    // Sales already paid for in cash that the phone cannot read. Once the file is
+                    // with the office the line says so, and the trip waits for Admin.
+                    if (state.outboxProblemOpen) {
+                        Say(stringResource(Res.string.trip_outbox_sent), error = true)
+                    } else if (state.hasUnreadable) {
+                        Say(stringResource(Res.string.trip_outbox_unreadable), error = true)
+                    }
                     Outbox(state, onEvent)
                     state.actionError?.let { Say(it, error = true) }
                     if (trip.canLoad) LoadForm(state, trip, onEvent)
@@ -643,8 +648,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.Actions(
                 enabled = !state.busy,
             )
         }
-        // Closing waits until everything on the phone has reached the server.
-        if (state.blockedByOutbox) {
+        // Closing waits until everything on the phone has reached the server, and until Admin has
+        // looked at any sales it could not read.
+        if (state.outboxProblemOpen && trip.canClose) {
+            Say(stringResource(Res.string.trip_outbox_sent), error = true)
+        } else if (state.blockedByOutbox) {
             Say(stringResource(Res.string.trip_close_blocked), error = true)
         } else if (state.canClose) {
             SecondaryButton(
@@ -783,6 +791,28 @@ private fun TripOutboxPreview() {
                             com.salesapp.data.TripExpenseRequest(requestId = "c", amount = 5_000, description = "Food allowance"),
                         ),
                     ),
+                ),
+            ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+// Sales this phone could not read, now with the office: the trip cannot close yet.
+@Preview
+@Composable
+private fun TripOutboxProblemPreview() {
+    SalesTheme {
+        TripDetailScreen(
+            TripDetailState(
+                loading = false,
+                hasUnreadable = true,
+                trip = sampleTrip.copy(
+                    outboxProblems = listOf(
+                        com.salesapp.data.TripOutboxProblem(id = 5, requestId = "trip-2-outbox-unreadable-1.json"),
+                    ),
+                    openOutboxProblems = 1,
                 ),
             ),
             onEvent = {},

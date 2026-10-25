@@ -19,5 +19,5 @@ val appModule = module {
     // The one Api for the whole app lives in AppState: it reads the address and token each time.
     single<Api> { get<AppState>().api }
     single { ListsRepository(get()) }
-    includes(phase1Module, usersModule, customersModule, catalogModule, stockModule, ordersModule, loadingModule, invoicesModule, cashModule, returnsModule, tripsModule, reportsModule)
+    includes(phase1Module, usersModule, customersModule, catalogModule, stockModule, ordersModule, loadingModule, invoicesModule, cashModule, returnsModule, tripsModule, reportsModule, searchModule)
 }

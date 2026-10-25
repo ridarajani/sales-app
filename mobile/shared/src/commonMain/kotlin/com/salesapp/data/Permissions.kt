@@ -133,3 +133,7 @@ fun User.canChangeUserRole(): Boolean = role == "admin"
 // Phase 10: Admin, Management and sales managers set each salesman's monthly target. The reports a
 // person may open are decided by the server, which gives a driver none at all.
 fun User.canSetTargets(): Boolean = role == "admin" || role == "management" || role == "sales_manager"
+
+// Phase 10 part 3: Admin and Management look at trip sales a phone could not read; only Admin
+// clears them, which the server says with canClear.
+fun User.canSeeUnreadSales(): Boolean = role == "admin" || role == "management"

@@ -194,6 +194,15 @@ data class TripSaleDetail(
     val payments: List<TripSalePayment> = emptyList(),
 )
 
+// One file of sales a phone could not read. requestId is the name of the file kept on that phone.
+@Serializable
+data class TripOutboxProblem(
+    val id: Int,
+    val requestId: String = "",
+    val reportedAt: String = "",
+    val cleared: Boolean = false,
+)
+
 @Serializable
 data class TripExpense(
     val id: Int,
@@ -250,6 +259,10 @@ data class TripDetail(
     val expenses: List<TripExpense> = emptyList(),
     val salesTotal: Double? = null,
     val expensesTotal: Double? = null,
+    // Phase 10 part 3: sales this phone could not read back, sent to the office. The trip cannot
+    // close while one of them is still open.
+    val outboxProblems: List<TripOutboxProblem> = emptyList(),
+    val openOutboxProblems: Int = 0,
     val canEdit: Boolean = false,
     val canLoad: Boolean = false,
     val canSell: Boolean = false,

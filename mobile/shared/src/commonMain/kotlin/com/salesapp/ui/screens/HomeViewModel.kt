@@ -7,6 +7,7 @@ import com.salesapp.core.currentHour
 import com.salesapp.data.Api
 import com.salesapp.core.formatMwk
 import com.salesapp.data.AirtelRepository
+import com.salesapp.data.AlertsRepository
 import com.salesapp.data.AppState
 import com.salesapp.data.CashRepository
 import com.salesapp.data.ReportsRepository
@@ -32,6 +33,9 @@ import com.salesapp.resources.home_good_afternoon
 import com.salesapp.resources.home_good_evening
 import com.salesapp.resources.home_good_morning
 import com.salesapp.resources.tile_airtel
+import com.salesapp.resources.tile_alerts
+import com.salesapp.resources.tile_alerts_none
+import com.salesapp.resources.tile_alerts_some
 import com.salesapp.resources.tile_airtel_both
 import com.salesapp.resources.tile_airtel_ledger
 import com.salesapp.resources.tile_approvals
@@ -151,7 +155,9 @@ import com.salesapp.ui.navigation.PlansRoute
 import com.salesapp.ui.navigation.ProductsRoute
 import com.salesapp.ui.navigation.ReceiveStockRoute
 import com.salesapp.ui.navigation.StockCountRoute
+import com.salesapp.ui.navigation.AlertsRoute
 import com.salesapp.ui.navigation.ReportsRoute
+import com.salesapp.ui.navigation.SearchRoute
 import com.salesapp.ui.navigation.StockRoute
 import com.salesapp.ui.navigation.TargetsRoute
 import com.salesapp.ui.navigation.UsersRoute
@@ -196,6 +202,11 @@ private fun more() = tile(Res.string.tile_more, Res.string.tile_more_sub, AppIco
 private fun reportsTile() = tile(Res.string.tile_reports, Res.string.tile_reports_sub, AppIcons.Chart, ReportsRoute)
 
 private fun targetsTile() = tile(Res.string.tile_targets, Res.string.tile_targets_sub, AppIcons.Chart, TargetsRoute)
+
+// Everything that needs someone now. The sub-line counts what needs doing and the red number the
+// worst of it, so a glance at Home is enough. Every job has it.
+private fun alertsTile(subText: String?, count: Int?) =
+    tile(Res.string.tile_alerts, Res.string.tile_alerts_none, AppIcons.Inbox, AlertsRoute, subText, count)
 
 private fun newOrderTile() = tile(Res.string.tile_new_order, Res.string.tile_new_order_sub, AppIcons.Cart, NewOrderRoute)
 
@@ -246,6 +257,8 @@ internal fun tilesFor(
     role: String,
     hasReports: Boolean = false,
     canSetTargets: Boolean = false,
+    alertsSub: String? = null,
+    alertsCount: Int? = null,
     expiringSub: String? = null,
     approvalsSub: String? = null,
     loadingCount: Int? = null,
@@ -285,6 +298,7 @@ internal fun tilesFor(
             tile(Res.string.tile_audit, Res.string.tile_audit_sub, AppIcons.List),
             reportsTile(),
             targetsTile(),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "management" -> listOf(
@@ -306,6 +320,7 @@ internal fun tilesFor(
             tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
             tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
             tile(Res.string.tile_users, Res.string.tile_users_manage_sub, AppIcons.Person, UsersRoute),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "sales_manager" -> listOf(
@@ -326,6 +341,7 @@ internal fun tilesFor(
             invoicesTile(Res.string.tile_invoices_share),
             reportsTile(),
             targetsTile(),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "salesman" -> listOf(
@@ -339,6 +355,7 @@ internal fun tilesFor(
             returnsTile(),
             ledgerTile(),
             tripsTile(tripsSub, tripsCount),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "warehouse" -> listOf(
@@ -354,6 +371,7 @@ internal fun tilesFor(
             tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
             tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
             reportsTile(),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "driver" -> listOf(
@@ -362,6 +380,7 @@ internal fun tilesFor(
             tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
             invoicesTile(Res.string.tile_invoices_register),
             tripsTile(tripsSub, tripsCount),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "cashier" -> listOf(
@@ -376,6 +395,7 @@ internal fun tilesFor(
             tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
             invoicesTile(Res.string.tile_invoices_register_print),
             reportsTile(),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         "accounts" -> listOf(
@@ -394,6 +414,7 @@ internal fun tilesFor(
             tile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, CustomersRoute),
             tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
             reportsTile(),
+            alertsTile(alertsSub, alertsCount),
             more(),
         )
         else -> listOf(more())
@@ -437,10 +458,14 @@ data class HomeState(
     // Phase 10: true once the server has said this person has reports to open.
     val hasReports: Boolean = false,
     val canSetTargets: Boolean = false,
+    // Phase 10 part 3: how many alerts need doing, and how many of them are bad.
+    val alertsSub: String? = null,
+    val alertsCount: Int? = null,
 )
 
 sealed interface HomeEvent {
     data class OpenTile(val tile: TileDef) : HomeEvent
+    data object OpenSearch : HomeEvent
     data object ShowAccount : HomeEvent
     data object HideAccount : HomeEvent
     data object SignOut : HomeEvent
@@ -460,6 +485,7 @@ class HomeViewModel(
     private val returnsRepository: ReturnsRepository,
     private val tripsRepository: TripsRepository,
     private val reportsRepository: ReportsRepository,
+    private val alertsRepository: AlertsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
@@ -472,11 +498,13 @@ class HomeViewModel(
     private var loadingLoading = false
     private var moneyLoading = false
     private var reportsLoading = false
+    private var alertsLoading = false
 
     // Every tile list is built from the state, so a new sub-line is never forgotten.
     private fun tilesOf(s: HomeState, role: String = s.role): List<TileDef> =
         tilesFor(
-            role, s.hasReports, s.canSetTargets, s.expiringSub, s.approvalsSub, s.loadingCount, s.cashSub,
+            role, s.hasReports, s.canSetTargets, s.alertsSub, s.alertsCount, s.expiringSub, s.approvalsSub,
+            s.loadingCount, s.cashSub,
             s.countSub, s.countCount, s.airtelSub, s.airtelCount, s.returnsSub, s.returnsCount,
             s.tripsSub, s.tripsCount,
         )
@@ -497,6 +525,7 @@ class HomeViewModel(
                 loadLoading()
                 loadMoney()
                 loadReports()
+                loadAlerts()
             }
         }
     }
@@ -518,6 +547,7 @@ class HomeViewModel(
                 val target = event.tile.opens
                 if (target != null) _effects.tryEmit(HomeEffect.Open(target)) else comingSoon()
             }
+            HomeEvent.OpenSearch -> _effects.tryEmit(HomeEffect.Open(SearchRoute))
             HomeEvent.ShowAccount -> _state.update { it.copy(sheetOpen = true) }
             HomeEvent.HideAccount -> _state.update { it.copy(sheetOpen = false) }
             HomeEvent.SignOut -> signOut()
@@ -528,6 +558,30 @@ class HomeViewModel(
                 loadLoading()
                 loadMoney()
                 loadReports()
+                loadAlerts()
+            }
+        }
+    }
+
+    // The Alerts square: how many things need doing, with a red number when money or stock is at
+    // risk. Everyone has it; errors are ignored and it simply says nothing is waiting.
+    private fun loadAlerts() {
+        if (app.user == null || alertsLoading) return
+        alertsLoading = true
+        viewModelScope.launch {
+            try {
+                val counts = alertsRepository.alerts().counts
+                val sub = if (counts.needing == 0) null else getString(Res.string.tile_alerts_some, counts.needing)
+                _state.update {
+                    val next = it.copy(alertsSub = sub, alertsCount = counts.bad.takeIf { bad -> bad > 0 })
+                    next.copy(tiles = tilesOf(next))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Keep the plain sub-line until it loads.
+            } finally {
+                alertsLoading = false
             }
         }
     }

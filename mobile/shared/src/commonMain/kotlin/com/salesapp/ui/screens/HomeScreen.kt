@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -40,9 +43,11 @@ import com.salesapp.resources.home_greeting
 import com.salesapp.resources.home_sign_out
 import com.salesapp.resources.home_what_to_do
 import com.salesapp.resources.home_your_account
+import com.salesapp.resources.search_hint
 import com.salesapp.ui.components.Avatar
 import com.salesapp.ui.components.Badge
 import com.salesapp.ui.components.DangerButton
+import com.salesapp.ui.components.ListCard
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.Tile
 import com.salesapp.ui.theme.SalesTheme
@@ -104,7 +109,24 @@ fun HomeScreen(state: HomeState, onEvent: (HomeEvent) -> Unit) {
                 Avatar(state.name, size = 44.dp)
             }
         }
-        SectionLabel(stringResource(Res.string.home_what_to_do), modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
+        // One box over everything: customers, orders, invoices, delivery notes, trips and products.
+        ListCard(onClick = { onEvent(HomeEvent.OpenSearch) }, modifier = Modifier.padding(top = 20.dp)) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = null,
+                tint = scheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                stringResource(Res.string.search_hint),
+                color = scheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 10.dp),
+            )
+        }
+        SectionLabel(stringResource(Res.string.home_what_to_do), modifier = Modifier.padding(top = 20.dp, bottom = 12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             state.tiles.chunked(2).forEachIndexed { rowIndex, pair ->
                 // Both tiles in a row are as tall as the taller one.
