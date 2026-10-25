@@ -20,6 +20,14 @@ const CHANNEL_LABELS = {
 };
 const STAFF_VIEWERS = ['admin', 'management', 'sales_manager'];
 const OUTBOX_VIEWERS = ['admin', 'management'];
+// What each list import is for, in the order to do them before going live. Same roles as the server.
+const IMPORTS = [
+  { kind: 'customers', title: 'Customers', sub: 'Every shop and supermarket, with its companies and payment terms.', roles: ['admin', 'accounts'] },
+  { kind: 'products', title: 'Products', sub: 'Every pack size, with its code and pieces per carton.', roles: ['admin', 'accounts'] },
+  { kind: 'opening-balances', title: 'Opening balances', sub: 'What each customer owed on the day you start. Import the customers first.', roles: ['admin', 'accounts'] },
+  { kind: 'stock', title: 'Opening stock', sub: 'What is in the warehouse on the day you start. Import the products first.', roles: ['admin', 'warehouse'] },
+];
+const myImports = () => IMPORTS.filter((i) => i.roles.includes(state.me.role));
 
 const state = { token: null, me: null, companies: [], catalogue: null, customers: null, products: null };
 
@@ -130,6 +138,7 @@ function navLinks() {
   links.push(['#/customers', 'Customers'], ['#/products', 'Products'], ['#/vehicles', 'Vehicles']);
   if (STAFF_VIEWERS.includes(state.me.role)) links.push(['#/staff', 'Staff']);
   if (OUTBOX_VIEWERS.includes(state.me.role)) links.push(['#/unread-sales', 'Unread trip sales']);
+  if (myImports().length) links.push(['#/import', 'Import from Excel']);
   return links;
 }
 
@@ -689,6 +698,141 @@ function staffPage(main) {
   });
 }
 
+// ---- Import from Excel ----
+
+// Sends the chosen Excel file as it is, not as JSON.
+async function sendFile(path, file) {
+  let res;
+  try {
+    res = await fetch(path, { method: 'POST', headers: { authorization: `Bearer ${state.token}`, 'content-type': 'application/octet-stream' }, body: file });
+  } catch {
+    throw new ApiError('The server cannot be reached. Please check the internet and try again.');
+  }
+  if (res.status === 401) {
+    signedOut();
+    throw new ApiError('Please sign in again.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok && !data.report) throw new ApiError(data.message || 'Something went wrong. Please try again.');
+  return data;
+}
+
+const rowsText = (n) => `${money(n)} ${n === 1 ? 'row' : 'rows'}`;
+
+function importPage(main, params) {
+  const mine = myImports();
+  const chosen = mine.find((i) => i.kind === params.get('kind')) ?? mine[0];
+  const error = h('p', { class: 'error', role: 'alert' });
+  const result = h('div');
+  const file = h('input', { type: 'file', id: 'import-file', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const checkButton = h('button', { class: 'primary', type: 'button' }, 'Check the file');
+
+  const template = h('button', { type: 'button' }, 'Download the template');
+  template.addEventListener('click', async () => {
+    error.textContent = '';
+    try {
+      const res = await api(`/import/${chosen.kind}/template`, { raw: true });
+      const url = URL.createObjectURL(await res.blob());
+      const a = h('a', { href: url, download: `${chosen.kind}-template.xlsx` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  });
+
+  const showSaved = (data) => {
+    result.replaceChildren(
+      h(
+        'div',
+        { class: 'alert good' },
+        h('div', {}, h('div', { class: 'title' }, `${rowsText(data.saved)} saved.`), data.receipts ? h('div', { class: 'sub' }, `Goods received notes: ${data.receipts.join(', ')}`) : null),
+      ),
+    );
+    file.value = '';
+  };
+
+  const showReport = (data) => {
+    if (data.ok) {
+      const save = h('button', { class: 'primary', type: 'button' }, `Save ${rowsText(data.rows)}`);
+      save.addEventListener('click', async () => {
+        error.textContent = '';
+        save.disabled = true;
+        try {
+          const saved = await sendFile(`/import/${chosen.kind}/save`, file.files[0]);
+          if (saved.report) return showReport(saved);
+          showSaved(saved);
+        } catch (err) {
+          error.textContent = err.message;
+          save.disabled = false;
+        }
+      });
+      result.replaceChildren(
+        h('div', { class: 'alert good' }, h('div', {}, h('div', { class: 'title' }, data.rows === 1 ? 'The row looks right.' : `All ${money(data.rows)} rows look right.`), h('div', { class: 'sub' }, 'Nothing is saved until you press Save.'))),
+        h('div', { class: 'actions' }, save),
+      );
+      return;
+    }
+    const bad = data.report.filter((r) => r.errors.length);
+    result.replaceChildren(
+      h(
+        'div',
+        { class: 'alert bad' },
+        h('div', {}, h('div', { class: 'title' }, `${money(data.rowsWithErrors)} of ${rowsText(data.rows)} ${data.rowsWithErrors === 1 ? 'has' : 'have'} problems. Nothing was saved.`), h('div', { class: 'sub' }, 'Fix these rows in Excel, save the file, then choose it again.')),
+      ),
+      h(
+        'div',
+        { class: 'table-wrap' },
+        h(
+          'table',
+          {},
+          h('thead', {}, h('tr', {}, h('th', { scope: 'col', class: 'num' }, 'Row'), h('th', { scope: 'col' }, 'First column'), h('th', { scope: 'col' }, 'Problems'))),
+          h('tbody', {}, bad.map((r) => h('tr', {}, h('td', { class: 'num' }, r.row), h('td', {}, Object.values(r.values)[0] || ''), h('td', { class: 'wrap' }, r.errors.map((e, i) => [i ? h('br') : null, e]))))),
+        ),
+      ),
+    );
+  };
+
+  const check = async () => {
+    error.textContent = '';
+    result.replaceChildren();
+    if (!file.files[0]) {
+      error.textContent = 'Please choose the filled Excel file first.';
+      return;
+    }
+    checkButton.disabled = true;
+    try {
+      showReport(await sendFile(`/import/${chosen.kind}/check`, file.files[0]));
+    } catch (err) {
+      error.textContent = err.message;
+    } finally {
+      checkButton.disabled = false;
+    }
+  };
+  checkButton.addEventListener('click', check);
+  file.addEventListener('change', () => result.replaceChildren());
+
+  main.append(
+    h('div', { class: 'head' }, h('div', {}, h('h1', {}, 'Import from Excel'), h('div', { class: 'muted' }, 'Add many customers, products, balances or stock at once.'))),
+    h('div', { class: 'choices' }, mine.map((i) => h('a', { href: `#/import?kind=${i.kind}`, class: i === chosen ? 'button chosen' : 'button' }, i.title))),
+    h(
+      'div',
+      { class: 'card' },
+      h('div', { class: 'title' }, chosen.title),
+      h('div', { class: 'sub' }, chosen.sub),
+      h('ol', { class: 'steps' }, h('li', {}, 'Download the template and fill it in. The second sheet says how.'), h('li', {}, 'Choose the filled file and press Check. Nothing is saved yet.'), h('li', {}, 'If every row looks right, press Save.')),
+      h('div', { class: 'actions' }, template),
+      h('label', { for: 'import-file' }, 'Filled Excel file'),
+      file,
+      h('div', { class: 'actions' }, checkButton),
+      error,
+      result,
+    ),
+  );
+}
+
 // ---- Router ----
 
 const PAGES = {
@@ -719,13 +863,14 @@ async function render() {
   const main = h('div');
   const report = /^#\/report\/([a-z0-9-]+)$/.exec(path);
   const unread = /^#\/unread-sales\/(\d+)$/.exec(path);
-  shell(root, report ? '#/reports' : unread ? '#/unread-sales' : path === '#/search' || PAGES[path] ? path : '#/', main);
+  shell(root, report ? '#/reports' : unread ? '#/unread-sales' : path === '#/search' || path === '#/import' || PAGES[path] ? path : '#/', main);
   main.append(h('p', { class: 'loading' }, 'Loading…'));
   const page = h('div');
   try {
     if (report) await reportPage(page, report[1], new URLSearchParams(search ?? ''));
     else if (unread) await unreadPage(page, unread[1]);
     else if (path === '#/search') await searchPage(page, new URLSearchParams(search ?? ''));
+    else if (path === '#/import' && myImports().length) importPage(page, new URLSearchParams(search ?? ''));
     else await (PAGES[path] ?? dashboardPage)(page);
   } catch (err) {
     page.append(h('p', { class: 'error' }, err.message));

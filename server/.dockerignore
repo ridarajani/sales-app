@@ -1,0 +1,5 @@
+node_modules
+.env
+apk/*.apk
+uploads
+branding

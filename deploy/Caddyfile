@@ -1,0 +1,9 @@
+# HTTPS for the live server. Caddy gets and renews the certificate by itself.
+{$DOMAIN} {
+	encode gzip
+	# A trip sync from a phone that was offline all day can be large.
+	request_body {
+		max_size 130MB
+	}
+	reverse_proxy server:3000
+}

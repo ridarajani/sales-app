@@ -1,0 +1,84 @@
+# The live server: the database, the app server, HTTPS in front of it, and a daily backup.
+#   cd deploy && cp .env.example .env   (then fill it in)
+#   docker compose up -d --build
+# See docs/GO-LIVE.md.
+name: sales
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sales
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: sales
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sales -d sales"]
+      interval: 10s
+      retries: 10
+
+  server:
+    build:
+      context: ../server
+      dockerfile: ../deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://sales:${POSTGRES_PASSWORD}@db:5432/sales
+      PUBLIC_URL: https://${DOMAIN:?Set DOMAIN in deploy/.env}
+      BOOTSTRAP_ADMIN_PHONE: ${BOOTSTRAP_ADMIN_PHONE:?Set BOOTSTRAP_ADMIN_PHONE in deploy/.env}
+      BOOTSTRAP_ADMIN_PIN: ${BOOTSTRAP_ADMIN_PIN:?Set BOOTSTRAP_ADMIN_PIN in deploy/.env}
+      TZ: Africa/Blantyre
+    volumes:
+      - apk:/app/apk
+      - uploads:/app/uploads
+      - branding:/app/branding
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: sales
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: sales
+      KEEP_DAYS: ${KEEP_DAYS:-30}
+      TZ: Africa/Blantyre
+    entrypoint: ["bash", "/scripts/backup.sh", "--daily"]
+    volumes:
+      - ./backup.sh:/scripts/backup.sh:ro
+      - ./backups:/backups
+      - uploads:/files/uploads:ro
+      - branding:/files/branding:ro
+      - apk:/files/apk:ro
+
+volumes:
+  pgdata:
+  apk:
+  uploads:
+  branding:
+  caddy_data:
+  caddy_config:
