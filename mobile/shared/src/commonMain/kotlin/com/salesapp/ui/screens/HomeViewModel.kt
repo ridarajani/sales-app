@@ -307,6 +307,7 @@ internal fun tilesFor(
         ordersTile(),
         tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
         tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+        tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
         invoicesTile(Res.string.tile_invoices_share),
         tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
         more(),

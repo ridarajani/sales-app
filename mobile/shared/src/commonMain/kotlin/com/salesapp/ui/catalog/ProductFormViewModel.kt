@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.salesapp.data.AppState
 import com.salesapp.data.ListsRepository
 import com.salesapp.data.Product
+import com.salesapp.data.canDeleteProducts
 import com.salesapp.data.ProductRequest
 import com.salesapp.resources.Res
 import com.salesapp.resources.catalog_added
 import com.salesapp.resources.catalog_saved
+import com.salesapp.resources.delete_done
+import com.salesapp.resources.delete_kept
 import com.salesapp.resources.product_err_brand
 import com.salesapp.resources.product_err_code
 import com.salesapp.resources.product_err_company
@@ -37,7 +40,12 @@ data class ProductFormState(
     val packSize: String = "",
     val pieces: String = "",
     val code: String = "",
+    // Client, 24 Oct: no VAT is worked out on an exempt product.
+    val vatExempt: Boolean = false,
     val active: Boolean = true,
+    val canDelete: Boolean = false,
+    val asking: Boolean = false,
+    val deleting: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -49,8 +57,12 @@ sealed interface ProductFormEvent {
     data class Pack(val value: String) : ProductFormEvent
     data class Pieces(val value: String) : ProductFormEvent
     data class Code(val value: String) : ProductFormEvent
+    data class VatExempt(val value: Boolean) : ProductFormEvent
     data class Active(val value: Boolean) : ProductFormEvent
     data object Save : ProductFormEvent
+    data object AskDelete : ProductFormEvent
+    data object Dismiss : ProductFormEvent
+    data object Delete : ProductFormEvent
     data object Retry : ProductFormEvent
 }
 
@@ -70,6 +82,8 @@ class ProductFormViewModel(
             loading = id != null,
             companies = companies,
             company = companies.singleOrNull(),
+            // Only on an existing product, and only for the roles the server allows.
+            canDelete = id != null && app.user?.canDeleteProducts() == true,
         ),
     )
     val state: StateFlow<ProductFormState> = _state.asStateFlow()
@@ -91,8 +105,12 @@ class ProductFormViewModel(
             is ProductFormEvent.Pack -> _state.update { it.copy(packSize = event.value, error = null) }
             is ProductFormEvent.Pieces -> _state.update { it.copy(pieces = event.value.filter { c -> c.isDigit() }.take(6), error = null) }
             is ProductFormEvent.Code -> _state.update { it.copy(code = event.value.uppercase().filter { c -> c.isLetterOrDigit() || c == '-' || c == '_' }, error = null) }
+            is ProductFormEvent.VatExempt -> _state.update { it.copy(vatExempt = event.value, error = null) }
             is ProductFormEvent.Active -> _state.update { it.copy(active = event.value) }
             ProductFormEvent.Save -> save()
+            ProductFormEvent.AskDelete -> if (_state.value.canDelete) _state.update { it.copy(asking = true) }
+            ProductFormEvent.Dismiss -> _state.update { it.copy(asking = false) }
+            ProductFormEvent.Delete -> delete()
             ProductFormEvent.Retry -> if (id != null) load(id)
         }
     }
@@ -112,6 +130,7 @@ class ProductFormViewModel(
                         packSize = p.packSize,
                         pieces = p.piecesPerCarton.toString(),
                         code = p.code,
+                        vatExempt = p.vatExempt,
                         active = p.active,
                     )
                 }
@@ -119,6 +138,31 @@ class ProductFormViewModel(
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, loadError = app.handleApiError(e)) }
+            }
+        }
+    }
+
+    // A product nothing refers to goes; one with history is kept for old documents.
+    private fun delete() {
+        val productId = id ?: return
+        val s = _state.value
+        if (s.deleting || !s.canDelete) return
+        _state.update { it.copy(deleting = true, asking = false, error = null) }
+        viewModelScope.launch {
+            try {
+                val result = repository.deleteProduct(productId)
+                val name = listOf(s.brand, s.name, s.packSize).filter { it.isNotBlank() }.joinToString(" ")
+                app.message = if (result.keptForHistory) {
+                    getString(Res.string.delete_kept, name)
+                } else {
+                    getString(Res.string.delete_done, name)
+                }
+                _effects.tryEmit(FormEffect.Done)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The server's own words, such as a product a trip still carries.
+                _state.update { it.copy(deleting = false, error = app.handleApiError(e)) }
             }
         }
     }
@@ -152,6 +196,7 @@ class ProductFormViewModel(
                     name = s.name.trim().takeIf { old == null || it != old.name },
                     packSize = s.packSize.trim().takeIf { old == null || it != old.packSize },
                     piecesPerCarton = pieces.takeIf { old == null || it != old.piecesPerCarton },
+                    vatExempt = s.vatExempt.takeIf { old == null || it != old.vatExempt },
                     active = if (old != null && s.active != old.active) s.active else null,
                 )
                 if (id == null) {

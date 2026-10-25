@@ -33,6 +33,7 @@ import com.salesapp.data.OrderDetail
 import com.salesapp.data.OrderHistoryEntry
 import com.salesapp.data.OrderLine
 import com.salesapp.data.User
+import com.salesapp.resources.line_vat_exempt
 import com.salesapp.resources.Res
 import com.salesapp.resources.order_detail_before_vat
 import com.salesapp.resources.order_detail_booked_by
@@ -220,7 +221,9 @@ private fun LineRow(line: OrderLine, seesStock: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            listOf(line.brand, line.name, line.packSize).filter { it.isNotBlank() }.joinToString(" "),
+            // Client, 24 Oct: an exempt line says so, since no VAT was worked out on it.
+            listOf(line.brand, line.name, line.packSize).filter { it.isNotBlank() }.joinToString(" ")
+                .let { if (line.vatExempt) "$it ${stringResource(Res.string.line_vat_exempt)}" else it },
             color = scheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,

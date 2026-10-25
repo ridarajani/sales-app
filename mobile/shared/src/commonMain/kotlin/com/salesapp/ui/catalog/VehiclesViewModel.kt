@@ -21,6 +21,9 @@ data class VehiclesState(
     val vehicles: List<Vehicle> = emptyList(),
     val error: String? = null,
     val canEdit: Boolean = false,
+    // The vehicle whose In use switch is being saved.
+    val changing: Int? = null,
+    val actionError: String? = null,
 )
 
 sealed interface VehiclesEvent {
@@ -28,6 +31,8 @@ sealed interface VehiclesEvent {
     data object Refresh : VehiclesEvent
     data class OpenVehicle(val id: Int) : VehiclesEvent
     data object AddVehicle : VehiclesEvent
+    // Each person marks the vehicles they do not use; it is their own mark, not everyone's.
+    data class InUseChanged(val id: Int, val inUse: Boolean) : VehiclesEvent
 }
 
 sealed interface VehiclesEffect {
@@ -55,6 +60,27 @@ class VehiclesViewModel(
             VehiclesEvent.Refresh -> if (!_state.value.loading && _state.value.error == null) load(showSpinner = false)
             is VehiclesEvent.OpenVehicle -> if (_state.value.canEdit) _effects.tryEmit(VehiclesEffect.OpenVehicle(event.id))
             VehiclesEvent.AddVehicle -> _effects.tryEmit(VehiclesEffect.AddVehicle)
+            is VehiclesEvent.InUseChanged -> setInUse(event.id, event.inUse)
+        }
+    }
+
+    // The mark is this person's own, so anyone who picks vehicles may set it.
+    private fun setInUse(vehicleId: Int, inUse: Boolean) {
+        if (_state.value.changing != null) return
+        _state.update { it.copy(changing = vehicleId, actionError = null) }
+        viewModelScope.launch {
+            try {
+                val saved = repository.setVehicleDormant(vehicleId, dormant = !inUse)
+                // The server lists dormant vehicles last, so the row moves on the next load.
+                _state.update { s ->
+                    s.copy(changing = null, vehicles = s.vehicles.map { if (it.id == saved.id) saved else it })
+                }
+                load(showSpinner = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(changing = null, actionError = app.handleApiError(e)) }
+            }
         }
     }
 

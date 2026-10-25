@@ -14,4 +14,7 @@ data object AddUserRoute
 data class UserDetailRoute(val id: Int)
 
 @Serializable
+data class EditUserRoute(val id: Int)
+
+@Serializable
 data class ResetPinRoute(val id: Int)

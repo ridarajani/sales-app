@@ -30,6 +30,7 @@ import com.salesapp.resources.empty_nothing_matches
 import com.salesapp.resources.products_add
 import com.salesapp.resources.products_empty
 import com.salesapp.resources.products_hide_off
+import com.salesapp.resources.product_vat_exempt
 import com.salesapp.resources.products_pack_line
 import com.salesapp.resources.products_search_hint
 import com.salesapp.resources.products_show_off
@@ -172,6 +173,10 @@ private fun ProductRow(product: Product, canEdit: Boolean, onClick: () -> Unit) 
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(product.code, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+            // Client, 24 Oct: no VAT is worked out on these.
+            if (product.vatExempt) {
+                Badge(stringResource(Res.string.product_vat_exempt), tone = BadgeTone.Role)
+            }
         }
         if (!product.active) {
             Badge(stringResource(Res.string.catalog_off), tone = BadgeTone.Off, modifier = Modifier.padding(start = 8.dp))
@@ -182,7 +187,7 @@ private fun ProductRow(product: Product, canEdit: Boolean, onClick: () -> Unit) 
 private val sampleProducts = listOf(
     Product(1, "LV-KG-400", "LV", "Kerrygold", "Milk powder tin", "400g tin", 24),
     Product(2, "LV-KG-075", "LV", "Kerrygold", "Milk powder sachet", "7.5g x 400", 400, active = false),
-    Product(3, "ZF-SU-001", "ZF", "Sunrise", "Cooking oil", "2 litre bottle", 6),
+    Product(3, "ZF-SU-001", "ZF", "Sunrise", "Cooking oil", "2 litre bottle", 6, vatExempt = true),
 )
 
 @Preview

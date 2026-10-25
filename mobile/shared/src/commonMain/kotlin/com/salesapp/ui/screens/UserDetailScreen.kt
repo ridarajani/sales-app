@@ -26,6 +26,7 @@ import com.salesapp.data.companyName
 import com.salesapp.data.roleLabel
 import com.salesapp.resources.Res
 import com.salesapp.resources.badge_switched_off
+import com.salesapp.resources.user_edit
 import com.salesapp.resources.user_detail_can_sign_in
 import com.salesapp.resources.user_detail_confirm_text
 import com.salesapp.resources.user_detail_confirm_title
@@ -43,6 +44,7 @@ import com.salesapp.ui.components.Badge
 import com.salesapp.ui.components.BadgeTone
 import com.salesapp.ui.components.ConfirmDialog
 import com.salesapp.ui.components.DangerButton
+import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.ListCard
 import com.salesapp.ui.components.LoadingState
@@ -61,6 +63,7 @@ fun UserDetailPage(
     id: Int,
     onBack: () -> Unit,
     onResetPin: (Int) -> Unit,
+    onEdit: (Int) -> Unit,
     viewModel: UserDetailViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -68,6 +71,9 @@ fun UserDetailPage(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is UserDetailEffect.ResetPin -> onResetPin(effect.id)
+                is UserDetailEffect.Edit -> onEdit(effect.id)
+                // The people list loads again when it comes back, so the deleted person is gone.
+                UserDetailEffect.Deleted -> onBack()
             }
         }
     }
@@ -120,26 +126,50 @@ private fun UserDetailBody(state: UserDetailState, row: UserRow, onEvent: (UserD
         if (state.isMe) {
             Say(stringResource(Res.string.user_detail_this_is_you))
         } else if (state.canManage) {
+            val busy = state.busy || state.deleting
+            // Two rows of paired actions: the PIN and the details, then switching off and deleting.
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PrimaryButton(
                     stringResource(Res.string.user_detail_reset_pin),
-                    modifier = Modifier.weight(1f).height(44.dp),
-                    enabled = !state.busy,
+                    modifier = if (state.canChange) Modifier.weight(1f).height(44.dp) else Modifier.fillMaxWidth().height(44.dp),
+                    enabled = !busy,
                     onClick = { onEvent(UserDetailEvent.ResetPin) },
                 )
+                if (state.canChange) {
+                    SecondaryButton(
+                        stringResource(Res.string.user_edit),
+                        modifier = Modifier.weight(1f),
+                        enabled = !busy,
+                        onClick = { onEvent(UserDetailEvent.Edit) },
+                    )
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val half = if (state.canChange) Modifier.weight(1f) else Modifier.fillMaxWidth()
                 if (row.active) {
                     DangerButton(
                         stringResource(Res.string.user_detail_switch_off),
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.busy,
+                        modifier = half,
+                        enabled = !busy,
                         onClick = { onEvent(UserDetailEvent.AskSwitchOff) },
                     )
                 } else {
                     SecondaryButton(
                         stringResource(Res.string.user_detail_switch_on),
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.busy,
+                        modifier = half,
+                        enabled = !busy,
                         onClick = { onEvent(UserDetailEvent.SwitchOn) },
+                    )
+                }
+                if (state.canChange) {
+                    DeleteButton(
+                        name = row.name,
+                        asking = state.asking,
+                        busy = state.deleting,
+                        onAsk = { onEvent(UserDetailEvent.AskDelete) },
+                        onConfirm = { onEvent(UserDetailEvent.Delete) },
+                        onDismiss = { onEvent(UserDetailEvent.DismissDelete) },
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -174,7 +204,20 @@ private val sampleUser = UserRow(1, "Chisomo Phiri", "0991234567", "salesman", l
 private fun UserDetailPreview() {
     SalesTheme {
         UserDetailScreen(
-            UserDetailState(loading = false, user = sampleUser, myId = 99, myRole = "admin"),
+            UserDetailState(loading = false, user = sampleUser, myId = 99, myRole = "admin", canChange = true),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+// What a sales manager sees for a salesman who is not theirs: the PIN and switching off only.
+@Preview
+@Composable
+private fun UserDetailByManagerPreview() {
+    SalesTheme {
+        UserDetailScreen(
+            UserDetailState(loading = false, user = sampleUser, myId = 99, myRole = "sales_manager"),
             onEvent = {},
             onBack = {},
         )

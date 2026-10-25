@@ -47,6 +47,7 @@ import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.LoadingState
+import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SectionLabel
@@ -176,8 +177,18 @@ private fun androidx.compose.foundation.layout.ColumnScope.FormBody(state: Custo
         PrimaryButton(
             stringResource(Res.string.form_save),
             onClick = { onEvent(CustomerFormEvent.Save) },
-            enabled = !state.saving,
+            enabled = !state.saving && !state.deleting,
         )
+        if (state.canDelete) {
+            DeleteButton(
+                name = state.name,
+                asking = state.asking,
+                busy = state.deleting,
+                onAsk = { onEvent(CustomerFormEvent.AskDelete) },
+                onConfirm = { onEvent(CustomerFormEvent.Delete) },
+                onDismiss = { onEvent(CustomerFormEvent.Dismiss) },
+            )
+        }
     }
 }
 
@@ -196,6 +207,7 @@ private fun previewState(edit: Boolean) = CustomerFormState(
     selected = if (edit) setOf("LV", "ZT") else emptySet(),
     days = mapOf("LV" to "30", "ZT" to "14", "ZF" to "30", "GL" to "30"),
     needsLpo = edit,
+    canDelete = edit,
 )
 
 @Preview

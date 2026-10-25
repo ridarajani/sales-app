@@ -35,6 +35,16 @@ class UsersRepository(private val api: Api, app: AppState) {
         return added
     }
 
+    // Client, 24 Oct: only the fields sent are changed.
+    suspend fun updateUser(id: Int, request: UserUpdateRequest): UserRow = replace(api.updateUser(id, request))
+
+    // A user nothing refers to goes; one with history keeps their name on old documents.
+    suspend fun deleteUser(id: Int): DeleteResult {
+        val result = api.deleteUser(id)
+        _rows.update { rows -> rows.filterNot { it.id == id } }
+        return result
+    }
+
     suspend fun switchOff(id: Int): UserRow = replace(api.switchOff(id))
 
     suspend fun switchOn(id: Int): UserRow = replace(api.switchOn(id))

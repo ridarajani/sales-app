@@ -5,12 +5,13 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.salesapp.ui.navigation.AddUserRoute
+import com.salesapp.ui.navigation.EditUserRoute
 import com.salesapp.ui.navigation.ResetPinRoute
 import com.salesapp.ui.navigation.UserDetailRoute
 import com.salesapp.ui.navigation.UsersRoute
 import com.salesapp.ui.navigation.open
 
-// The people list, adding a person, one person and resetting a PIN.
+// The people list, adding a person, one person, changing them and resetting a PIN.
 fun NavGraphBuilder.usersGraph(nav: NavController) {
     val back = { nav.popBackStack() }
     composable<UsersRoute> {
@@ -28,7 +29,11 @@ fun NavGraphBuilder.usersGraph(nav: NavController) {
             id = entry.toRoute<UserDetailRoute>().id,
             onBack = { back() },
             onResetPin = { nav.open(ResetPinRoute(it)) },
+            onEdit = { nav.open(EditUserRoute(it)) },
         )
+    }
+    composable<EditUserRoute> { entry ->
+        EditUserPage(id = entry.toRoute<EditUserRoute>().id, onBack = { back() }, onDone = { back() })
     }
     composable<ResetPinRoute> { entry ->
         ResetPinPage(id = entry.toRoute<ResetPinRoute>().id, onBack = { back() }, onDone = { back() })

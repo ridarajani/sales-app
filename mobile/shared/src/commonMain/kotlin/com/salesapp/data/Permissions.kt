@@ -23,7 +23,7 @@ fun User.canCorrectOpeningBalance(): Boolean = role == "admin"
 
 fun User.canEditProducts(): Boolean = role == "admin" || role == "accounts"
 
-fun User.canEditVehicles(): Boolean = role == "admin"
+fun User.canEditVehicles(): Boolean = role == "admin" || role == "sales_manager"
 
 fun User.canEditCompanies(): Boolean = role == "admin"
 
@@ -109,3 +109,23 @@ fun User.canSeeTrips(): Boolean =
 fun User.canPlanTrips(): Boolean = role == "admin" || role == "management" || role == "sales_manager"
 
 fun User.canLoadTrips(): Boolean = role == "admin" || role == "warehouse"
+
+// Client answers of 24 October: deleting. A row nothing refers to goes; one with history is kept
+// for old documents but leaves every list. These mirror the guards on the server.
+fun User.canDeleteProducts(): Boolean = canEditProducts()
+
+// Only for a customer the server also says this person may change.
+fun User.canDeleteCustomers(customer: Customer? = null): Boolean = canEditCustomers(customer)
+
+fun User.canDeleteVehicles(): Boolean = canEditVehicles()
+
+// Admin may change or delete anyone; a sales manager only their own salesmen.
+fun User.canManageUser(target: UserRow): Boolean = when {
+    role == "admin" -> true
+    role != "sales_manager" -> false
+    target.role != "salesman" -> false
+    else -> target.managerId == id || target.managers.any { it.managerId == id }
+}
+
+// A sales manager cannot change what job their salesman does.
+fun User.canChangeUserRole(): Boolean = role == "admin"

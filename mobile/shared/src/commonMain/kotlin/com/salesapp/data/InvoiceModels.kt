@@ -74,6 +74,8 @@ data class InvoiceLine(
     val delivered: Int? = null,
     val returned: Int = 0,
     val canReturn: Int? = null,
+    // Kept as it was when the invoice was made, so returns use the same rule.
+    val vatExempt: Boolean = false,
 )
 
 @Serializable

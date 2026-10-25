@@ -101,6 +101,7 @@ import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.components.VehiclePicker
 import com.salesapp.ui.loading.cartonsText
 import com.salesapp.ui.loading.splitText
 import com.salesapp.ui.theme.SalesTheme
@@ -314,16 +315,12 @@ private fun LoadForm(state: TripDetailState, trip: TripDetail, onEvent: (TripDet
         }
         if (state.vehicles.isNotEmpty()) {
             SectionLabel(stringResource(Res.string.trip_load_vehicle))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.vehicles.forEach { vehicle ->
-                    ChoiceButton(
-                        text = vehicle.plate,
-                        selected = (state.loadVehicleId ?: trip.vehicleId) == vehicle.id,
-                        onClick = { onEvent(TripDetailEvent.LoadVehicleChosen(vehicle.id)) },
-                        enabled = !state.busy,
-                    )
-                }
-            }
+            VehiclePicker(
+                vehicles = state.vehicles,
+                chosenId = state.loadVehicleId ?: trip.vehicleId,
+                onChoose = { onEvent(TripDetailEvent.LoadVehicleChosen(it)) },
+                enabled = !state.busy,
+            )
         }
         PrimaryButton(
             stringResource(if (state.busy) Res.string.trip_loading else Res.string.trip_load_action),

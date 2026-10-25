@@ -18,6 +18,16 @@ class ListsRepository(private val api: Api) {
 
     suspend fun product(id: Int): Product = api.product(id)
 
+    // Client, 24 Oct: a row nothing refers to goes; one with history stays on old documents only.
+    suspend fun deleteProduct(id: Int): DeleteResult = api.deleteProduct(id)
+
+    suspend fun deleteCustomer(id: Int): DeleteResult = api.deleteCustomer(id)
+
+    suspend fun deleteVehicle(id: Int): DeleteResult = api.deleteVehicle(id)
+
+    // Each person's own mark, so the vehicles they use come first in their list.
+    suspend fun setVehicleDormant(id: Int, dormant: Boolean): Vehicle = api.setVehicleDormant(id, dormant)
+
     suspend fun createProduct(request: ProductRequest): Product = api.createProduct(request)
 
     suspend fun updateProduct(id: Int, request: ProductRequest): Product = api.updateProduct(id, request)

@@ -26,7 +26,9 @@ import com.salesapp.resources.catalog_save
 import com.salesapp.resources.vehicle_description
 import com.salesapp.resources.vehicle_description_hint
 import com.salesapp.resources.vehicle_driver
-import com.salesapp.resources.vehicle_facility
+import com.salesapp.resources.vehicle_facility_both
+import com.salesapp.resources.vehicle_facility_both_help
+import com.salesapp.resources.vehicle_facility_question
 import com.salesapp.resources.vehicle_in_use
 import com.salesapp.resources.vehicle_in_use_note
 import com.salesapp.resources.vehicle_no_driver
@@ -40,6 +42,7 @@ import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.LoadingState
+import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SectionLabel
@@ -93,17 +96,25 @@ fun VehicleFormScreen(state: VehicleFormState, onEvent: (VehicleFormEvent) -> Un
                     enabled = !state.busy,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel(stringResource(Res.string.vehicle_facility))
+                    SectionLabel(stringResource(Res.string.vehicle_facility_question))
                     ChoiceColumn {
                         listOf<String?>("F1", "F2", null).forEach { code ->
                             ChoiceButton(
-                                facilityLabel(code),
+                                // No facility means both warehouses share the vehicle.
+                                if (code == null) stringResource(Res.string.vehicle_facility_both) else facilityLabel(code),
                                 selected = state.facility == code,
                                 onClick = { onEvent(VehicleFormEvent.Facility(code)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = !state.busy,
                             )
                         }
+                    }
+                    if (state.facility == null) {
+                        Text(
+                            stringResource(Res.string.vehicle_facility_both_help),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,8 +158,18 @@ fun VehicleFormScreen(state: VehicleFormState, onEvent: (VehicleFormEvent) -> Un
                 PrimaryButton(
                     stringResource(Res.string.catalog_save),
                     onClick = { onEvent(VehicleFormEvent.Save) },
-                    enabled = !state.busy,
+                    enabled = !state.busy && !state.deleting,
                 )
+                if (state.canDelete) {
+                    DeleteButton(
+                        name = state.plate,
+                        asking = state.asking,
+                        busy = state.deleting,
+                        onAsk = { onEvent(VehicleFormEvent.AskDelete) },
+                        onConfirm = { onEvent(VehicleFormEvent.Delete) },
+                        onDismiss = { onEvent(VehicleFormEvent.Dismiss) },
+                    )
+                }
               }
             }
         }
@@ -168,7 +189,21 @@ private fun VehicleFormPreview() {
                 description = "3 ton truck",
                 facility = "F1",
                 driverId = 7,
+                canDelete = true,
             ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+// A new vehicle both warehouses share.
+@Preview
+@Composable
+private fun VehicleFormBothPreview() {
+    SalesTheme {
+        VehicleFormScreen(
+            state = VehicleFormState(loading = false, plate = "MZ 1007", description = "Pick-up", facility = null),
             onEvent = {},
             onBack = {},
         )
