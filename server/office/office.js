@@ -19,6 +19,7 @@ const CHANNEL_LABELS = {
   upcountry: 'Upcountry',
 };
 const STAFF_VIEWERS = ['admin', 'management', 'sales_manager'];
+const OUTBOX_VIEWERS = ['admin', 'management'];
 
 const state = { token: null, me: null, companies: [], catalogue: null, customers: null, products: null };
 
@@ -124,10 +125,11 @@ function signInPage(root) {
 // ---- Layout ----
 
 function navLinks() {
-  const links = [['#/', 'Dashboard']];
+  const links = [['#/', 'Dashboard'], ['#/alerts', 'Alerts'], ['#/search', 'Search']];
   if (state.catalogue?.groups.length) links.push(['#/reports', 'Reports']);
   links.push(['#/customers', 'Customers'], ['#/products', 'Products'], ['#/vehicles', 'Vehicles']);
   if (STAFF_VIEWERS.includes(state.me.role)) links.push(['#/staff', 'Staff']);
+  if (OUTBOX_VIEWERS.includes(state.me.role)) links.push(['#/unread-sales', 'Unread trip sales']);
   return links;
 }
 
@@ -160,10 +162,17 @@ function shell(root, active, content) {
 // ---- Dashboard ----
 
 async function dashboardPage(main) {
-  const d = await api('/dashboard');
+  const [d, a] = await Promise.all([api('/dashboard'), api('/alerts')]);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   main.append(h('div', { class: 'head' }, h('div', {}, h('h1', {}, `${greeting}, ${state.me.name.split(' ')[0]}`), h('div', { class: 'muted' }, dateText(new Date().toISOString())))));
+  const urgent = a.alerts.filter((x) => x.severity !== 'info');
+  if (urgent.length) {
+    main.append(
+      h('div', { class: 'alerts' }, urgent.slice(0, 3).map(alertCard)),
+      urgent.length > 3 ? h('p', {}, h('a', { href: '#/alerts' }, `See all ${money(a.alerts.length)} alerts`)) : null,
+    );
+  }
   if (d.tiles.length === 0) main.append(h('p', { class: 'muted' }, 'There is nothing here for your job yet.'));
   main.append(
     h(
@@ -408,6 +417,170 @@ function table(r) {
   );
 }
 
+// ---- Alerts ----
+
+// Where an alert opens on the website: its report, or the unread trip sales page.
+function alertLink(a) {
+  if (a.screen === 'outboxProblem' && a.id && OUTBOX_VIEWERS.includes(state.me.role)) return `#/unread-sales/${a.id}`;
+  if (a.screen === 'customer' && a.id && a.report === 'invoices-overdue') return `#/report/invoices-overdue?${new URLSearchParams({ customer: a.id })}`;
+  if (a.report && state.catalogue?.groups.some((g) => g.reports.some((r) => r.key === a.report))) return `#/report/${a.report}`;
+  return null;
+}
+
+function alertCard(a) {
+  const link = alertLink(a);
+  return h(
+    'div',
+    { class: `alert ${a.severity}` },
+    h('div', {}, h('div', { class: 'title' }, a.title), h('div', { class: 'sub' }, a.detail)),
+    link ? h('a', { class: 'button', href: link }, 'Open') : null,
+  );
+}
+
+async function alertsPage(main) {
+  const { alerts } = await api('/alerts');
+  main.append(
+    h('div', { class: 'head' }, h('div', {}, h('h1', {}, 'Alerts'), h('div', { class: 'muted' }, 'Things that need attention for the companies you can see.'))),
+    alerts.length ? h('div', { class: 'alerts' }, alerts.map(alertCard)) : h('div', { class: 'table-wrap' }, h('div', { class: 'empty' }, 'No alerts. All is in order.')),
+  );
+}
+
+// ---- Search ----
+
+async function searchPage(main, params) {
+  const cat = await catalogue();
+  const canLedger = cat.groups.some((g) => g.reports.some((r) => r.key === 'customer-ledger'));
+  const box = h('input', { type: 'search', placeholder: 'Type a shop name, phone, order, invoice, vehicle or product', 'aria-label': 'Search', value: params.get('q') ?? '' });
+  const error = h('p', { class: 'error', role: 'alert' });
+  const body = h('div');
+  let timer;
+  let asked = 0;
+  const draw = async () => {
+    const text = box.value.trim();
+    history.replaceState(null, '', `#/search${text ? `?${new URLSearchParams({ q: text })}` : ''}`);
+    error.textContent = '';
+    if (text.length < 2) return body.replaceChildren(h('p', { class: 'muted' }, 'Type at least 2 letters.'));
+    const mine = ++asked;
+    try {
+      const r = await api(`/search?${new URLSearchParams({ q: text })}`);
+      if (mine !== asked) return;
+      body.replaceChildren(
+        ...(r.groups.length === 0
+          ? [h('div', { class: 'table-wrap' }, h('div', { class: 'empty' }, 'Nothing found. Try fewer letters.'))]
+          : r.groups.flatMap((g) => [
+              h('h2', {}, g.title, ' ', h('span', { class: 'muted' }, g.count > g.items.length ? `${g.items.length} of ${money(g.count)}` : money(g.count))),
+              h(
+                'div',
+                { class: 'cards' },
+                g.items.map((it) => {
+                  const href = g.key === 'customers' && canLedger ? `#/report/customer-ledger?${new URLSearchParams({ customer: it.id })}` : null;
+                  return h(href ? 'a' : 'div', { class: 'card', ...(href ? { href } : {}) }, h('div', { class: 'title' }, it.title), h('div', { class: 'sub' }, it.detail));
+                }),
+              ),
+            ])),
+      );
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  };
+  box.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(draw, 250);
+  });
+  main.append(h('div', { class: 'head' }, h('h1', {}, 'Search')), box, error, body);
+  setTimeout(() => box.focus());
+  return draw();
+}
+
+// ---- Unread trip sales ----
+// Sales a phone saved on a trip and could not read back. Admin opens the file, enters anything missing and clears it.
+
+async function unreadListPage(main) {
+  const rows = await api('/outbox-problems');
+  main.append(
+    h('div', { class: 'head' }, h('div', {}, h('h1', {}, 'Unread trip sales'), h('div', { class: 'muted' }, 'Sales a phone saved on a trip but could not read back. The trip cannot close until Admin clears them.'))),
+    rows.length === 0
+      ? h('div', { class: 'table-wrap' }, h('div', { class: 'empty' }, 'Nothing here. Every phone could read its sales.'))
+      : h(
+          'div',
+          { class: 'table-wrap' },
+          h(
+            'table',
+            {},
+            h('thead', {}, h('tr', {}, ['Sent', 'Trip', 'Route', 'Leader', 'State', ''].map((t) => h('th', { scope: 'col' }, t)))),
+            h(
+              'tbody',
+              {},
+              rows.map((p) =>
+                h(
+                  'tr',
+                  {},
+                  h('td', {}, dateText(p.reportedAt)),
+                  h('td', {}, p.tripNumber),
+                  h('td', { class: 'wrap' }, p.route),
+                  h('td', {}, p.leaderName),
+                  h('td', {}, p.cleared ? h('span', { class: 'pill on' }, 'Cleared') : h('span', { class: 'pill off' }, 'To check')),
+                  h('td', {}, h('a', { href: `#/unread-sales/${p.id}` }, 'Open')),
+                ),
+              ),
+            ),
+          ),
+        ),
+  );
+}
+
+async function unreadPage(main, id) {
+  const p = await api(`/outbox-problems/${id}`);
+  const error = h('p', { class: 'error', role: 'alert' });
+  const download = h('button', {}, 'Download the file');
+  download.addEventListener('click', async () => {
+    error.textContent = '';
+    try {
+      const res = await api(`/outbox-problems/${id}/file`, { raw: true });
+      const url = URL.createObjectURL(await res.blob());
+      const a = h('a', { href: url, download: `${p.tripNumber}-unread-sales-${id}.json` });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      error.textContent = err.message;
+    }
+  });
+  const facts = [
+    ['Trip', `${p.tripNumber} · ${p.route}`],
+    ['Leader', p.leaderName],
+    ['Sent by', `${p.reportedBy} on ${dateText(p.reportedAt)}`],
+    ['File', `${p.fileName || 'No name'} · ${money(Math.ceil(p.fileSize / 1024))} KB`],
+    p.note ? ['Note from the phone', p.note] : null,
+    p.cleared ? ['Cleared', `${p.clearedBy} on ${dateText(p.clearedAt)}: ${p.clearNote}`] : null,
+  ].filter(Boolean);
+  main.append(
+    h('div', { class: 'head' }, h('div', {}, h('a', { href: '#/unread-sales' }, '‹ Unread trip sales'), h('h1', {}, `Unread sales on trip ${p.tripNumber}`))),
+    h('div', { class: 'card' }, facts.map(([k, v]) => h('div', { class: 'fact' }, h('label', {}, k), h('div', {}, v)))),
+    h('div', { class: 'actions' }, download),
+    error,
+  );
+  if (p.canClear) {
+    const note = h('input', { id: 'clear-note', placeholder: 'For example: entered the 2 missing sales by hand' });
+    const button = h('button', { class: 'primary', type: 'submit' }, 'Clear');
+    const form = h('form', { class: 'card' }, h('label', { for: 'clear-note' }, 'What did you do about these sales?'), note, h('div', { class: 'actions' }, button));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      button.disabled = true;
+      try {
+        await api(`/outbox-problems/${id}/clear`, { method: 'POST', body: { note: note.value } });
+        render();
+      } catch (err) {
+        error.textContent = err.message;
+        button.disabled = false;
+      }
+    });
+    main.append(h('p', { class: 'muted' }, 'Look at the file, enter any sale that is missing, then clear it so the trip can close.'), form);
+  }
+}
+
 // ---- Lists ----
 
 function listPage(main, title, { load, columns, searchable = true }) {
@@ -525,6 +698,8 @@ const PAGES = {
   '#/products': productsPage,
   '#/vehicles': vehiclesPage,
   '#/staff': staffPage,
+  '#/alerts': alertsPage,
+  '#/unread-sales': unreadListPage,
 };
 
 let drawing = 0;
@@ -543,11 +718,14 @@ async function render() {
   const [path, search] = (location.hash || '#/').split('?');
   const main = h('div');
   const report = /^#\/report\/([a-z0-9-]+)$/.exec(path);
-  shell(root, report ? '#/reports' : PAGES[path] ? path : '#/', main);
+  const unread = /^#\/unread-sales\/(\d+)$/.exec(path);
+  shell(root, report ? '#/reports' : unread ? '#/unread-sales' : path === '#/search' || PAGES[path] ? path : '#/', main);
   main.append(h('p', { class: 'loading' }, 'Loading…'));
   const page = h('div');
   try {
     if (report) await reportPage(page, report[1], new URLSearchParams(search ?? ''));
+    else if (unread) await unreadPage(page, unread[1]);
+    else if (path === '#/search') await searchPage(page, new URLSearchParams(search ?? ''));
     else await (PAGES[path] ?? dashboardPage)(page);
   } catch (err) {
     page.append(h('p', { class: 'error' }, err.message));

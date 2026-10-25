@@ -251,6 +251,7 @@ erDiagram
     stock_batches ||--o{ trip_line_batches : "loaded"
     trips ||--o{ trip_sales : "sells"
     trips ||--o{ trip_orders : "delivers"
+    trips ||--o{ outbox_problems : "unread sales"
     orders ||--o{ trip_orders : "goes out on"
     customers ||--o{ trip_sales : "buys"
     trip_sales ||--o{ invoices : "makes"
@@ -467,6 +468,15 @@ erDiagram
         date month PK "first day"
         bigint amount "before VAT"
         int set_by FK
+    }
+    outbox_problems {
+        int id PK
+        int trip_id FK
+        bytea file "as it was on the phone"
+        text request_id "one per phone send"
+        int reported_by FK
+        int cleared_by FK "Admin"
+        text clear_note
     }
     trip_sales {
         int id PK
@@ -695,3 +705,7 @@ erDiagram
 - **Audit actions:** `target_set`.
 - **Office website** (Phase 10 part 2): `server/office/` holds plain HTML, CSS and JavaScript with no build step, served at `/office/` by the same server (so at `PUBLIC_URL/office/`). Staff sign in with their phone and PIN as in the app (`POST /auth/login`); the token stays in that browser until they sign out or it stops working. It shows the dashboard, every report they may open (with Excel and PDF), and the lists of customers, products, vehicles and, for Admin, Management and sales managers, staff. Changes are still made in the phone app. The pages are sent with a strict content security policy: only the server's own files run.
 - **Dashboard** (`GET /dashboard`): the numbers on the website's first page, each taken from a report so it matches what that report shows the same person: sales today and this month, orders still to deliver, what customers owe and how much is late, cash not yet handed over, handovers to count, products low on stock, write-offs to approve and returns to book. Each tile names the report and dates it opens. `salesByDay` gives this month's sales for the chart. A job sees only the tiles of the reports it may open.
+- **Search** (Phase 10 part 3, `GET /search?q=`, at least 2 letters): one box that finds customers (name, area, town or phone typed any way), orders and invoices (number, customer or LPO number), vehicles and delivery notes (plan, delivery note or gate pass number, plate), trips (number, route, gate pass, plate), returns (number, customer or invoice), products (code or name) and, for Admin, Management and sales managers, staff (name or phone). Each group shows only what the person may already open (a salesman: his own orders and invoices; drivers: no customers), at most 8 items with the full count. Each item has an `id`, a `title` and a one-line `detail` already written in plain words. Products show what is free to sell only to those who see stock.
+- **Alerts** (`GET /alerts`): what needs someone's attention now, worst first (`bad`, `warn`, `info`), each with a `title`, a `detail`, where the phone app opens it (`screen` and `id`) and the report the website opens (`report`). By job: plans changed after sending (warehouse) or changed by the warehouse (planners); loaded vehicles without invoices; vehicles out since before today; orders from before today not on a vehicle; returns to book and goods coming back; Airtel Money payments not ticked; customers late paying (each customer and company, biggest first, at most 15 and then one summing up the rest); customers over their credit limit; cash not yet handed over (from the cash in hand report); handovers to count; low stock (from the low stock report); expired batches still in stock; batches expiring within 90 days; stock changes to approve; and unread trip sales.
+- **Unread trip sales** (migration 027): when a phone cannot read the trip sales it saved, the trip leader's phone sends the file (`POST /trips/:id/outbox-problems { requestId, file (base64), fileName, note }`; sent twice, it is one problem). Admin and Management see them (`GET /outbox-problems`, `GET /outbox-problems/:id`, the file at `/outbox-problems/:id/file`); Admin enters anything missing by hand and clears it with a note (`POST /outbox-problems/:id/clear { note }`). The trip shows `outboxProblems` and `openOutboxProblems`, and cannot close while one is open (`outbox_problem`). The office website has a page for them.
+- **Audit actions:** `outbox_problem_reported`, `outbox_problem_cleared`.

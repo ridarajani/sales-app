@@ -83,7 +83,7 @@ const noteQuery = z.object({
 });
 
 // Which returns and notes a user may see. $1 = their companies, $2 = their id. Salesmen see their own invoices'.
-function invoiceWhere(user: AuthUser, alias: string) {
+export function invoiceWhere(user: AuthUser, alias: string) {
   const mine = `${alias}.company_code = any($1::text[])`;
   if (user.role === 'salesman') return `${mine} and exists (select 1 from invoices w where w.id = ${alias}.invoice_id and w.salesman_id = $2::int)`;
   return `${mine} and $2::int is not null`;
