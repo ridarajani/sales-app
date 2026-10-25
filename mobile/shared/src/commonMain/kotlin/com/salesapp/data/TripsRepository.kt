@@ -19,6 +19,9 @@ class TripsRepository(
 
     fun outboxOf(id: Int): TripOutbox = outbox.load(id)
 
+    // True when something saved on this phone could not be read and the office needs telling.
+    fun hasUnreadable(id: Int): Boolean = outbox.hasUnreadable(id)
+
     suspend fun plan(request: PlanTripRequest): TripDetail = api.planTrip(request)
 
     suspend fun change(id: Int, request: PlanTripRequest): TripDetail = api.changeTrip(id, request)
@@ -52,8 +55,14 @@ class TripsRepository(
     // from the server (not_on_vehicle and the like) is not kept: it would only fail again.
     suspend fun sell(tripId: Int, request: TripSaleRequest): SaleOutcome =
         try {
-            SaleOutcome.Sent(api.tripSale(tripId, request))
+            val sale = api.tripSale(tripId, request)
+            // The pack on the phone is only as fresh as its last download, so what this sale took
+            // comes off it now. Otherwise the next form would offer goods that have already gone,
+            // and a sale made after the network drops would be refused with the cash already taken.
+            outbox.takeOffPack(tripId, request.lines)
+            SaleOutcome.Sent(sale)
         } catch (e: ApiException) {
+            // An outbox sale is already counted off by the outbox itself.
             if (e.keepForLater) SaleOutcome.Saved(outbox.addSale(tripId, request)) else throw e
         }
 

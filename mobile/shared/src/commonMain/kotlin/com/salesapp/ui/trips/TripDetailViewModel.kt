@@ -35,6 +35,8 @@ data class TripDetailState(
     val outbox: TripOutbox = TripOutbox(),
     // True when the trip on screen came from the phone, not the server.
     val fromPhone: Boolean = false,
+    // Something saved on this phone could not be read and is waiting for the office.
+    val hasUnreadable: Boolean = false,
     // The warehouse's own form.
     val loadLines: List<LoadLine> = emptyList(),
     val loadVehicleId: Int? = null,
@@ -84,7 +86,7 @@ class TripDetailViewModel(
     init {
         if (_state.value.allowed) {
             // Whatever the phone is holding shows at once, before the server is asked.
-            _state.update { it.copy(outbox = repository.outboxOf(id)) }
+            _state.update { it.copy(outbox = repository.outboxOf(id), hasUnreadable = repository.hasUnreadable(id)) }
             load()
         } else {
             _state.update { it.copy(loading = false) }
@@ -97,7 +99,7 @@ class TripDetailViewModel(
         when (event) {
             TripDetailEvent.Retry -> load()
             TripDetailEvent.Refresh -> {
-                _state.update { it.copy(outbox = repository.outboxOf(id)) }
+                _state.update { it.copy(outbox = repository.outboxOf(id), hasUnreadable = repository.hasUnreadable(id)) }
                 if (!s.loading) load(showSpinner = false)
             }
             is TripDetailEvent.EditLoadCartons -> editLoad(event.productId) { it.copy(cartons = event.value) }
@@ -191,6 +193,7 @@ class TripDetailViewModel(
                         vehicles = vehicles,
                         loadVehicleId = it.loadVehicleId ?: trip.vehicleId,
                         outbox = repository.outboxOf(id),
+                        hasUnreadable = repository.hasUnreadable(id),
                         error = null,
                         // The warehouse's form starts at what was planned.
                         loadLines = if (trip.canLoad) {
@@ -213,7 +216,16 @@ class TripDetailViewModel(
                 // No network: fall back to what this phone saved, so the trip can still be sold from.
                 val saved = repository.savedPack(id)
                 if (saved != null) {
-                    _state.update { it.copy(loading = false, trip = saved.trip, fromPhone = true, outbox = repository.outboxOf(id), error = null) }
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            trip = saved.trip,
+                            fromPhone = true,
+                            outbox = repository.outboxOf(id),
+                            hasUnreadable = repository.hasUnreadable(id),
+                            error = null,
+                        )
+                    }
                 } else {
                     val message = app.handleApiError(e)
                     _state.update { if (it.trip == null) it.copy(loading = false, error = message) else it.copy(loading = false) }

@@ -1,6 +1,8 @@
 package com.salesapp.data
 
 import com.salesapp.core.Files
+import com.salesapp.core.nowUtcTimestamp
+import com.salesapp.core.splitPieces
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -58,15 +60,34 @@ class TripOutboxStore(private val files: Files) {
 
     private fun packName(tripId: Int) = "trip-$tripId-pack.json"
 
+    // Written when an outbox file could not be read, so the warning survives a restart.
+    private fun markerName(tripId: Int) = "trip-$tripId-outbox-unreadable.marker"
+
     fun load(tripId: Int): TripOutbox {
         val text = files.read(outboxName(tripId)) ?: return TripOutbox(tripId)
         return try {
             json.decodeFromString<TripOutbox>(text)
         } catch (e: Exception) {
-            // A file we cannot read is worse than none: start again rather than block the trip.
+            // These are sales the customer has already paid for in cash, so the file is never
+            // thrown away or written over: it is put aside under its own name for the office.
+            keepAside(tripId, text)
             TripOutbox(tripId)
         }
     }
+
+    // Moves an unreadable outbox out of the way and leaves a marker, so the next save cannot
+    // overwrite it and the trip screen can say something about it.
+    private fun keepAside(tripId: Int, text: String) {
+        val stamp = nowUtcTimestamp().filter { it.isLetterOrDigit() }
+        val kept = "trip-$tripId-outbox-unreadable-$stamp.json"
+        files.write(kept, text)
+        // Only once the copy is safely written is the original let go.
+        files.delete(outboxName(tripId))
+        files.write(markerName(tripId), listOfNotNull(files.read(markerName(tripId)), kept).joinToString("\n"))
+    }
+
+    // True when something saved on this phone could not be read and is waiting for the office.
+    fun hasUnreadable(tripId: Int): Boolean = files.read(markerName(tripId)) != null
 
     private fun save(outbox: TripOutbox) {
         if (outbox.isEmpty) files.delete(outboxName(outbox.tripId)) else files.write(outboxName(outbox.tripId), json.encodeToString(outbox))
@@ -125,6 +146,37 @@ class TripOutboxStore(private val files: Files) {
 
     fun clear(tripId: Int) {
         files.delete(outboxName(tripId))
+    }
+
+    // Takes what one sale carried off the pack kept on the phone, so the van count stays right
+    // between downloads. Called once the server has taken the sale.
+    fun takeOffPack(tripId: Int, lines: List<TripSaleLineQty>) {
+        val pack = loadPack(tripId) ?: return
+        val perCarton = pack.trip.lines.associate { it.productId to it.piecesPerCarton.coerceAtLeast(1) }
+        val sold = lines.associate { line ->
+            line.productId to (line.cartons * (perCarton[line.productId] ?: 1) + line.pieces)
+        }
+        val next = pack.trip.lines.map { line ->
+            val off = sold[line.productId] ?: 0
+            if (off == 0) {
+                line
+            } else {
+                val left = (line.onVehicle - off).coerceAtLeast(0)
+                val soldNow = line.sold + off
+                line.copy(
+                    sold = soldNow,
+                    soldQty = split(soldNow, line.piecesPerCarton),
+                    onVehicle = left,
+                    onVehicleQty = split(left, line.piecesPerCarton),
+                )
+            }
+        }
+        savePack(pack.copy(trip = pack.trip.copy(lines = next)))
+    }
+
+    private fun split(pieces: Int, piecesPerCarton: Int): PieceQty {
+        val (cartons, loose) = splitPieces(pieces, piecesPerCarton)
+        return PieceQty(pieces = pieces, cartons = cartons, loosePieces = loose)
     }
 
     // The pack is kept too, so the trip opens and sells with no network.

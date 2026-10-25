@@ -161,13 +161,51 @@ class TripOutboxTest {
         assertTrue(store.load(7).isEmpty)
     }
 
-    // A file the phone cannot read must not block the trip.
+    // A file the phone cannot read holds sales already paid for in cash, so it is put aside and
+    // never written over, and the trip screen says the office has to be told.
     @Test
-    fun aBrokenFileStartsAgainRatherThanBlocking() {
+    fun anUnreadableFileIsKeptAsideAndWarnedAbout() {
         val files = Memory()
         files.write("trip-7-outbox.json", "{ not json")
-        val outbox = TripOutboxStore(files).load(7)
+        val store = TripOutboxStore(files)
+
+        val outbox = store.load(7)
         assertTrue(outbox.isEmpty)
+        assertTrue(store.hasUnreadable(7))
+
+        // The text is kept under its own name, and the original is out of the way.
+        val kept = files.files.keys.filter { it.startsWith("trip-7-outbox-unreadable-") && it.endsWith(".json") }
+        assertEquals(1, kept.size)
+        assertEquals("{ not json", files.files[kept[0]])
+        assertNull(files.files["trip-7-outbox.json"])
+    }
+
+    // The next sale must not write over what could not be read.
+    @Test
+    fun aSaleAfterAnUnreadableFileDoesNotOverwriteIt() {
+        val files = Memory()
+        files.write("trip-7-outbox.json", "{ not json")
+        val store = TripOutboxStore(files)
+        store.load(7)
+        val kept = files.files.keys.first { it.startsWith("trip-7-outbox-unreadable-") }
+
+        store.addSale(7, sale("a"))
+
+        // The put-aside copy is untouched, and the new sale is in a file of its own.
+        assertEquals("{ not json", files.files[kept])
+        assertEquals(listOf("a"), store.load(7).sales.map { it.requestId })
+        assertTrue(store.hasUnreadable(7))
+    }
+
+    // Another trip is not tarred with it.
+    @Test
+    fun theWarningIsOnlyForTheTripItHappenedTo() {
+        val files = Memory()
+        files.write("trip-7-outbox.json", "{ not json")
+        val store = TripOutboxStore(files)
+        store.load(7)
+        assertTrue(store.hasUnreadable(7))
+        assertFalse(store.hasUnreadable(8))
     }
 
     // The pack is kept too, so a trip on the road opens with no network at all.
@@ -197,5 +235,50 @@ class TripOutboxTest {
         store.clear(7)
         store.clearPack(7)
         assertTrue(files.files.isEmpty())
+    }
+
+    // What a sale took comes off the pack kept on the phone, so the van count stays right between
+    // downloads. Without this the next form would offer goods that have already gone.
+    @Test
+    fun anOnlineSaleComesOffThePackOnThePhone() {
+        val files = Memory()
+        val store = TripOutboxStore(files)
+        store.savePack(
+            TripPack(
+                trip = TripDetail(
+                    id = 7,
+                    number = "TRP-000007",
+                    status = "out",
+                    canSell = true,
+                    lines = listOf(
+                        TripLine(productId = 1, brand = "Lucky", name = "Milk", packSize = "500 ml", piecesPerCarton = 12, loaded = 120, sold = 48, onVehicle = 72),
+                    ),
+                ),
+            ),
+        )
+
+        // Two cartons of twelve went out.
+        store.takeOffPack(7, listOf(TripSaleLineQty(productId = 1, cartons = 2, pricePerCarton = 25_000)))
+
+        val line = TripOutboxStore(files).loadPack(7)?.trip?.lines?.first()
+        assertEquals(48, line?.onVehicle)
+        assertEquals(4, line?.onVehicleQty?.cartons)
+        assertEquals(72, line?.sold)
+    }
+
+    @Test
+    fun takingOffMoreThanIsThereStopsAtNothing() {
+        val files = Memory()
+        val store = TripOutboxStore(files)
+        store.savePack(
+            TripPack(
+                trip = TripDetail(
+                    id = 7,
+                    lines = listOf(TripLine(productId = 1, piecesPerCarton = 12, loaded = 24, sold = 0, onVehicle = 24)),
+                ),
+            ),
+        )
+        store.takeOffPack(7, listOf(TripSaleLineQty(productId = 1, cartons = 5, pricePerCarton = 1)))
+        assertEquals(0, store.loadPack(7)?.trip?.lines?.first()?.onVehicle)
     }
 }

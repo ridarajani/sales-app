@@ -72,6 +72,7 @@ import com.salesapp.resources.trip_outbox_failed
 import com.salesapp.resources.trip_outbox_help
 import com.salesapp.resources.trip_outbox_one
 import com.salesapp.resources.trip_outbox_sales
+import com.salesapp.resources.trip_outbox_unreadable
 import com.salesapp.resources.trip_overspent
 import com.salesapp.resources.trip_record_sale
 import com.salesapp.resources.trip_sale_pending
@@ -160,6 +161,9 @@ fun TripDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Header(trip, state.fromPhone)
+                    // Sales already paid for in cash that the phone cannot read: the office has to
+                    // be told, and the file is kept aside for them.
+                    if (state.hasUnreadable) Say(stringResource(Res.string.trip_outbox_unreadable), error = true)
                     Outbox(state, onEvent)
                     state.actionError?.let { Say(it, error = true) }
                     if (trip.canLoad) LoadForm(state, trip, onEvent)
@@ -635,6 +639,18 @@ private fun TripOutboxPreview() {
                     ),
                 ),
             ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun TripUnreadablePreview() {
+    SalesTheme {
+        TripDetailScreen(
+            TripDetailState(loading = false, trip = sampleTrip, hasUnreadable = true),
             onEvent = {},
             onBack = {},
         )

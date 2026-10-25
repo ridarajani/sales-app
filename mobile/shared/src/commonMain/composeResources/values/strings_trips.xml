@@ -120,6 +120,7 @@
     <string name="trip_outbox_expenses">%1$d expenses not sent yet</string>
     <string name="trip_outbox_both">%1$d not sent yet</string>
     <string name="trip_outbox_help">They are kept on this phone and go up when there is a network.</string>
+    <string name="trip_outbox_unreadable">Some sales saved on this phone could not be read. Please tell the office before closing the trip.</string>
     <string name="trip_send_now">Send now</string>
     <string name="trip_sending">Sending...</string>
     <string name="trip_sent_all">Everything is sent.</string>
