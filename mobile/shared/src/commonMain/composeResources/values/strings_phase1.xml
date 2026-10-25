@@ -41,9 +41,6 @@
     <string name="tile_audit">Audit trail</string>
     <string name="tile_audit_sub">Who did what</string>
     <string name="tile_reports">Reports</string>
-    <string name="tile_reports_sales_sub">Sales and money owed</string>
-    <string name="tile_reports_export_sub">Excel, PDF, print</string>
-    <string name="tile_reports_stock_sub">Stock and deliveries</string>
     <string name="tile_more">More</string>
     <string name="tile_more_sub">Everything else</string>
     <string name="tile_nothing_waiting">Nothing waiting</string>

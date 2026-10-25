@@ -33,6 +33,8 @@ import com.salesapp.resources.product_name
 import com.salesapp.resources.product_pack
 import com.salesapp.resources.product_pack_hint
 import com.salesapp.resources.product_pack_note
+import com.salesapp.resources.product_low_stock
+import com.salesapp.resources.product_low_stock_note
 import com.salesapp.resources.product_pieces
 import com.salesapp.resources.product_selling
 import com.salesapp.resources.product_selling_note
@@ -48,6 +50,7 @@ import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.LoadingState
+import com.salesapp.ui.components.NumberField
 import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.Say
@@ -143,6 +146,13 @@ fun ProductFormScreen(state: ProductFormState, onEvent: (ProductFormEvent) -> Un
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                NumberField(
+                    label = stringResource(Res.string.product_low_stock),
+                    value = state.lowStock,
+                    onValueChange = { onEvent(ProductFormEvent.LowStock(it)) },
+                    note = stringResource(Res.string.product_low_stock_note),
+                    enabled = !state.busy,
+                )
                 if (state.isEdit) {
                     ToggleRow(
                         stringResource(Res.string.product_selling),
@@ -193,6 +203,7 @@ private fun ProductFormPreview() {
                 pieces = "400",
                 code = "LV-KG-075",
                 vatExempt = true,
+                lowStock = 20,
                 canDelete = true,
             ),
             onEvent = {},

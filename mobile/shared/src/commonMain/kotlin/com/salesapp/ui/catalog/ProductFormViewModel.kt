@@ -7,6 +7,7 @@ import com.salesapp.data.ListsRepository
 import com.salesapp.data.Product
 import com.salesapp.data.canDeleteProducts
 import com.salesapp.data.ProductRequest
+import com.salesapp.data.sentNumber
 import com.salesapp.resources.Res
 import com.salesapp.resources.catalog_added
 import com.salesapp.resources.catalog_saved
@@ -42,6 +43,8 @@ data class ProductFormState(
     val code: String = "",
     // Client, 24 Oct: no VAT is worked out on an exempt product.
     val vatExempt: Boolean = false,
+    // Phase 10: the level at which the product shows on the low stock report. Null means none.
+    val lowStock: Int? = null,
     val active: Boolean = true,
     val canDelete: Boolean = false,
     val asking: Boolean = false,
@@ -58,6 +61,7 @@ sealed interface ProductFormEvent {
     data class Pieces(val value: String) : ProductFormEvent
     data class Code(val value: String) : ProductFormEvent
     data class VatExempt(val value: Boolean) : ProductFormEvent
+    data class LowStock(val value: Int?) : ProductFormEvent
     data class Active(val value: Boolean) : ProductFormEvent
     data object Save : ProductFormEvent
     data object AskDelete : ProductFormEvent
@@ -106,6 +110,7 @@ class ProductFormViewModel(
             is ProductFormEvent.Pieces -> _state.update { it.copy(pieces = event.value.filter { c -> c.isDigit() }.take(6), error = null) }
             is ProductFormEvent.Code -> _state.update { it.copy(code = event.value.uppercase().filter { c -> c.isLetterOrDigit() || c == '-' || c == '_' }, error = null) }
             is ProductFormEvent.VatExempt -> _state.update { it.copy(vatExempt = event.value, error = null) }
+            is ProductFormEvent.LowStock -> _state.update { it.copy(lowStock = event.value, error = null) }
             is ProductFormEvent.Active -> _state.update { it.copy(active = event.value) }
             ProductFormEvent.Save -> save()
             ProductFormEvent.AskDelete -> if (_state.value.canDelete) _state.update { it.copy(asking = true) }
@@ -131,6 +136,7 @@ class ProductFormViewModel(
                         pieces = p.piecesPerCarton.toString(),
                         code = p.code,
                         vatExempt = p.vatExempt,
+                        lowStock = p.lowStockCartons,
                         active = p.active,
                     )
                 }
@@ -197,6 +203,8 @@ class ProductFormViewModel(
                     packSize = s.packSize.trim().takeIf { old == null || it != old.packSize },
                     piecesPerCarton = pieces.takeIf { old == null || it != old.piecesPerCarton },
                     vatExempt = s.vatExempt.takeIf { old == null || it != old.vatExempt },
+                    // Always sent, so emptying the field really takes the level away.
+                    lowStockCartons = sentNumber(s.lowStock),
                     active = if (old != null && s.active != old.active) s.active else null,
                 )
                 if (id == null) {

@@ -9,6 +9,7 @@ import com.salesapp.core.formatMwk
 import com.salesapp.data.AirtelRepository
 import com.salesapp.data.AppState
 import com.salesapp.data.CashRepository
+import com.salesapp.data.ReportsRepository
 import com.salesapp.data.ReturnsRepository
 import com.salesapp.data.TripsRepository
 import com.salesapp.data.LoadingRepository
@@ -23,6 +24,7 @@ import com.salesapp.data.canSeeTrips
 import com.salesapp.data.canSeeWallets
 import com.salesapp.data.holdsCash
 import com.salesapp.data.canSeeStock
+import com.salesapp.data.canSetTargets
 import com.salesapp.data.seesPlanChanges
 import com.salesapp.resources.Res
 import com.salesapp.resources.home_coming_soon
@@ -112,9 +114,9 @@ import com.salesapp.resources.tile_trips_many
 import com.salesapp.resources.tile_trips_none
 import com.salesapp.resources.tile_trips_one
 import com.salesapp.resources.tile_trips_sub
-import com.salesapp.resources.tile_reports_export_sub
-import com.salesapp.resources.tile_reports_sales_sub
-import com.salesapp.resources.tile_reports_stock_sub
+import com.salesapp.resources.tile_reports_sub
+import com.salesapp.resources.tile_targets
+import com.salesapp.resources.tile_targets_sub
 import com.salesapp.resources.tile_stock
 import com.salesapp.resources.tile_stock_count
 import com.salesapp.resources.tile_stock_count_sub
@@ -149,7 +151,9 @@ import com.salesapp.ui.navigation.PlansRoute
 import com.salesapp.ui.navigation.ProductsRoute
 import com.salesapp.ui.navigation.ReceiveStockRoute
 import com.salesapp.ui.navigation.StockCountRoute
+import com.salesapp.ui.navigation.ReportsRoute
 import com.salesapp.ui.navigation.StockRoute
+import com.salesapp.ui.navigation.TargetsRoute
 import com.salesapp.ui.navigation.UsersRoute
 import com.salesapp.ui.navigation.VehiclesRoute
 import kotlinx.coroutines.CancellationException
@@ -186,6 +190,12 @@ private fun approvalsTile(subText: String?) =
     tile(Res.string.tile_approvals, Res.string.tile_approvals_loading, AppIcons.Inbox, ApprovalsRoute, subText)
 
 private fun more() = tile(Res.string.tile_more, Res.string.tile_more_sub, AppIcons.Grid)
+
+// Phase 10. The server decides which reports a person may open, so the square is left out
+// altogether for anyone it gives none to (a driver).
+private fun reportsTile() = tile(Res.string.tile_reports, Res.string.tile_reports_sub, AppIcons.Chart, ReportsRoute)
+
+private fun targetsTile() = tile(Res.string.tile_targets, Res.string.tile_targets_sub, AppIcons.Chart, TargetsRoute)
 
 private fun newOrderTile() = tile(Res.string.tile_new_order, Res.string.tile_new_order_sub, AppIcons.Cart, NewOrderRoute)
 
@@ -234,6 +244,8 @@ private fun myTripsTile() = tile(Res.string.tile_my_trips, Res.string.tile_my_tr
 // Everyone who may see loading plans (canSeePlans) gets Loading, or My trips for a driver; never a salesman.
 internal fun tilesFor(
     role: String,
+    hasReports: Boolean = false,
+    canSetTargets: Boolean = false,
     expiringSub: String? = null,
     approvalsSub: String? = null,
     loadingCount: Int? = null,
@@ -246,143 +258,153 @@ internal fun tilesFor(
     returnsCount: Int? = null,
     tripsSub: String? = null,
     tripsCount: Int? = null,
-): List<TileDef> = when (role) {
-    "admin" -> listOf(
-        newOrderTile(),
-        tile(Res.string.tile_users, Res.string.tile_users_admin_sub, AppIcons.Person, UsersRoute),
-        tile(Res.string.tile_customers, Res.string.tile_customers_add, AppIcons.People, CustomersRoute),
-        ordersTile(),
-        loadingTile(loadingCount),
-        tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
-        tile(Res.string.tile_companies, Res.string.tile_companies_sub, AppIcons.Settings, CompaniesRoute),
-        tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
-        expiringTile(expiringSub),
-        approvalsTile(approvalsSub),
-        invoicesTile(Res.string.tile_invoices_register_print),
-        recordPaymentTile(),
-        paymentsTile(),
-        returnsTile(returnsSub, returnsCount),
-        ledgerTile(),
-        tripsTile(tripsSub, tripsCount),
-        expensesTile(),
-        handOverTile(cashSub),
-        countCashTile(countSub, countCount),
-        airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
-        tile(Res.string.tile_audit, Res.string.tile_audit_sub, AppIcons.List),
-        tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
-        more(),
-    )
-    "management" -> listOf(
-        tile(Res.string.tile_today, Res.string.tile_today_sub, AppIcons.Chart),
-        ordersTile(),
-        approvalsTile(approvalsSub),
-        loadingTile(loadingCount),
-        airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
-        paymentsTile(),
-        returnsTile(),
-        ledgerTile(),
-        tripsTile(tripsSub, tripsCount),
-        tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
-        tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
-        expiringTile(expiringSub),
-        invoicesTile(Res.string.tile_invoices_register),
-        tile(Res.string.tile_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
-        tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
-        tile(Res.string.tile_users, Res.string.tile_users_manage_sub, AppIcons.Person, UsersRoute),
-        more(),
-    )
-    "sales_manager" -> listOf(
-        newOrderTile(),
-        loadingTile(loadingCount),
-        collectTile(Res.string.tile_collect_money_sub),
-        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
-        handOverTile(cashSub),
-        expensesTile(),
-        returnsTile(),
-        ledgerTile(),
-        tripsTile(tripsSub, tripsCount),
-        tile(Res.string.tile_my_salesmen, Res.string.tile_my_salesmen_sub, AppIcons.People, UsersRoute),
-        ordersTile(),
-        tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
-        tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
-        invoicesTile(Res.string.tile_invoices_share),
-        tile(Res.string.tile_reports, Res.string.tile_reports_sales_sub, AppIcons.Chart),
-        more(),
-    )
-    "salesman" -> listOf(
-        newOrderTile(),
-        collectTile(Res.string.tile_collect_money_sub),
-        handOverTile(cashSub),
-        expensesTile(),
-        ordersTile(),
-        tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
-        invoicesTile(Res.string.tile_invoices_share),
-        returnsTile(),
-        ledgerTile(),
-        tripsTile(tripsSub, tripsCount),
-        more(),
-    )
-    "warehouse" -> listOf(
-        tile(Res.string.tile_jobs, Res.string.tile_nothing_waiting, AppIcons.Box),
-        ordersTile(),
-        loadingTile(loadingCount),
-        tile(Res.string.tile_receive_stock, Res.string.tile_receive_stock_sub, AppIcons.Box, ReceiveStockRoute),
-        tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
-        expiringTile(expiringSub),
-        tile(Res.string.tile_stock_count, Res.string.tile_stock_count_sub, AppIcons.Inbox, StockCountRoute),
-        returnsTile(returnsSub, returnsCount),
-        tripsTile(tripsSub, tripsCount),
-        tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
-        tile(Res.string.tile_reports, Res.string.tile_reports_stock_sub, AppIcons.Chart),
-        more(),
-    )
-    "driver" -> listOf(
-        myTripsTile(),
-        tile(Res.string.tile_hand_over_goods, Res.string.tile_hand_over_goods_sub, AppIcons.Box),
-        tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
-        invoicesTile(Res.string.tile_invoices_register),
-        tripsTile(tripsSub, tripsCount),
-        more(),
-    )
-    "cashier" -> listOf(
-        countCashTile(countSub, countCount),
-        ordersTile(),
-        loadingTile(loadingCount),
-        recordPaymentTile(),
-        paymentsTile(),
-        ledgerTile(),
-        tripsTile(tripsSub, tripsCount),
-        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
-        tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
-        invoicesTile(Res.string.tile_invoices_register_print),
-        tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
-        more(),
-    )
-    "accounts" -> listOf(
-        invoicesTile(Res.string.tile_invoices_register_print),
-        recordPaymentTile(),
-        paymentsTile(),
-        handOverTile(cashSub),
-        returnsTile(returnsSub, returnsCount),
-        ledgerTile(),
-        airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
-        tripsTile(tripsSub, tripsCount),
-        ordersTile(),
-        loadingTile(loadingCount),
-        tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
-        tile(Res.string.tile_ledger, Res.string.tile_ledger_sub, AppIcons.List),
-        tile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, CustomersRoute),
-        tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
-        tile(Res.string.tile_reports, Res.string.tile_reports_export_sub, AppIcons.Chart),
-        more(),
-    )
-    else -> listOf(more())
+): List<TileDef> {
+    val tiles = when (role) {
+        "admin" -> listOf(
+            newOrderTile(),
+            tile(Res.string.tile_users, Res.string.tile_users_admin_sub, AppIcons.Person, UsersRoute),
+            tile(Res.string.tile_customers, Res.string.tile_customers_add, AppIcons.People, CustomersRoute),
+            ordersTile(),
+            loadingTile(loadingCount),
+            tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+            tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
+            tile(Res.string.tile_companies, Res.string.tile_companies_sub, AppIcons.Settings, CompaniesRoute),
+            tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
+            expiringTile(expiringSub),
+            approvalsTile(approvalsSub),
+            invoicesTile(Res.string.tile_invoices_register_print),
+            recordPaymentTile(),
+            paymentsTile(),
+            returnsTile(returnsSub, returnsCount),
+            ledgerTile(),
+            tripsTile(tripsSub, tripsCount),
+            expensesTile(),
+            handOverTile(cashSub),
+            countCashTile(countSub, countCount),
+            airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
+            tile(Res.string.tile_audit, Res.string.tile_audit_sub, AppIcons.List),
+            reportsTile(),
+            targetsTile(),
+            more(),
+        )
+        "management" -> listOf(
+            tile(Res.string.tile_today, Res.string.tile_today_sub, AppIcons.Chart),
+            ordersTile(),
+            approvalsTile(approvalsSub),
+            loadingTile(loadingCount),
+            airtelTile(Res.string.tile_airtel_both, airtelSub, airtelCount),
+            paymentsTile(),
+            returnsTile(),
+            ledgerTile(),
+            tripsTile(tripsSub, tripsCount),
+            reportsTile(),
+            targetsTile(),
+            tile(Res.string.tile_stock, Res.string.tile_stock_sub, AppIcons.Box, StockRoute),
+            expiringTile(expiringSub),
+            invoicesTile(Res.string.tile_invoices_register),
+            tile(Res.string.tile_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
+            tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+            tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
+            tile(Res.string.tile_users, Res.string.tile_users_manage_sub, AppIcons.Person, UsersRoute),
+            more(),
+        )
+        "sales_manager" -> listOf(
+            newOrderTile(),
+            loadingTile(loadingCount),
+            collectTile(Res.string.tile_collect_money_sub),
+            airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
+            handOverTile(cashSub),
+            expensesTile(),
+            returnsTile(),
+            ledgerTile(),
+            tripsTile(tripsSub, tripsCount),
+            tile(Res.string.tile_my_salesmen, Res.string.tile_my_salesmen_sub, AppIcons.People, UsersRoute),
+            ordersTile(),
+            tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
+            tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+            tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
+            invoicesTile(Res.string.tile_invoices_share),
+            reportsTile(),
+            targetsTile(),
+            more(),
+        )
+        "salesman" -> listOf(
+            newOrderTile(),
+            collectTile(Res.string.tile_collect_money_sub),
+            handOverTile(cashSub),
+            expensesTile(),
+            ordersTile(),
+            tile(Res.string.tile_my_customers, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
+            invoicesTile(Res.string.tile_invoices_share),
+            returnsTile(),
+            ledgerTile(),
+            tripsTile(tripsSub, tripsCount),
+            more(),
+        )
+        "warehouse" -> listOf(
+            tile(Res.string.tile_jobs, Res.string.tile_nothing_waiting, AppIcons.Box),
+            ordersTile(),
+            loadingTile(loadingCount),
+            tile(Res.string.tile_receive_stock, Res.string.tile_receive_stock_sub, AppIcons.Box, ReceiveStockRoute),
+            tile(Res.string.tile_stock, Res.string.tile_stock_warehouse_sub, AppIcons.Box, StockRoute),
+            expiringTile(expiringSub),
+            tile(Res.string.tile_stock_count, Res.string.tile_stock_count_sub, AppIcons.Inbox, StockCountRoute),
+            returnsTile(returnsSub, returnsCount),
+            tripsTile(tripsSub, tripsCount),
+            tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+            tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
+            reportsTile(),
+            more(),
+        )
+        "driver" -> listOf(
+            myTripsTile(),
+            tile(Res.string.tile_hand_over_goods, Res.string.tile_hand_over_goods_sub, AppIcons.Box),
+            tile(Res.string.tile_report_shortage, Res.string.tile_report_shortage_sub, AppIcons.Inbox),
+            invoicesTile(Res.string.tile_invoices_register),
+            tripsTile(tripsSub, tripsCount),
+            more(),
+        )
+        "cashier" -> listOf(
+            countCashTile(countSub, countCount),
+            ordersTile(),
+            loadingTile(loadingCount),
+            recordPaymentTile(),
+            paymentsTile(),
+            ledgerTile(),
+            tripsTile(tripsSub, tripsCount),
+            airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
+            tile(Res.string.tile_who_owes, Res.string.tile_look_up, AppIcons.People, CustomersRoute),
+            invoicesTile(Res.string.tile_invoices_register_print),
+            reportsTile(),
+            more(),
+        )
+        "accounts" -> listOf(
+            invoicesTile(Res.string.tile_invoices_register_print),
+            recordPaymentTile(),
+            paymentsTile(),
+            handOverTile(cashSub),
+            returnsTile(returnsSub, returnsCount),
+            ledgerTile(),
+            airtelTile(Res.string.tile_airtel_ledger, airtelSub, airtelCount),
+            tripsTile(tripsSub, tripsCount),
+            ordersTile(),
+            loadingTile(loadingCount),
+            tile(Res.string.tile_credit_notes, Res.string.tile_credit_notes_sub, AppIcons.Receipt),
+            tile(Res.string.tile_ledger, Res.string.tile_ledger_sub, AppIcons.List),
+            tile(Res.string.tile_customers, Res.string.tile_balances_terms, AppIcons.People, CustomersRoute),
+            tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
+            reportsTile(),
+            more(),
+        )
+        else -> listOf(more())
+    }
+    // The Reports square waits until the server has said this person has reports to open, and the
+    // Targets square is only for those who may set them.
+    return tiles.filterNot {
+        (it.labelRes == Res.string.tile_reports && !hasReports) ||
+            (it.labelRes == Res.string.tile_targets && !canSetTargets)
+    }
 }
-
 
 private fun greetingFor(hour: Int): StringResource = when {
     hour < 12 -> Res.string.home_good_morning
@@ -412,6 +434,9 @@ data class HomeState(
     // Phase 9: how many trips are on the road.
     val tripsSub: String? = null,
     val tripsCount: Int? = null,
+    // Phase 10: true once the server has said this person has reports to open.
+    val hasReports: Boolean = false,
+    val canSetTargets: Boolean = false,
 )
 
 sealed interface HomeEvent {
@@ -434,6 +459,7 @@ class HomeViewModel(
     private val airtelRepository: AirtelRepository,
     private val returnsRepository: ReturnsRepository,
     private val tripsRepository: TripsRepository,
+    private val reportsRepository: ReportsRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
@@ -445,12 +471,14 @@ class HomeViewModel(
     private var approvalsLoading = false
     private var loadingLoading = false
     private var moneyLoading = false
+    private var reportsLoading = false
 
     // Every tile list is built from the state, so a new sub-line is never forgotten.
     private fun tilesOf(s: HomeState, role: String = s.role): List<TileDef> =
         tilesFor(
-            role, s.expiringSub, s.approvalsSub, s.loadingCount, s.cashSub, s.countSub, s.countCount,
-            s.airtelSub, s.airtelCount, s.returnsSub, s.returnsCount, s.tripsSub, s.tripsCount,
+            role, s.hasReports, s.canSetTargets, s.expiringSub, s.approvalsSub, s.loadingCount, s.cashSub,
+            s.countSub, s.countCount, s.airtelSub, s.airtelCount, s.returnsSub, s.returnsCount,
+            s.tripsSub, s.tripsCount,
         )
 
     init {
@@ -468,6 +496,7 @@ class HomeViewModel(
                 loadApprovals()
                 loadLoading()
                 loadMoney()
+                loadReports()
             }
         }
     }
@@ -498,6 +527,28 @@ class HomeViewModel(
                 loadApprovals()
                 loadLoading()
                 loadMoney()
+                loadReports()
+            }
+        }
+    }
+
+    // Which reports a person may open is the server's business, so the Reports square waits for its
+    // answer; a driver is given none and never sees the square. Errors are ignored.
+    private fun loadReports() {
+        val user = app.user ?: return
+        _state.update { val next = it.copy(canSetTargets = user.canSetTargets()); next.copy(tiles = tilesOf(next)) }
+        if (reportsLoading || _state.value.hasReports) return
+        reportsLoading = true
+        viewModelScope.launch {
+            try {
+                val has = reportsRepository.catalogue().groups.isNotEmpty()
+                _state.update { val next = it.copy(hasReports = has); next.copy(tiles = tilesOf(next)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // No square until the server answers.
+            } finally {
+                reportsLoading = false
             }
         }
     }

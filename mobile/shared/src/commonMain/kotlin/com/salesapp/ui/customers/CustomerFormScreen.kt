@@ -34,6 +34,8 @@ import com.salesapp.resources.form_can_buy_note
 import com.salesapp.resources.form_cash_only
 import com.salesapp.resources.form_cash_only_note
 import com.salesapp.resources.form_companies
+import com.salesapp.resources.form_credit_limit
+import com.salesapp.resources.form_credit_limit_note
 import com.salesapp.resources.form_days
 import com.salesapp.resources.form_edit_title
 import com.salesapp.resources.form_name
@@ -47,6 +49,7 @@ import com.salesapp.ui.components.ChoiceColumn
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.LoadingState
+import com.salesapp.ui.components.MwkField
 import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
@@ -148,6 +151,14 @@ private fun androidx.compose.foundation.layout.ColumnScope.FormBody(state: Custo
                         modifier = Modifier.padding(start = 16.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
+                    // Phase 10: what the office allows this customer to owe this company.
+                    MwkField(
+                        label = stringResource(Res.string.form_credit_limit),
+                        amount = state.limits[code],
+                        onAmountChange = { onEvent(CustomerFormEvent.LimitChanged(code, it)) },
+                        modifier = Modifier.padding(start = 16.dp),
+                        note = stringResource(Res.string.form_credit_limit_note),
+                    )
                 }
             }
         }
@@ -206,6 +217,7 @@ private fun previewState(edit: Boolean) = CustomerFormState(
     availableCompanies = listOf("LV", "ZT", "ZF", "GL"),
     selected = if (edit) setOf("LV", "ZT") else emptySet(),
     days = mapOf("LV" to "30", "ZT" to "14", "ZF" to "30", "GL" to "30"),
+    limits = if (edit) mapOf("LV" to 2_000_000L) else emptyMap(),
     needsLpo = edit,
     canDelete = edit,
 )

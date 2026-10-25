@@ -456,6 +456,22 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     suspend fun closeTrip(id: Int, request: CloseTripRequest): TripDetail =
         post<TripDetail, CloseTripRequest>("/trips/$id/close", request)
 
+    // Phase 10: reports and targets.
+
+    // The reports this person may open, by group, with the staff they may pick.
+    suspend fun reports(): ReportCatalogue = get("/reports")
+
+    suspend fun report(key: String, filters: Map<String, String?>): ReportResult = get("/reports/$key", filters)
+
+    // The same report as an Excel sheet or a printable PDF.
+    suspend fun reportFile(key: String, filters: Map<String, String?>, format: String): ServerFile =
+        bytes("/reports/$key", filters + ("format" to format))
+
+    suspend fun targets(month: String): List<TargetRow> = get("/targets", mapOf("month" to month))
+
+    // Build the body with targetBody(...), so an empty amount is sent as null and takes the target away.
+    suspend fun setTarget(body: JsonObject): TargetRow = put<TargetRow, JsonObject>("/targets", body)
+
     suspend fun tripSaleSignature(saleId: Int): ServerFile = bytes("/trip-sales/$saleId/signature")
 
     suspend fun tripSaleProof(saleId: Int): ServerFile = bytes("/trip-sales/$saleId/proof")

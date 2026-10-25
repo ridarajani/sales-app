@@ -9,6 +9,7 @@ import com.salesapp.data.Customer
 import com.salesapp.data.canDeleteCustomers
 import com.salesapp.data.CustomerCompany
 import com.salesapp.data.CustomerRequest
+import com.salesapp.data.customerCompanies
 import com.salesapp.data.ListsRepository
 import com.salesapp.resources.delete_done
 import com.salesapp.resources.delete_kept
@@ -50,6 +51,8 @@ data class CustomerFormState(
     val selected: Set<String> = emptySet(),
     // Days to pay as typed, by company code.
     val days: Map<String, String> = emptyMap(),
+    // Phase 10: the credit limit as typed, by company code. Empty means no limit.
+    val limits: Map<String, Long?> = emptyMap(),
     val cashOnly: Boolean = false,
     val needsLpo: Boolean = false,
     val active: Boolean = true,
@@ -73,6 +76,7 @@ sealed interface CustomerFormEvent {
     data class ChannelPicked(val code: String) : CustomerFormEvent
     data class CompanyToggled(val code: String) : CustomerFormEvent
     data class DaysChanged(val code: String, val value: String) : CustomerFormEvent
+    data class LimitChanged(val code: String, val value: Long?) : CustomerFormEvent
     data class CashOnlyChanged(val value: Boolean) : CustomerFormEvent
     data class NeedsLpoChanged(val value: Boolean) : CustomerFormEvent
     data class ActiveChanged(val value: Boolean) : CustomerFormEvent
@@ -141,6 +145,7 @@ class CustomerFormViewModel(
                 it.copy(selected = if (event.code in it.selected) it.selected - event.code else it.selected + event.code)
             }
             is CustomerFormEvent.DaysChanged -> edit { it.copy(days = it.days + (event.code to event.value.filter(Char::isDigit).take(3))) }
+            is CustomerFormEvent.LimitChanged -> edit { it.copy(limits = it.limits + (event.code to event.value)) }
             is CustomerFormEvent.CashOnlyChanged -> edit { it.copy(cashOnly = event.value) }
             is CustomerFormEvent.NeedsLpoChanged -> edit { it.copy(needsLpo = event.value) }
             CustomerFormEvent.AskDelete -> if (_state.value.canDelete) _state.update { it.copy(asking = true) }
@@ -176,6 +181,9 @@ class CustomerFormViewModel(
                             days = available.associateWith { "30" },
                         )
                     } else {
+                        val limits = available.associateWith { code ->
+                            customer.companies.firstOrNull { c -> c.code == code }?.creditLimit?.toLong()
+                        }
                         val days = available.associateWith { code ->
                             val stored = customer.companies.firstOrNull { c -> c.code == code }?.paymentTermsDays
                             if (stored == null || customer.cashOnly) "30" else stored.toString()
@@ -193,6 +201,7 @@ class CustomerFormViewModel(
                             channel = customer.channel,
                             selected = customer.companies.map { c -> c.code }.filter { c -> c in available }.toSet(),
                             days = days,
+                            limits = limits,
                             cashOnly = customer.cashOnly,
                             needsLpo = customer.needsLpo,
                             active = customer.active,
@@ -231,7 +240,13 @@ class CustomerFormViewModel(
                 _state.update { it.copy(saving = false, error = problem) }
                 return@launch
             }
-            val companies = chosen.mapIndexed { i, code -> CustomerCompany(code, if (s.cashOnly) 0 else dayValues[i] ?: 0) }
+            val companies = chosen.mapIndexed { i, code ->
+                CustomerCompany(
+                    code = code,
+                    paymentTermsDays = if (s.cashOnly) 0 else dayValues[i] ?: 0,
+                    creditLimit = s.limits[code]?.toInt(),
+                )
+            }
             try {
                 val before = original
                 if (before == null) {
@@ -247,7 +262,7 @@ class CustomerFormViewModel(
                             regNo = s.regNo.trim(),
                             needsLpo = s.needsLpo,
                             cashOnly = s.cashOnly,
-                            companies = companies,
+                            companies = customerCompanies(companies),
                         ),
                     )
                     app.message = getString(Res.string.form_added, name)
@@ -270,7 +285,7 @@ class CustomerFormViewModel(
                             regNo = s.regNo.trim(),
                             needsLpo = s.needsLpo,
                             cashOnly = s.cashOnly,
-                            companies = if (changed) companies + hidden else null,
+                            companies = if (changed) customerCompanies(companies + hidden) else null,
                             active = s.active,
                         ),
                     )

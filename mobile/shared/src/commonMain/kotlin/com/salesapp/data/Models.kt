@@ -1,7 +1,13 @@
 package com.salesapp.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -109,7 +115,13 @@ data class NewUserRequest(
 data class ResetPinRequest(val pin: String)
 
 @Serializable
-data class CustomerCompany(val code: String, val paymentTermsDays: Int = 0)
+data class CustomerCompany(
+    val code: String,
+    val paymentTermsDays: Int = 0,
+    // Phase 10: how much this customer may owe this company. Null means no limit. It shows on the
+    // reports only and never stops an order.
+    val creditLimit: Int? = null,
+)
 
 @Serializable
 data class Customer(
@@ -143,7 +155,8 @@ data class CustomerRequest(
     val phone: String? = null,
     val needsLpo: Boolean? = null,
     val cashOnly: Boolean? = null,
-    val companies: List<CustomerCompany>? = null,
+    // Build it with customerCompanies(...), so an empty credit limit is sent as null.
+    val companies: JsonArray? = null,
     val active: Boolean? = null,
 )
 
@@ -158,6 +171,8 @@ data class Product(
     val piecesPerCarton: Int = 1,
     // Client, 24 Oct: VAT is worked out only on the lines that are not exempt.
     val vatExempt: Boolean = false,
+    // Phase 10: less free to sell than this many cartons puts it on the low stock report.
+    val lowStockCartons: Int? = null,
     val active: Boolean = true,
 )
 
@@ -170,6 +185,8 @@ data class ProductRequest(
     val packSize: String? = null,
     val piecesPerCarton: Int? = null,
     val vatExempt: Boolean? = null,
+    // Always sent on a save, as null when the field is empty: see sentNumber.
+    val lowStockCartons: JsonElement? = null,
     val active: Boolean? = null,
 )
 
@@ -202,6 +219,22 @@ data class VehicleRequest(
 
 // Builds the body for changing a vehicle. Only the fields passed are sent; a passed null is sent
 // as null (clears the value). Leave a field out to keep it as it is.
+// A whole number that is always sent, even when there is none. The server reads a missing field as
+// "leave it as it was" and a null as "there is none", so clearing a field needs the null to go.
+fun sentNumber(value: Int?): JsonElement = if (value == null) JsonNull else JsonPrimitive(value)
+
+// The companies of a customer, with each one's days to pay and credit limit. The limit is always
+// sent, as null when there is none, so clearing it on an edit really clears it.
+fun customerCompanies(companies: List<CustomerCompany>): JsonArray = buildJsonArray {
+    companies.forEach { company ->
+        addJsonObject {
+            put("code", company.code)
+            put("paymentTermsDays", company.paymentTermsDays)
+            put("creditLimit", company.creditLimit as Number?)
+        }
+    }
+}
+
 fun vehicleChange(
     plate: String? = null,
     description: String? = null,

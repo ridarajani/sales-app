@@ -129,3 +129,7 @@ fun User.canManageUser(target: UserRow): Boolean = when {
 
 // A sales manager cannot change what job their salesman does.
 fun User.canChangeUserRole(): Boolean = role == "admin"
+
+// Phase 10: Admin, Management and sales managers set each salesman's monthly target. The reports a
+// person may open are decided by the server, which gives a driver none at all.
+fun User.canSetTargets(): Boolean = role == "admin" || role == "management" || role == "sales_manager"
