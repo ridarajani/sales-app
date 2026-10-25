@@ -120,15 +120,18 @@ class TripOutboxStore(private val files: Files) {
     // What one kept file holds, as it was written.
     fun keptText(name: String): String? = files.read(name)
 
-    // Sends every kept file the office has not had yet, each exactly once. The name that went up is
-    // written down beside the marker; the file itself is never deleted to record that, because it
-    // holds sales nobody else has.
-    suspend fun sendKept(tripId: Int, send: suspend (name: String, text: String) -> Unit) {
+    // Sends every kept file the office has not had yet, each exactly once, and answers how many
+    // went up. The name that went up is written down beside the marker; the file itself is never
+    // deleted to record that, because it holds sales nobody else has.
+    suspend fun sendKept(tripId: Int, send: suspend (name: String, text: String) -> Unit): Int {
+        var sent = 0
         for (name in unsentKept(tripId)) {
             val text = keptText(name) ?: continue
             send(name, text)
             markSent(tripId, name)
+            sent++
         }
+        return sent
     }
 
     // Writes down that a file has gone to the office. The file itself stays where it is.
