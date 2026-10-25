@@ -23,3 +23,6 @@ export const config = {
   bootstrapAdminPhone: process.env.BOOTSTRAP_ADMIN_PHONE ?? '0990000000',
   bootstrapAdminPin: process.env.BOOTSTRAP_ADMIN_PIN ?? '1234',
 };
+
+// The office website's files, in the repo.
+export const officeDir = fileURLToPath(new URL('../office', import.meta.url));

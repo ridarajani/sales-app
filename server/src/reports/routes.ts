@@ -6,7 +6,7 @@ import { CHANNEL_LABELS, CHANNELS, invalid, notFound } from '../lists/common.js'
 import { dateText } from '../print/pdf.js';
 import { INT4_MAX, parse } from '../users.js';
 import { REPORTS } from './catalogue.js';
-import { ALL_START, canSee, GROUPS, runReport, type Filters, type Report } from './engine.js';
+import { ALL_START, canSee, GROUPS, runReport, today, type Filters, type Report } from './engine.js';
 import { reportPdf, reportXlsx } from './output.js';
 
 const id = z.coerce.number().int().positive().max(INT4_MAX).optional();
@@ -21,9 +21,6 @@ const reportQuery = z.object({
   format: z.enum(['json', 'xlsx', 'pdf']).default('json'),
 });
 const keyParams = z.object({ key: z.string().max(60) });
-
-// Today in Malawi (UTC+2 all year).
-const today = () => new Date(Date.now() + 2 * 3_600_000).toISOString().slice(0, 10);
 
 function defaultFrom(report: Report, to: string) {
   if (report.defaultFrom === 'all') return ALL_START;

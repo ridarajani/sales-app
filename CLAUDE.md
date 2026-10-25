@@ -6,6 +6,7 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 
 - `index.html`: the clickable prototype, served on GitHub Pages. Never change or move it. It is the agreed behaviour, together with the client's brief of 16 October 2026.
 - `server/`: Node.js 22, TypeScript, Fastify, PostgreSQL. Database changes are numbered SQL files in `server/src/db/migrations`, each run once.
+- `server/office/`: the office website (plain HTML, CSS and JavaScript, no build step), served by the server at `/office/`.
 - `mobile/`: one phone app for Android and iPhone (Kotlin Multiplatform, Compose Multiplatform). Screens live in `mobile/shared/src/commonMain`; `androidApp` and `iosApp` are thin shells.
 - `docs/DATABASE.md`: tables and how to view the data. Update it with every migration.
 - `docs/PLAN.md`: phases 0 to 11, the eight roles, and how staff get the app. Work one phase at a time, each in its own pull request.

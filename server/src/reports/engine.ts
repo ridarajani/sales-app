@@ -59,6 +59,9 @@ export const GROUPS: { key: string; title: string }[] = [
 // The most rows a report gives; more means the dates or filters should be narrowed.
 export const MAX_ROWS = 10_000;
 
+// Today in Malawi (UTC+2 all year).
+export const today = () => new Date(Date.now() + 2 * 3_600_000).toISOString().slice(0, 10);
+
 // The start of the dates for a report that covers everything.
 export const ALL_START = '2000-01-01';
 

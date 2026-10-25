@@ -306,3 +306,27 @@ test('a low-stock level and a credit limit stay when other fields are edited', a
     { code: 'ZT', paymentTermsDays: 14, creditLimit: 50000 },
   ]);
 });
+
+test('the dashboard shows each job its own numbers, each from a report', async () => {
+  const d = (await get(app, manager, '/dashboard')).json();
+  const tile = (key: string) => d.tiles.find((t: { key: string }) => t.key === key);
+  expect(tile('salesMonth')).toMatchObject({ value: 145000, kind: 'money', report: 'sales-daily' });
+  expect(tile('ordersPending')).toMatchObject({ value: 2, report: 'orders-pending' });
+  expect(d.salesByDay).toHaveLength(1);
+  expect(tile('lowStock')).toBeDefined();
+
+  const store_ = (await get(app, store, '/dashboard')).json();
+  expect(store_.tiles.map((t: { key: string }) => t.key)).toEqual(['lowStock']);
+  expect(store_.salesByDay).toBeNull();
+  const mine = (await get(app, other, '/dashboard')).json();
+  expect(mine.tiles.find((t: { key: string }) => t.key === 'salesMonth').value).toBe(0);
+});
+
+test('the office website is served with a strict content policy', async () => {
+  const page = await app.inject({ method: 'GET', url: '/office/' });
+  expect(page.statusCode).toBe(200);
+  expect(page.body).toContain('<script type="module" src="office.js">');
+  expect(page.headers['content-security-policy']).toContain("default-src 'self'");
+  expect((await app.inject({ method: 'GET', url: '/office/office.js' })).statusCode).toBe(200);
+  expect((await app.inject({ method: 'GET', url: '/office' })).headers.location).toBe('/office/');
+});

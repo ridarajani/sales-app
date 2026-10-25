@@ -1,7 +1,7 @@
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { HttpError } from './auth/guard.js';
-import { config } from './config.js';
+import { config, officeDir } from './config.js';
 import type { Db } from './db/pool.js';
 import { appRoutes } from './routes/app.js';
 import { authRoutes } from './routes/auth.js';
@@ -25,6 +25,7 @@ import { ledgerRoutes } from './returns/ledger.js';
 import { tripRoutes } from './trips/trips.js';
 import { reportRoutes } from './reports/routes.js';
 import { targetRoutes } from './reports/targets.js';
+import { dashboardRoutes } from './reports/dashboard.js';
 
 export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string; brandingDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -90,6 +91,19 @@ export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string;
   tripRoutes(app, db, options.uploadDir ?? config.uploadDir);
   reportRoutes(app, db);
   targetRoutes(app, db);
+  dashboardRoutes(app, db);
+
+  // The office website: plain files, signed in with the same phone and PIN as the app.
+  app.register(fastifyStatic, {
+    root: officeDir,
+    prefix: '/office/',
+    decorateReply: false,
+    setHeaders: (res) => {
+      res.header('content-security-policy', "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
+      res.header('x-content-type-options', 'nosniff');
+    },
+  });
+  app.get('/office', async (_request, reply) => reply.redirect('/office/'));
 
   return app;
 }
