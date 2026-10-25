@@ -13,7 +13,7 @@ export const dateText = (iso: string) => {
   return `${d}/${m}/${y}`;
 };
 
-function toBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
+export function toBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const parts: Buffer[] = [];
     doc.on('data', (b: Buffer) => parts.push(b));

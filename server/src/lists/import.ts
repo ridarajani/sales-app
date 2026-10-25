@@ -235,6 +235,7 @@ async function checkProducts(db: Db, rows: { row: number; values: Record<string,
         packSize: values['Pack size']!,
         piecesPerCarton: pieces,
         vatExempt: vatExempt!,
+        lowStockCartons: null,
       });
     }
   }

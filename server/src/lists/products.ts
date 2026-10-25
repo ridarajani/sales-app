@@ -16,6 +16,8 @@ export type Product = {
   packSize: string;
   piecesPerCarton: number;
   vatExempt: boolean;
+  // Below this many cartons free to sell, the product shows on the low stock report.
+  lowStockCartons: number | null;
   active: boolean;
 };
 
@@ -27,9 +29,10 @@ const productFields = z.object({
   packSize: z.string().trim().min(1, 'Please type the pack size, for example 400g tin.'),
   piecesPerCarton: z.number().int().positive('Pieces per carton must be more than 0.').max(100000),
   vatExempt: z.boolean(),
+  lowStockCartons: z.number().int('Please type whole cartons.').min(0).max(1_000_000).nullable(),
 });
 // Defaults apply only when creating. An update leaves out fields it does not send.
-const productBody = productFields.extend({ vatExempt: z.boolean().default(false) });
+const productBody = productFields.extend({ vatExempt: z.boolean().default(false), lowStockCartons: productFields.shape.lowStockCartons.default(null) });
 const updateBody = productFields.partial().extend({ active: z.boolean().optional() });
 const listQuery = z.object({
   q: z.string().trim().optional(),
@@ -40,7 +43,8 @@ const listQuery = z.object({
 export type NewProduct = z.infer<typeof productBody>;
 
 const productSelect = `select p.id, p.code, p.company_code as "companyCode", p.brand, p.name, p.pack_size as "packSize",
-    p.pieces_per_carton as "piecesPerCarton", p.vat_exempt as "vatExempt", p.active
+    p.pieces_per_carton as "piecesPerCarton", p.vat_exempt as "vatExempt",
+    p.low_stock_cartons as "lowStockCartons", p.active
   from products p join companies co on co.code = p.company_code
   where p.deleted_at is null`;
 
@@ -50,9 +54,10 @@ export async function checkProductCompany(db: Db, code: string) {
 
 export async function insertProduct(client: PoolClient | Db, p: NewProduct): Promise<number | null> {
   const { rows } = await client.query<{ id: number }>(
-    `insert into products (code, company_code, brand, name, pack_size, pieces_per_carton, vat_exempt) values ($1, $2, $3, $4, $5, $6, $7)
+    `insert into products (code, company_code, brand, name, pack_size, pieces_per_carton, vat_exempt, low_stock_cartons)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
      on conflict (code) where deleted_at is null do nothing returning id`,
-    [p.code, p.companyCode, p.brand, p.name, p.packSize, p.piecesPerCarton, p.vatExempt],
+    [p.code, p.companyCode, p.brand, p.name, p.packSize, p.piecesPerCarton, p.vatExempt, p.lowStockCartons],
   );
   return rows[0]?.id ?? null;
 }
@@ -109,7 +114,7 @@ export function productRoutes(app: FastifyInstance, db: Db) {
     }
     const { rowCount } = await db.query(
       `update products set code = $2, company_code = $3, brand = $4, name = $5, pack_size = $6, pieces_per_carton = $7,
-         active = $8, vat_exempt = $9, updated_at = now()
+         active = $8, vat_exempt = $9, low_stock_cartons = $10, updated_at = now()
        where id = $1 and not exists (select 1 from products o where o.code = $2 and o.id <> $1 and o.deleted_at is null)`,
       [
         id,
@@ -121,6 +126,7 @@ export function productRoutes(app: FastifyInstance, db: Db) {
         body.piecesPerCarton ?? current.piecesPerCarton,
         body.active ?? current.active,
         body.vatExempt ?? current.vatExempt,
+        body.lowStockCartons === undefined ? current.lowStockCartons : body.lowStockCartons,
       ],
     );
     if (rowCount === 0) throw codeTaken();
