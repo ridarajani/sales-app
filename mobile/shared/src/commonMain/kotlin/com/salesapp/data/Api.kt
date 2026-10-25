@@ -456,6 +456,22 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     suspend fun closeTrip(id: Int, request: CloseTripRequest): TripDetail =
         post<TripDetail, CloseTripRequest>("/trips/$id/close", request)
 
+    // Phase 10 part 3: one search box over everything, and the alerts that need someone now.
+
+    // At least 2 letters; the server decides what this person may be shown.
+    suspend fun search(q: String): SearchResult = get("/search", mapOf("q" to q))
+
+    suspend fun alerts(): AlertsResult = get("/alerts")
+
+    // Sales this phone saved but could not read back. Sent twice, it stays one problem.
+    suspend fun reportOutboxProblem(tripId: Int, request: OutboxProblemRequest): OutboxProblemSaved =
+        post<OutboxProblemSaved, OutboxProblemRequest>("/trips/$tripId/outbox-problems", request, timeoutMillis = FILE_TIMEOUT)
+
+    suspend fun outboxProblem(id: Int): OutboxProblem = get("/outbox-problems/$id")
+
+    suspend fun clearOutboxProblem(id: Int, note: String): OutboxProblem =
+        post<OutboxProblem, ClearProblemRequest>("/outbox-problems/$id/clear", ClearProblemRequest(note))
+
     // Phase 10: reports and targets.
 
     // The reports this person may open, by group, with the staff they may pick.

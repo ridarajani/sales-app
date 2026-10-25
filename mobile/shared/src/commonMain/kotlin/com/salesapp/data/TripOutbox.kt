@@ -71,8 +71,13 @@ class TripOutboxStore(private val files: Files) {
 
     private fun packName(tripId: Int) = "trip-$tripId-pack.json"
 
-    // Written when an outbox file could not be read, so the warning survives a restart.
+    // Written when an outbox file could not be read, so the warning survives a restart. It lists
+    // the names of the files kept aside, one per line.
     private fun markerName(tripId: Int) = "trip-$tripId-outbox-unreadable.marker"
+
+    // The names of the kept files already sent to the office, beside the marker. The files
+    // themselves are never deleted to record that they went up.
+    private fun sentName(tripId: Int) = "trip-$tripId-outbox-unreadable.sent"
 
     fun load(tripId: Int): TripOutbox {
         val text = files.read(outboxName(tripId)) ?: return TripOutbox(tripId)
@@ -90,15 +95,67 @@ class TripOutboxStore(private val files: Files) {
     // overwrite it and the trip screen can say something about it.
     private fun keepAside(tripId: Int, text: String) {
         val stamp = nowUtcTimestamp().filter { it.isLetterOrDigit() }
-        val kept = "trip-$tripId-outbox-unreadable-$stamp.json"
+        // Two in the same millisecond would otherwise be written over each other.
+        var kept = "trip-$tripId-outbox-unreadable-$stamp.json"
+        var next = 1
+        while (files.read(kept) != null) kept = "trip-$tripId-outbox-unreadable-$stamp-${next++}.json"
         files.write(kept, text)
         // Only once the copy is safely written is the original let go.
         files.delete(outboxName(tripId))
-        files.write(markerName(tripId), listOfNotNull(files.read(markerName(tripId)), kept).joinToString("\n"))
+        files.write(markerName(tripId), (keptFiles(tripId) + kept).joinToString("\n"))
     }
 
     // True when something saved on this phone could not be read and is waiting for the office.
-    fun hasUnreadable(tripId: Int): Boolean = files.read(markerName(tripId)) != null
+    fun hasUnreadable(tripId: Int): Boolean = keptFiles(tripId).isNotEmpty()
+
+    // The files kept aside for this trip, oldest first.
+    fun keptFiles(tripId: Int): List<String> = lines(markerName(tripId))
+
+    // Those of them the office has not been sent yet.
+    fun unsentKept(tripId: Int): List<String> {
+        val sent = lines(sentName(tripId)).toSet()
+        return keptFiles(tripId).filterNot { it in sent }
+    }
+
+    // What one kept file holds, as it was written.
+    fun keptText(name: String): String? = files.read(name)
+
+    // Sends every kept file the office has not had yet, each exactly once. The name that went up is
+    // written down beside the marker; the file itself is never deleted to record that, because it
+    // holds sales nobody else has.
+    suspend fun sendKept(tripId: Int, send: suspend (name: String, text: String) -> Unit) {
+        for (name in unsentKept(tripId)) {
+            val text = keptText(name) ?: continue
+            send(name, text)
+            markSent(tripId, name)
+        }
+    }
+
+    // Writes down that a file has gone to the office. The file itself stays where it is.
+    fun markSent(tripId: Int, name: String) {
+        val sent = lines(sentName(tripId))
+        if (name in sent) return
+        files.write(sentName(tripId), (sent + name).joinToString("\n"))
+    }
+
+    // The files go only once the office has cleared every one of them: while one is still open the
+    // file is the only copy of those sales.
+    fun forgetIfAllCleared(tripId: Int, cleared: Set<String>): Boolean {
+        val kept = keptFiles(tripId)
+        if (kept.isEmpty() || !kept.all { it in cleared }) return false
+        forgetUnreadable(tripId)
+        return true
+    }
+
+    // Throws away the kept files and the notes beside them.
+    fun forgetUnreadable(tripId: Int) {
+        keptFiles(tripId).forEach { files.delete(it) }
+        files.delete(markerName(tripId))
+        files.delete(sentName(tripId))
+    }
+
+    private fun lines(name: String): List<String> =
+        files.read(name)?.split("\n")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
 
     private fun save(outbox: TripOutbox) {
         if (outbox.isEmpty) files.delete(outboxName(outbox.tripId)) else files.write(outboxName(outbox.tripId), json.encodeToString(outbox))

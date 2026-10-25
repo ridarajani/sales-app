@@ -82,8 +82,12 @@ data class TripDetailState(
     // True when an order's delivery is sitting in the outbox, so the card says so.
     fun waitingOn(order: TripOrder): Boolean = outbox.sales.any { it.request.orderId == order.id }
 
+    // Sales this phone could not read, now with the office. The trip cannot close until Admin has
+    // looked at them, which the server also refuses.
+    val outboxProblemOpen: Boolean get() = (trip?.openOutboxProblems ?: 0) > 0
+
     // Closing is only allowed once everything on the phone has reached the server.
-    val canClose: Boolean get() = trip?.canClose == true && outbox.isEmpty
+    val canClose: Boolean get() = trip?.canClose == true && outbox.isEmpty && !outboxProblemOpen
 
     val blockedByOutbox: Boolean get() = trip?.canClose == true && !outbox.isEmpty
 }
@@ -211,6 +215,12 @@ class TripDetailViewModel(
                 val trip = repository.trip(id)
                 // The leader of a trip on the road keeps everything needed to sell with no network.
                 if (trip.canSell) runCatching { repository.pack(id) }
+                // The network is up, so any sales file this phone could not read goes to the office
+                // now, and the files go only once the office has cleared them all.
+                if (repository.hasUnreadable(id)) {
+                    runCatching { repository.sendOutboxProblems(id) }
+                    repository.forgetClearedProblems(id, trip.outboxProblems)
+                }
                 val vehicles = if (trip.canLoad) runCatching { repository.vehicles(trip.facilityCode) }.getOrDefault(emptyList()) else emptyList()
                 _state.update {
                     it.copy(

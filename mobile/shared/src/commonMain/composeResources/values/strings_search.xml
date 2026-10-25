@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The search box, on Home and on its own screen -->
+    <string name="search_hint">Search customers, orders, invoices, products</string>
+    <string name="search_title">Search</string>
+    <string name="search_short">Type at least 2 letters: a shop name, phone number, order, invoice or delivery note number, vehicle or product.</string>
+    <string name="search_nothing">Nothing found. Try fewer letters.</string>
+    <string name="search_group">%1$s · %2$d</string>
+    <string name="search_group_more">%1$s · %2$d of %3$d</string>
+
+    <!-- Alerts -->
+    <string name="tile_alerts">Alerts</string>
+    <string name="tile_alerts_none">Nothing waiting</string>
+    <string name="tile_alerts_some">%1$d need you</string>
+    <string name="alerts_title">Alerts</string>
+    <string name="alerts_lead">Things that need attention for the companies you can see.</string>
+    <string name="alerts_none">No alerts. All is in order.</string>
+
+    <!-- Trip sales a phone could not read -->
+    <string name="trip_outbox_sent">Some sales saved on this phone could not be read. They were sent to the office. You can close the trip once Admin has checked them.</string>
+    <string name="problem_title">Unread trip sales</string>
+    <string name="problem_no_access">You cannot see unread trip sales.</string>
+    <string name="problem_leader">Trip leader</string>
+    <string name="problem_sent_by">Sent by</string>
+    <string name="problem_sent_value">%1$s, %2$s</string>
+    <string name="problem_file">The file</string>
+    <string name="problem_file_value">%1$s, %2$s</string>
+    <string name="problem_size_bytes">%1$s bytes</string>
+    <string name="problem_size_kb">%1$s kB</string>
+    <string name="problem_note">Note from the phone</string>
+    <string name="problem_state">Checked?</string>
+    <string name="problem_open">Not checked yet.</string>
+    <string name="problem_cleared">Checked by %1$s on %2$s</string>
+    <string name="problem_clear_note">What did you do about these sales?</string>
+    <string name="problem_clear">Clear</string>
+    <string name="problem_clearing">Clearing...</string>
+    <string name="problem_need_note">Please write what you did about these sales.</string>
+    <string name="problem_website">To look at the file, open Unread trip sales on the office website.</string>
+</resources>

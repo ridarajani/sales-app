@@ -1,5 +1,7 @@
 package com.salesapp.data
 
+import com.salesapp.core.toBase64
+
 // Where the trip screens get their data. A sale or expense is tried on the server first; if that
 // fails for any reason other than the server refusing it, it goes to the outbox on the phone and is
 // sent later. Nothing is lost either way.
@@ -21,6 +23,23 @@ class TripsRepository(
 
     // True when something saved on this phone could not be read and the office needs telling.
     fun hasUnreadable(id: Int): Boolean = outbox.hasUnreadable(id)
+
+    // Sales this phone could not read go to the office, one file at a time, each only once. The
+    // file itself is never deleted to record that: the names that went up are kept beside it.
+    suspend fun sendOutboxProblems(tripId: Int) {
+        outbox.sendKept(tripId) { name, text ->
+            // Both a first send (201) and a repeat (200) come back without an error, so both count.
+            api.reportOutboxProblem(
+                tripId,
+                OutboxProblemRequest(requestId = name, file = text.encodeToByteArray().toBase64(), fileName = name),
+            )
+        }
+    }
+
+    // Once the office has cleared every file this phone kept aside, the files can go.
+    fun forgetClearedProblems(tripId: Int, problems: List<TripOutboxProblem>) {
+        outbox.forgetIfAllCleared(tripId, problems.filter { it.cleared }.map { it.requestId }.toSet())
+    }
 
     // Orders booked ahead that a trip may take. Passing the trip keeps its own orders in the list.
     suspend fun openOrders(facilityCode: String, tripId: Int?): List<OpenOrder> = api.openOrders(facilityCode, tripId)
