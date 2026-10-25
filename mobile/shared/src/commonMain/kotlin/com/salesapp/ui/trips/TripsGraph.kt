@@ -27,6 +27,7 @@ fun NavGraphBuilder.tripsGraph(nav: NavController) {
             id = entry.toRoute<TripDetailRoute>().id,
             onBack = { back() },
             onSell = { tripId -> nav.open(TripSaleRoute(tripId)) },
+            onDeliver = { tripId, orderId -> nav.open(TripSaleRoute(tripId, orderId)) },
             onExpense = { tripId -> nav.open(TripExpenseRoute(tripId)) },
             onClose = { tripId -> nav.open(CloseTripRoute(tripId)) },
             onEdit = { tripId -> nav.open(PlanTripRoute(tripId)) },
@@ -49,7 +50,8 @@ fun NavGraphBuilder.tripsGraph(nav: NavController) {
         )
     }
     composable<TripSaleRoute> { entry ->
-        TripSalePage(tripId = entry.toRoute<TripSaleRoute>().tripId, onBack = { back() })
+        val route = entry.toRoute<TripSaleRoute>()
+        TripSalePage(tripId = route.tripId, orderId = route.orderId, onBack = { back() })
     }
     composable<TripExpenseRoute> { entry ->
         TripExpensePage(tripId = entry.toRoute<TripExpenseRoute>().tripId, onBack = { back() }, onSaved = { back() })

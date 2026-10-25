@@ -428,6 +428,10 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
     // Everything the leader's phone keeps for selling with no network.
     suspend fun tripPack(id: Int): TripPack = get("/trips/$id/pack")
 
+    // Orders a trip could carry. tripId keeps the ones already on that trip in the list.
+    suspend fun openOrders(facility: String, tripId: Int?): List<OpenOrder> =
+        get("/trips/open-orders", mapOf("facility" to facility, "tripId" to tripId?.toString()))
+
     suspend fun planTrip(request: PlanTripRequest): TripDetail = post<TripDetail, PlanTripRequest>("/trips", request)
 
     suspend fun changeTrip(id: Int, request: PlanTripRequest): TripDetail = put<TripDetail, PlanTripRequest>("/trips/$id", request)

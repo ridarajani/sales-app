@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Orders a trip delivers: planning -->
+    <string name="plan_orders">Orders to deliver</string>
+    <string name="plan_orders_help">Orders booked ahead that this trip takes out. The warehouse loads these first.</string>
+    <string name="plan_orders_add">Add orders</string>
+    <string name="plan_orders_pick">Which orders go on this trip?</string>
+    <string name="plan_orders_pick_help">Only orders from this warehouse that are not on a loading plan, a vehicle or another trip.</string>
+    <string name="plan_orders_none_open">There are no orders waiting for this warehouse.</string>
+    <string name="plan_orders_none_chosen">No orders yet.</string>
+    <string name="plan_orders_remove">Take off</string>
+    <string name="plan_orders_done">Done</string>
+    <string name="plan_orders_chosen">%1$d on this trip</string>
+    <string name="plan_orders_wanted">Wanted %1$s</string>
+    <string name="plan_orders_left">%1$s left to deliver</string>
+    <string name="plan_orders_products">%1$d products</string>
+    <string name="plan_products_optional">Not needed when the trip only delivers orders.</string>
+    <string name="plan_need_lines_or_orders">Add at least one product to load, or an order to deliver.</string>
+
+    <!-- Orders a trip delivers: the trip screen -->
+    <string name="trip_orders">Orders</string>
+    <string name="trip_order_wanted">Wanted %1$s</string>
+    <string name="trip_order_to_deliver">Still to deliver</string>
+    <string name="trip_order_line">%1$s: %2$s</string>
+    <string name="trip_order_all_done">All delivered.</string>
+    <string name="trip_order_waiting">Waiting to go up from this phone.</string>
+    <string name="trip_order_deliver">Deliver</string>
+    <string name="trip_line_for_orders">For orders: %1$s</string>
+    <string name="trip_line_for_sale">For sale: %1$s</string>
+
+    <!-- Delivering an order at the stop -->
+    <string name="sale_order_title">Deliver an order</string>
+    <string name="sale_order_card">Order %1$s</string>
+    <string name="sale_order_help">The order\'s own prices and invoice are used. You can hand over less, never more.</string>
+    <string name="sale_order_price">%1$s per carton</string>
+    <string name="sale_order_on_vehicle">%1$s on the van for this order</string>
+    <string name="sale_order_too_much">Only %1$s is on the van for this order.</string>
+    <string name="sale_order_nothing">Nothing from this order is on the van.</string>
+    <string name="sale_order_gone">That order is not on this trip any more.</string>
+    <string name="sale_order_invoice">%1$s, as the order says</string>
+</resources>

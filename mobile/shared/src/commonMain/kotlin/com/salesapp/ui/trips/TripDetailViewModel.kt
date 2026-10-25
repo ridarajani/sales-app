@@ -6,6 +6,7 @@ import com.salesapp.data.AppState
 import com.salesapp.data.LoadTripRequest
 import com.salesapp.data.TripDetail
 import com.salesapp.data.TripLineQty
+import com.salesapp.data.TripOrder
 import com.salesapp.data.TripOutbox
 import com.salesapp.data.TripsRepository
 import com.salesapp.data.canLoadTrips
@@ -47,13 +48,39 @@ data class TripDetailState(
     val error: String? = null,
     val actionError: String? = null,
 ) {
+    private val perCarton: Map<Int, Int>
+        get() = trip?.lines.orEmpty().associate { it.productId to it.piecesPerCarton } +
+            trip?.orders.orEmpty().flatMap { it.lines }.associate { it.productId to it.perCarton }
+
     // What is on the van, less anything this phone has sold but not sent yet.
     val onVehicle: Map<Int, Int>
         get() {
-            val perCarton = trip?.lines.orEmpty().associate { it.productId to it.piecesPerCarton }
             val waiting = outbox.soldPieces(perCarton)
             return trip?.lines.orEmpty().associate { it.productId to (it.onVehicle - (waiting[it.productId] ?: 0)).coerceAtLeast(0) }
         }
+
+    // Of that, what the van is holding for the trip's own orders.
+    val forOrders: Map<Int, Int>
+        get() {
+            val waiting = outbox.orderSoldPieces(perCarton)
+            return trip?.lines.orEmpty().associate { it.productId to (it.forOrders - (waiting[it.productId] ?: 0)).coerceAtLeast(0) }
+        }
+
+    // And what may be sold to anybody at a stop.
+    val forSale: Map<Int, Int>
+        get() {
+            val waiting = outbox.plainSoldPieces(perCarton)
+            return trip?.lines.orEmpty().associate { it.productId to (it.sellable - (waiting[it.productId] ?: 0)).coerceAtLeast(0) }
+        }
+
+    // What is still to deliver on one order, less the deliveries waiting on this phone.
+    fun toDeliver(order: TripOrder): Map<Int, Int> {
+        val waiting = outbox.orderSoldPieces(perCarton, order.id)
+        return order.lines.associate { it.productId to (it.toDeliver - (waiting[it.productId] ?: 0)).coerceAtLeast(0) }
+    }
+
+    // True when an order's delivery is sitting in the outbox, so the card says so.
+    fun waitingOn(order: TripOrder): Boolean = outbox.sales.any { it.request.orderId == order.id }
 
     // Closing is only allowed once everything on the phone has reached the server.
     val canClose: Boolean get() = trip?.canClose == true && outbox.isEmpty

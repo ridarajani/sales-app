@@ -7,6 +7,7 @@ import com.salesapp.core.Camera
 import com.salesapp.core.nowUtcTimestamp
 import com.salesapp.core.randomUuid
 import com.salesapp.core.signaturePng
+import com.salesapp.core.splitPieces
 import com.salesapp.core.toBase64
 import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
@@ -14,6 +15,8 @@ import com.salesapp.data.PackCustomer
 import com.salesapp.data.SaleOutcome
 import com.salesapp.data.TripDetail
 import com.salesapp.data.TripLine
+import com.salesapp.data.TripOrder
+import com.salesapp.data.TripOrderLine
 import com.salesapp.data.TripSaleDetail
 import com.salesapp.data.TripSaleLineQty
 import com.salesapp.data.TripSaleRequest
@@ -42,6 +45,8 @@ data class SaleLine(
     val cartons: Int? = null,
     val pieces: Int? = null,
     val price: Long? = null,
+    // On an order's delivery the price is the order's own, shown but not typed.
+    val fixedPrice: Boolean = false,
 ) {
     val perCarton: Int get() = line.piecesPerCarton.coerceAtLeast(1)
 
@@ -70,6 +75,10 @@ data class TripSaleState(
     val proof: ByteArray? = null,
     val cameraAvailable: Boolean = false,
     val lines: List<SaleLine> = emptyList(),
+    // Set when this sale delivers one of the trip's orders.
+    val order: TripOrder? = null,
+    // The order is no longer on the trip, so there is nothing to deliver.
+    val orderGone: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
     val actionError: String? = null,
@@ -79,6 +88,9 @@ data class TripSaleState(
     val savedOffline: Boolean = false,
 ) {
     val customer: PackCustomer? get() = customers.firstOrNull { it.id == customerId }
+
+    // Delivering an order: the customer, the prices and the invoice all come from the order.
+    val isOrder: Boolean get() = order != null
 
     val shown: List<PackCustomer>
         get() = if (query.isBlank()) customers else customers.filter { it.name.contains(query.trim(), ignoreCase = true) }
@@ -101,7 +113,8 @@ data class TripSaleState(
             query == other.query && customerId == other.customerId && stop == other.stop && invoiceType == other.invoiceType &&
             payment == other.payment && reference == other.reference && receivedBy == other.receivedBy &&
             strokes == other.strokes && padSize == other.padSize && proof.contentEquals(other.proof) &&
-            cameraAvailable == other.cameraAvailable && lines == other.lines && busy == other.busy &&
+            cameraAvailable == other.cameraAvailable && lines == other.lines && order == other.order &&
+            orderGone == other.orderGone && busy == other.busy &&
             error == other.error && actionError == other.actionError && saved == other.saved && savedOffline == other.savedOffline
     }
 
@@ -110,6 +123,7 @@ data class TripSaleState(
         result = 31 * result + lines.hashCode()
         result = 31 * result + strokes.hashCode()
         result = 31 * result + (proof?.contentHashCode() ?: 0)
+        result = 31 * result + (order?.id ?: 0)
         result = 31 * result + busy.hashCode()
         result = 31 * result + (saved?.hashCode() ?: 0)
         return result
@@ -140,6 +154,8 @@ sealed interface TripSaleEvent {
 
 class TripSaleViewModel(
     private val tripId: Int,
+    // Set when the leader is delivering one of the trip's orders.
+    private val orderId: Int?,
     private val repository: TripsRepository,
     private val camera: Camera,
     private val app: AppState,
@@ -160,9 +176,9 @@ class TripSaleViewModel(
         when (event) {
             is TripSaleEvent.QueryChanged -> _state.update { it.copy(query = event.value) }
             is TripSaleEvent.CustomerChosen -> pickCustomer(event.id)
-            TripSaleEvent.ChangeCustomer -> _state.update { it.copy(customerId = null, query = "") }
+            TripSaleEvent.ChangeCustomer -> if (!s.isOrder) _state.update { it.copy(customerId = null, query = "") }
             is TripSaleEvent.StopChosen -> _state.update { it.copy(stop = event.stop, actionError = null) }
-            is TripSaleEvent.InvoiceTypeChosen -> _state.update { it.copy(invoiceType = event.type, actionError = null) }
+            is TripSaleEvent.InvoiceTypeChosen -> if (!s.isOrder) _state.update { it.copy(invoiceType = event.type, actionError = null) }
             is TripSaleEvent.PaymentChosen -> _state.update {
                 // A cash-only shop cannot buy on account, so that choice is simply not offered.
                 if (event.payment == "credit" && !it.canUseCredit) it else it.copy(payment = event.payment, actionError = null)
@@ -171,7 +187,7 @@ class TripSaleViewModel(
             is TripSaleEvent.ReceivedByChanged -> _state.update { it.copy(receivedBy = event.value, actionError = null) }
             is TripSaleEvent.EditCartons -> edit(event.productId) { it.copy(cartons = event.value) }
             is TripSaleEvent.EditPieces -> edit(event.productId) { it.copy(pieces = event.value) }
-            is TripSaleEvent.EditPrice -> edit(event.productId) { it.copy(price = event.value) }
+            is TripSaleEvent.EditPrice -> edit(event.productId) { if (it.fixedPrice) it else it.copy(price = event.value) }
             is TripSaleEvent.StrokeDone -> _state.update { it.copy(strokes = it.strokes + listOf(event.stroke), actionError = null) }
             is TripSaleEvent.PadSized -> _state.update { it.copy(padSize = event.size) }
             TripSaleEvent.ClearSignature -> _state.update { it.copy(strokes = emptyList()) }
@@ -184,7 +200,9 @@ class TripSaleViewModel(
             TripSaleEvent.Another -> {
                 // A new sale is a new id; the pack and what is on the van are read again.
                 requestId = randomUuid()
-                _state.update { TripSaleState(cameraAvailable = it.cameraAvailable, customers = it.customers, trip = it.trip, stop = it.stop) }
+                _state.update {
+                    TripSaleState(cameraAvailable = it.cameraAvailable, customers = it.customers, trip = it.trip, stop = it.stop, order = it.order)
+                }
                 load()
             }
             TripSaleEvent.Retry -> load()
@@ -223,7 +241,7 @@ class TripSaleViewModel(
                 _state.update { it.copy(actionError = getString(Res.string.sale_need_lines)) }
                 return@launch
             }
-            if (s.lines.any { it.wanted > 0 && (it.price ?: 0) <= 0 }) {
+            if (!s.isOrder && s.lines.any { it.wanted > 0 && (it.price ?: 0) <= 0 }) {
                 _state.update { it.copy(actionError = getString(Res.string.sale_need_price)) }
                 return@launch
             }
@@ -246,6 +264,8 @@ class TripSaleViewModel(
                 val request = TripSaleRequest(
                     requestId = requestId,
                     customerId = customer,
+                    // The server then uses the order's prices, invoice type, LPO and salesman.
+                    orderId = s.order?.id,
                     stop = s.stop,
                     invoiceType = s.invoiceType,
                     payment = s.payment,
@@ -260,7 +280,8 @@ class TripSaleViewModel(
                             productId = it.line.productId,
                             cartons = it.cartons ?: 0,
                             pieces = it.pieces ?: 0,
-                            pricePerCarton = (it.price ?: 0).toInt(),
+                            // Left out on an order's delivery: the order's own price is used.
+                            pricePerCarton = if (s.isOrder) null else it.price?.toInt(),
                         )
                     },
                 )
@@ -293,8 +314,52 @@ class TripSaleViewModel(
                     if (e.keepForLater) repository.savedPack(tripId) ?: throw e else throw e
                 }
                 val outbox = repository.outboxOf(tripId)
-                val perCarton = pack.trip.lines.associate { it.productId to it.piecesPerCarton }
-                val waiting = outbox.soldPieces(perCarton)
+                val perCarton = pack.trip.lines.associate { it.productId to it.piecesPerCarton } +
+                    pack.trip.orders.flatMap { it.lines }.associate { it.productId to it.perCarton }
+                val order = orderId?.let { id -> pack.trip.orders.firstOrNull { it.id == id } }
+                if (orderId != null && order == null) {
+                    // The office took the order off the trip, or it is fully delivered already.
+                    _state.update { it.copy(loading = false, allowed = pack.trip.canSell, trip = pack.trip, orderGone = true) }
+                    return@launch
+                }
+                if (order != null) {
+                    // Delivering an order: its own customer, lines and prices, and never more than
+                    // the van is carrying for it, less whatever this phone has not sent yet.
+                    val waiting = outbox.orderSoldPieces(perCarton, order.id)
+                    val customer = pack.customers.firstOrNull { it.id == order.customerId }
+                        ?: PackCustomer(id = order.customerId, name = order.customerName, area = order.area, cashOnly = order.cashOnly)
+                    _state.update { s ->
+                        s.copy(
+                            loading = false,
+                            allowed = pack.trip.canSell,
+                            trip = pack.trip,
+                            order = order,
+                            customers = pack.customers.filterNot { it.id == customer.id } + customer,
+                            customerId = customer.id,
+                            invoiceType = order.invoiceType,
+                            payment = if (customer.cashOnly && s.payment == "credit") "cash" else s.payment,
+                            stop = s.stop.ifBlank { pack.trip.stops.firstOrNull().orEmpty() },
+                            lines = order.lines.mapNotNull { line ->
+                                val left = (line.toDeliver - (waiting[line.productId] ?: 0)).coerceAtLeast(0)
+                                if (left == 0) return@mapNotNull null
+                                val (cartons, loose) = splitPieces(left, line.perCarton)
+                                SaleLine(
+                                    line = line.asTripLine(),
+                                    onVehicle = left,
+                                    // Starts at everything the van holds for the order; the leader
+                                    // can hand over less, never more.
+                                    cartons = cartons.takeIf { it > 0 },
+                                    pieces = loose.takeIf { it > 0 },
+                                    price = line.pricePerCarton?.toLong(),
+                                    fixedPrice = true,
+                                )
+                            },
+                            error = null,
+                        )
+                    }
+                    return@launch
+                }
+                val waiting = outbox.plainSoldPieces(perCarton)
                 _state.update { s ->
                     s.copy(
                         loading = false,
@@ -303,8 +368,10 @@ class TripSaleViewModel(
                         customers = pack.customers,
                         stop = s.stop.ifBlank { pack.trip.stops.firstOrNull().orEmpty() },
                         lines = pack.trip.lines.map { line ->
-                            // What this phone has already sold but not sent comes off at once.
-                            val left = (line.onVehicle - (waiting[line.productId] ?: 0)).coerceAtLeast(0)
+                            // Only what is for sale at a stop: goods the van is holding for the
+                            // trip's own orders belong to those orders. What this phone has already
+                            // sold but not sent comes off as well.
+                            val left = (line.sellable - (waiting[line.productId] ?: 0)).coerceAtLeast(0)
                             SaleLine(line, onVehicle = left, price = s.customer?.lastPriceOf(line.productId))
                         },
                         error = null,
@@ -319,3 +386,15 @@ class TripSaleViewModel(
         }
     }
 }
+
+// An order's line shown like a van line, so one sale form serves both.
+private fun TripOrderLine.asTripLine() = TripLine(
+    productId = productId,
+    code = code,
+    brand = brand,
+    name = name,
+    packSize = packSize,
+    companyCode = companyCode,
+    piecesPerCarton = piecesPerCarton,
+    onVehicle = onVehicle,
+)

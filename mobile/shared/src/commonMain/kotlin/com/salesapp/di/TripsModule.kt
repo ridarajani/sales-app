@@ -21,7 +21,8 @@ val tripsModule = module {
     viewModel { (id: Int) -> TripDetailViewModel(id, get(), get()) }
     // Null when a new trip is being planned.
     viewModel { (id: Int?) -> PlanTripViewModel(id, get(), get()) }
-    viewModel { (tripId: Int) -> TripSaleViewModel(tripId, get(), get(), get()) }
+    // orderId is null for an ordinary sale at a stop, set when an order is being delivered.
+    viewModel { (tripId: Int, orderId: Int?) -> TripSaleViewModel(tripId, orderId, get(), get(), get()) }
     viewModel { (tripId: Int) -> TripExpenseViewModel(tripId, get(), get(), get()) }
     viewModel { (tripId: Int) -> CloseTripViewModel(tripId, get(), get()) }
 }
