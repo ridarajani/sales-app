@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -21,8 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.core.formatIsoDate
+import com.salesapp.core.formatMwk
 import com.salesapp.data.Company
 import com.salesapp.data.Driver
+import com.salesapp.data.OpenOrder
 import com.salesapp.data.Product
 import com.salesapp.data.UserRow
 import com.salesapp.data.Vehicle
@@ -47,9 +53,23 @@ import com.salesapp.resources.plan_leader_help
 import com.salesapp.resources.plan_no_access
 import com.salesapp.resources.plan_no_stops
 import com.salesapp.resources.plan_note
+import com.salesapp.resources.plan_orders
+import com.salesapp.resources.plan_orders_add
+import com.salesapp.resources.plan_orders_chosen
+import com.salesapp.resources.plan_orders_done
+import com.salesapp.resources.plan_orders_help
+import com.salesapp.resources.plan_orders_left
+import com.salesapp.resources.plan_orders_none_chosen
+import com.salesapp.resources.plan_orders_none_open
+import com.salesapp.resources.plan_orders_pick
+import com.salesapp.resources.plan_orders_pick_help
+import com.salesapp.resources.plan_orders_products
+import com.salesapp.resources.plan_orders_remove
+import com.salesapp.resources.plan_orders_wanted
 import com.salesapp.resources.plan_pieces
 import com.salesapp.resources.plan_products
 import com.salesapp.resources.plan_products_help
+import com.salesapp.resources.plan_products_optional
 import com.salesapp.resources.plan_route
 import com.salesapp.resources.plan_route_hint
 import com.salesapp.resources.plan_save
@@ -76,6 +96,7 @@ import com.salesapp.ui.components.PrimaryButton
 import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
+import com.salesapp.ui.components.TickCard
 import com.salesapp.ui.components.TopBar
 import com.salesapp.ui.components.VehiclePicker
 import com.salesapp.ui.theme.SalesTheme
@@ -110,13 +131,21 @@ fun PlanTripScreen(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit, onBac
     val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
-            stringResource(if (state.tripId == null) Res.string.plan_title else Res.string.plan_change_title),
-            onBack = onBack,
+            stringResource(
+                when {
+                    state.picking -> Res.string.plan_orders_add
+                    state.tripId == null -> Res.string.plan_title
+                    else -> Res.string.plan_change_title
+                },
+            ),
+            // While picking orders, back closes the list and leaves the form as it was.
+            onBack = { if (state.picking) onEvent(PlanTripEvent.OrdersDone) else onBack() },
         )
         when {
             !state.allowed -> Say(stringResource(Res.string.plan_no_access), error = true, modifier = Modifier.padding(16.dp))
             state.loading -> LoadingState()
             state.error != null -> ErrorState(state.error, onRetry = { onEvent(PlanTripEvent.Retry) })
+            state.picking -> PickOrders(state, onEvent)
             else -> {
                 Column(
                     modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -232,9 +261,10 @@ fun PlanTripScreen(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit, onBac
                         onValueChange = { onEvent(PlanTripEvent.NoteChanged(it)) },
                         enabled = !state.busy,
                     )
+                    Orders(state, onEvent)
                     SectionLabel(stringResource(Res.string.plan_products))
                     Text(
-                        stringResource(Res.string.plan_products_help),
+                        stringResource(if (state.hasOrders) Res.string.plan_products_optional else Res.string.plan_products_help),
                         color = scheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -309,6 +339,105 @@ private fun Stops(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit) {
     }
 }
 
+// Orders booked ahead that this trip takes out, each with a way to take it off again.
+@Composable
+private fun Orders(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(Res.string.plan_orders))
+        Text(stringResource(Res.string.plan_orders_help), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        if (state.chosenOrders.isEmpty()) {
+            Text(stringResource(Res.string.plan_orders_none_chosen), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        state.chosenOrders.forEach { order ->
+            ListCard(onClick = null) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) { OrderFacts(order) }
+                SecondaryButton(
+                    stringResource(Res.string.plan_orders_remove),
+                    onClick = { onEvent(PlanTripEvent.RemoveOrder(order.id)) },
+                    enabled = !state.busy,
+                    modifier = Modifier.weight(0.6f),
+                )
+            }
+        }
+        SecondaryButton(
+            stringResource(Res.string.plan_orders_add),
+            onClick = { onEvent(PlanTripEvent.AddOrders) },
+            enabled = !state.busy,
+        )
+    }
+}
+
+// The list of orders this warehouse could send out, ticked one by one.
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.PickOrders(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SectionLabel(stringResource(Res.string.plan_orders_pick))
+        Text(stringResource(Res.string.plan_orders_pick_help), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        if (state.hasOrders) {
+            Text(
+                stringResource(Res.string.plan_orders_chosen, state.orderIds.size),
+                color = scheme.onSurface,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+    LazyColumn(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (state.openOrders.isEmpty()) {
+            item { Say(stringResource(Res.string.plan_orders_none_open)) }
+        }
+        items(state.openOrders, key = { it.id }) { order ->
+            TickCard(
+                checked = order.id in state.orderIds,
+                onCheckedChange = { onEvent(PlanTripEvent.OrderToggled(order.id)) },
+                enabled = !state.busy,
+            ) {
+                OrderFacts(order)
+            }
+        }
+    }
+    PrimaryButton(
+        stringResource(Res.string.plan_orders_done),
+        onClick = { onEvent(PlanTripEvent.OrdersDone) },
+        modifier = Modifier.padding(16.dp),
+    )
+}
+
+// What an order says, the same way in the list and on the card.
+@Composable
+private fun OrderFacts(order: OpenOrder) {
+    val scheme = MaterialTheme.colorScheme
+    Text(order.customerName, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall)
+    Text(order.number, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    if (order.area.isNotBlank()) {
+        Text(order.area, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+    if (order.wantedOn.isNotBlank()) {
+        Text(
+            stringResource(Res.string.plan_orders_wanted, formatIsoDate(order.wantedOn)),
+            color = scheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    Text(
+        stringResource(Res.string.plan_orders_left, formatMwk(order.amountLeft.toLong())),
+        color = scheme.onSurface,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (order.products > 0) {
+        Text(
+            stringResource(Res.string.plan_orders_products, order.products),
+            color = scheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
 @Composable
 private fun LineCard(line: PlanLine, busy: Boolean, onEvent: (PlanTripEvent) -> Unit) {
     val productId = line.product.id
@@ -370,6 +499,41 @@ private fun samplePlan(tripId: Int? = null) = PlanTripState(
     float = 100_000,
     lines = listOf(PlanLine(sampleProducts[0], cartons = 10), PlanLine(sampleProducts[1], cartons = 5)),
 )
+
+private val sampleOpenOrders = listOf(
+    OpenOrder(
+        id = 31, number = "LV-ORD-000031", customerId = 1, customerName = "Salima Shop", area = "Salima",
+        channel = "upcountry", wantedOn = "2026-10-27", amountLeft = 450_000.0, products = 3,
+    ),
+    OpenOrder(
+        id = 32, number = "ZT-ORD-000032", customerId = 2, customerName = "Nkhotakota Stores", area = "Nkhotakota",
+        channel = "upcountry", wantedOn = "2026-10-28", amountLeft = 120_000.0, products = 1,
+    ),
+)
+
+@Preview
+@Composable
+private fun PlanTripWithOrdersPreview() {
+    SalesTheme {
+        PlanTripScreen(
+            samplePlan().copy(openOrders = sampleOpenOrders, orderIds = setOf(31)),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PlanTripPickOrdersPreview() {
+    SalesTheme {
+        PlanTripScreen(
+            samplePlan().copy(openOrders = sampleOpenOrders, orderIds = setOf(31), picking = true),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
 
 @Preview
 @Composable

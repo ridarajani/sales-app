@@ -66,7 +66,6 @@
     <string name="plan_deleted">Trip deleted.</string>
     <string name="plan_need_route">Please type the route.</string>
     <string name="plan_need_leader">Please pick who leads the trip.</string>
-    <string name="plan_need_lines">Add at least one product to load.</string>
     <string name="plan_need_date">Please pick the date.</string>
 
     <!-- Trip detail -->

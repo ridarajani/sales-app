@@ -30,6 +30,8 @@ import com.salesapp.data.PieceQty
 import com.salesapp.data.TripDetail
 import com.salesapp.data.TripExpense
 import com.salesapp.data.TripLine
+import com.salesapp.data.TripOrder
+import com.salesapp.data.TripOrderLine
 import com.salesapp.data.TripOutbox
 import com.salesapp.data.TripSale
 import com.salesapp.resources.Res
@@ -50,6 +52,8 @@ import com.salesapp.resources.trip_gate_pass
 import com.salesapp.resources.trip_line_back
 import com.salesapp.resources.trip_line_missing
 import com.salesapp.resources.trip_line_on_vehicle
+import com.salesapp.resources.trip_line_for_orders
+import com.salesapp.resources.trip_line_for_sale
 import com.salesapp.resources.trip_line_sold
 import com.salesapp.resources.trip_line_to_load
 import com.salesapp.resources.trip_edit
@@ -65,6 +69,13 @@ import com.salesapp.resources.trip_loading
 import com.salesapp.resources.trip_no_sales
 import com.salesapp.resources.trip_offline_pack
 import com.salesapp.resources.trip_on_this_trip
+import com.salesapp.resources.trip_order_all_done
+import com.salesapp.resources.trip_order_deliver
+import com.salesapp.resources.trip_order_line
+import com.salesapp.resources.trip_order_to_deliver
+import com.salesapp.resources.trip_order_waiting
+import com.salesapp.resources.trip_order_wanted
+import com.salesapp.resources.trip_orders
 import com.salesapp.resources.trip_outbox_both
 import com.salesapp.resources.trip_outbox_drop
 import com.salesapp.resources.trip_outbox_expenses
@@ -118,6 +129,7 @@ fun TripDetailPage(
     onExpense: (Int) -> Unit,
     onClose: (Int) -> Unit,
     onEdit: (Int) -> Unit,
+    onDeliver: (Int, Int) -> Unit,
     viewModel: TripDetailViewModel = koinViewModel { parametersOf(id) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -126,7 +138,7 @@ fun TripDetailPage(
         viewModel.onEvent(TripDetailEvent.Refresh)
         onPauseOrDispose {}
     }
-    TripDetailScreen(state, viewModel::onEvent, onBack, onSell, onExpense, onClose, onEdit)
+    TripDetailScreen(state, viewModel::onEvent, onBack, onSell, onExpense, onClose, onEdit, onDeliver)
 }
 
 // One trip: what is on the van, the sales and expenses, the float, and whatever this phone is still
@@ -140,6 +152,8 @@ fun TripDetailScreen(
     onExpense: (Int) -> Unit = {},
     onClose: (Int) -> Unit = {},
     onEdit: (Int) -> Unit = {},
+    // Trip and order: delivering one of the orders the trip carries.
+    onDeliver: (Int, Int) -> Unit = { _, _ -> },
 ) {
     val trip = state.trip
     val scheme = MaterialTheme.colorScheme
@@ -171,8 +185,17 @@ fun TripDetailScreen(
                     NotLoadedCard(trip.notLoaded)
                     if (trip.showsMoney && !trip.waitingToLoad) FloatBox(trip)
                     if (trip.closed) Closed(trip)
+                    Orders(state, trip, onDeliver)
                     SectionLabel(stringResource(Res.string.trip_on_this_trip))
-                    trip.lines.forEach { line -> LineRow(line, state.onVehicle[line.productId] ?: line.onVehicle, trip) }
+                    trip.lines.forEach { line ->
+                        LineRow(
+                            line = line,
+                            onVehicle = state.onVehicle[line.productId] ?: line.onVehicle,
+                            forOrders = state.forOrders[line.productId] ?: line.forOrders,
+                            forSale = state.forSale[line.productId] ?: line.sellable,
+                            trip = trip,
+                        )
+                    }
                     Sales(trip, state.outbox)
                     Expenses(trip)
                 }
@@ -386,8 +409,79 @@ private fun Closed(trip: TripDetail) {
     }
 }
 
+// The orders this trip carries. While it is out, the leader hands each one over from here.
 @Composable
-private fun LineRow(line: TripLine, onVehicle: Int, trip: TripDetail) {
+private fun Orders(state: TripDetailState, trip: TripDetail, onDeliver: (Int, Int) -> Unit) {
+    if (trip.orders.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(Res.string.trip_orders))
+        trip.orders.forEach { order ->
+            val left = state.toDeliver(order)
+            OrderCard(order, left, trip, waiting = state.waitingOn(order))
+            if (trip.canSell && left.values.sum() > 0) {
+                PrimaryButton(
+                    stringResource(Res.string.trip_order_deliver),
+                    onClick = { onDeliver(trip.id, order.id) },
+                    enabled = !state.busy,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderCard(order: TripOrder, left: Map<Int, Int>, trip: TripDetail, waiting: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val amount = order.amount
+    ListCard(onClick = null) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(order.customerName, color = scheme.onSurface, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                if (trip.showsMoney && amount != null) {
+                    Text(formatMwk(amount.toLong()), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Text(order.number, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            if (order.area.isNotBlank()) {
+                Text(order.area, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+            }
+            if (order.wantedOn.isNotBlank()) {
+                Text(
+                    stringResource(Res.string.trip_order_wanted, formatIsoDate(order.wantedOn)),
+                    color = scheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.caption,
+                )
+            }
+            val lines = order.lines.filter { (left[it.productId] ?: 0) > 0 }
+            if (lines.isEmpty()) {
+                // A closed trip says nothing here: what an order did not get was set aside for it
+                // again, which is the office's business now, not the leader's.
+                if (!trip.closed) {
+                    Text(stringResource(Res.string.trip_order_all_done), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+            } else {
+                Text(stringResource(Res.string.trip_order_to_deliver), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+                lines.forEach { line -> OrderLineRow(line, left[line.productId] ?: 0) }
+            }
+            // A delivery saved with no signal: the numbers above already allow for it.
+            if (waiting) {
+                Text(stringResource(Res.string.trip_order_waiting), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.caption)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderLineRow(line: TripOrderLine, pieces: Int) {
+    Text(
+        stringResource(Res.string.trip_order_line, line.label, splitText(pieces, line.perCarton)),
+        color = MaterialTheme.colorScheme.onSurface,
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+
+@Composable
+private fun LineRow(line: TripLine, onVehicle: Int, forOrders: Int, forSale: Int, trip: TripDetail) {
     val scheme = MaterialTheme.colorScheme
     ListCard(onClick = null) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -411,6 +505,21 @@ private fun LineRow(line: TripLine, onVehicle: Int, trip: TripDetail) {
                     color = scheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+            // Goods held for the trip's own orders cannot be sold to anybody else.
+            if (forOrders > 0) {
+                Text(
+                    stringResource(Res.string.trip_line_for_orders, splitText(forOrders, line.piecesPerCarton)),
+                    color = scheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.caption,
+                )
+                if (trip.onTheRoad) {
+                    Text(
+                        stringResource(Res.string.trip_line_for_sale, splitText(forSale, line.piecesPerCarton)),
+                        color = scheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.caption,
+                    )
+                }
             }
             if (trip.closed) {
                 line.returned?.let {
@@ -602,6 +711,46 @@ private val sampleTrip = TripDetail(
     canSell = true,
     canClose = true,
 )
+
+private val sampleOrder = TripOrder(
+    id = 31,
+    number = "LV-ORD-000031",
+    customerId = 1,
+    customerName = "Salima Shop",
+    area = "Salima",
+    invoiceType = "plain",
+    wantedOn = "2026-10-27",
+    lines = listOf(
+        TripOrderLine(
+            orderLineId = 1, productId = 1, brand = "Lucky", name = "Milk", packSize = "500 ml", companyCode = "LV",
+            piecesPerCarton = 12, pricePerCarton = 25_000.0, pieces = 48, onVehicle = 48, toDeliver = 48,
+            toDeliverQty = qty(48, 12), amount = 100_000.0,
+        ),
+    ),
+)
+
+// A trip that carries an order as well as goods to sell at the stops.
+@Preview
+@Composable
+private fun TripWithOrdersPreview() {
+    SalesTheme {
+        TripDetailScreen(
+            TripDetailState(
+                loading = false,
+                trip = sampleTrip.copy(
+                    orders = listOf(sampleOrder),
+                    lines = sampleLines.map { line ->
+                        if (line.productId != 1) line else line.copy(
+                            forOrders = 48, forOrdersQty = qty(48, 12), forSale = 24, forSaleQty = qty(24, 12),
+                        )
+                    },
+                ),
+            ),
+            onEvent = {},
+            onBack = {},
+        )
+    }
+}
 
 @Preview
 @Composable

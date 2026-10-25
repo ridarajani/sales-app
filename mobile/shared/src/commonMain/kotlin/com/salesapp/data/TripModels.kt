@@ -65,14 +65,87 @@ data class TripLine(
     val plannedQty: PieceQty = PieceQty(),
     val loadedQty: PieceQty = PieceQty(),
     val soldQty: PieceQty = PieceQty(),
-    // What is still on the vehicle, which is the most that can be sold.
+    // What is still on the vehicle.
     val onVehicle: Int = 0,
     val onVehicleQty: PieceQty = PieceQty(),
+    // Phase 9 part 2: of what is on the vehicle, how much is held for the trip's own orders and
+    // how much may be sold to anybody at a stop.
+    val forOrders: Int = 0,
+    val forOrdersQty: PieceQty = PieceQty(),
+    val forSale: Int = 0,
+    val forSaleQty: PieceQty = PieceQty(),
     val quantity: String = "",
     val batches: List<TripBatch> = emptyList(),
 ) {
     val label: String get() = listOf(brand, name, packSize).filter { it.isNotBlank() }.joinToString(" ")
+
+    // The most a sale to somebody else may take. Worked out the same way as on the server, so a
+    // pack saved by an older app, which knows nothing of orders, still sells the whole van.
+    val sellable: Int get() = (onVehicle - forOrders).coerceAtLeast(0)
 }
+
+// --- Orders the trip delivers (Phase 9 part 2) ---
+
+// One product on one of the trip's orders. toDeliver is all that is left while the trip is being
+// planned, and what is on the vehicle for it once loaded. The price is missing for the warehouse.
+@Serializable
+data class TripOrderLine(
+    val orderLineId: Int = 0,
+    val productId: Int,
+    val code: String = "",
+    val brand: String = "",
+    val name: String = "",
+    val packSize: String = "",
+    val companyCode: String = "",
+    val piecesPerCarton: Int = 1,
+    val vatExempt: Boolean = false,
+    val pricePerCarton: Double? = null,
+    val pieces: Int = 0,
+    val delivered: Int = 0,
+    val onVehicle: Int = 0,
+    val toDeliver: Int = 0,
+    val toDeliverQty: PieceQty = PieceQty(),
+    val amount: Double? = null,
+) {
+    val label: String get() = listOf(brand, name, packSize).filter { it.isNotBlank() }.joinToString(" ")
+
+    val perCarton: Int get() = piecesPerCarton.coerceAtLeast(1)
+}
+
+@Serializable
+data class TripOrder(
+    val id: Int,
+    val number: String = "",
+    val status: String = "open",
+    val customerId: Int = 0,
+    val customerName: String = "",
+    val area: String = "",
+    val cashOnly: Boolean = false,
+    val invoiceType: String = "vat",
+    val salesmanName: String? = null,
+    val wantedOn: String = "",
+    val lines: List<TripOrderLine> = emptyList(),
+) {
+    val toDeliver: Int get() = lines.sumOf { it.toDeliver }
+
+    // Missing for the warehouse, which never sees what anything is worth.
+    val amount: Double? get() = if (lines.any { it.amount == null }) null else lines.sumOf { it.amount ?: 0.0 }
+}
+
+// An order this trip could carry, as GET /trips/open-orders lists it.
+@Serializable
+data class OpenOrder(
+    val id: Int,
+    val number: String = "",
+    val customerId: Int = 0,
+    val customerName: String = "",
+    val area: String = "",
+    val channel: String = "",
+    val wantedOn: String = "",
+    val salesmanName: String? = null,
+    val amountLeft: Double = 0.0,
+    val products: Int = 0,
+)
 
 @Serializable
 data class TripSaleInvoice(
@@ -171,6 +244,8 @@ data class TripDetail(
     val createdBy: String = "",
     val createdAt: String = "",
     val lines: List<TripLine> = emptyList(),
+    // The orders booked ahead that this trip delivers.
+    val orders: List<TripOrder> = emptyList(),
     val sales: List<TripSale> = emptyList(),
     val expenses: List<TripExpense> = emptyList(),
     val salesTotal: Double? = null,
@@ -254,6 +329,8 @@ data class PlanTripRequest(
     val note: String = "",
     val float: Int = 0,
     val lines: List<TripLineQty> = emptyList(),
+    // Orders booked ahead that this trip delivers.
+    val orderIds: List<Int> = emptyList(),
 )
 
 @Serializable
@@ -264,7 +341,8 @@ data class TripSaleLineQty(
     val productId: Int,
     val cartons: Int = 0,
     val pieces: Int = 0,
-    val pricePerCarton: Int = 0,
+    // Left out when the sale delivers an order: the order's own price is used.
+    val pricePerCarton: Int? = null,
 )
 
 // soldAt is the phone's own time, so a sale made offline keeps the moment it happened.
@@ -272,6 +350,8 @@ data class TripSaleLineQty(
 data class TripSaleRequest(
     val requestId: String,
     val customerId: Int,
+    // Set when the sale delivers one of the trip's orders.
+    val orderId: Int? = null,
     val stop: String = "",
     val invoiceType: String? = null,
     val payment: String = "cash",

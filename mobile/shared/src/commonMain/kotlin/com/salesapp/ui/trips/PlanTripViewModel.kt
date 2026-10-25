@@ -6,11 +6,13 @@ import com.salesapp.core.todayIsoDate
 import com.salesapp.data.AppState
 import com.salesapp.data.Company
 import com.salesapp.data.Driver
+import com.salesapp.data.OpenOrder
 import com.salesapp.data.PlanTripRequest
 import com.salesapp.data.Product
 import com.salesapp.data.Role
 import com.salesapp.data.TripDetail
 import com.salesapp.data.TripLineQty
+import com.salesapp.data.TripOrder
 import com.salesapp.data.TripsRepository
 import com.salesapp.data.UserRow
 import com.salesapp.data.Vehicle
@@ -18,7 +20,7 @@ import com.salesapp.data.canPlanTrips
 import com.salesapp.resources.Res
 import com.salesapp.resources.plan_changed
 import com.salesapp.resources.plan_need_leader
-import com.salesapp.resources.plan_need_lines
+import com.salesapp.resources.plan_need_lines_or_orders
 import com.salesapp.resources.plan_need_route
 import com.salesapp.resources.plan_saved
 import com.salesapp.resources.plan_deleted
@@ -66,12 +68,23 @@ data class PlanTripState(
     val float: Long? = null,
     val note: String = "",
     val lines: List<PlanLine> = emptyList(),
+    // Orders booked ahead that this trip may deliver, and the ones picked.
+    val openOrders: List<OpenOrder> = emptyList(),
+    val orderIds: Set<Int> = emptySet(),
+    // True while the list of orders is open for picking.
+    val picking: Boolean = false,
     val asking: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
     val actionError: String? = null,
 ) {
     val anything: Boolean get() = lines.any { it.total > 0 }
+
+    // The orders picked, in the order the server listed them.
+    val chosenOrders: List<OpenOrder> get() = openOrders.filter { it.id in orderIds }
+
+    // Goods to sell are only needed when the trip is not delivering an order.
+    val hasOrders: Boolean get() = orderIds.isNotEmpty()
 
     // The companies of the chosen warehouse that this user may plan for.
     val facilityCompanies: List<Company> get() = companies.filter { it.facilityCode == facilityCode }
@@ -94,6 +107,10 @@ sealed interface PlanTripEvent {
     data class NoteChanged(val value: String) : PlanTripEvent
     data class EditCartons(val productId: Int, val value: Int?) : PlanTripEvent
     data class EditPieces(val productId: Int, val value: Int?) : PlanTripEvent
+    data object AddOrders : PlanTripEvent
+    data object OrdersDone : PlanTripEvent
+    data class OrderToggled(val id: Int) : PlanTripEvent
+    data class RemoveOrder(val id: Int) : PlanTripEvent
     data object Save : PlanTripEvent
     data object AskDelete : PlanTripEvent
     data object Dismiss : PlanTripEvent
@@ -132,7 +149,13 @@ class PlanTripViewModel(
             is PlanTripEvent.FacilityChosen -> {
                 if (event.code == s.facilityCode) return
                 // Another warehouse means other companies, products, vehicles and leaders.
-                _state.update { it.copy(facilityCode = event.code, companyCode = null, vehicleId = null, leaderId = null, lines = emptyList(), actionError = null) }
+                _state.update {
+                    it.copy(
+                        facilityCode = event.code, companyCode = null, vehicleId = null, leaderId = null,
+                        lines = emptyList(), openOrders = emptyList(), orderIds = emptySet(), picking = false,
+                        actionError = null,
+                    )
+                }
                 loadFacility(event.code)
             }
             is PlanTripEvent.CompanyChosen -> _state.update { it.copy(companyCode = event.code, actionError = null) }
@@ -156,6 +179,15 @@ class PlanTripViewModel(
             is PlanTripEvent.NoteChanged -> _state.update { it.copy(note = event.value) }
             is PlanTripEvent.EditCartons -> edit(event.productId) { it.copy(cartons = event.value) }
             is PlanTripEvent.EditPieces -> edit(event.productId) { it.copy(pieces = event.value) }
+            PlanTripEvent.AddOrders -> _state.update { it.copy(picking = true, actionError = null) }
+            PlanTripEvent.OrdersDone -> _state.update { it.copy(picking = false) }
+            is PlanTripEvent.OrderToggled -> _state.update {
+                it.copy(
+                    orderIds = if (event.id in it.orderIds) it.orderIds - event.id else it.orderIds + event.id,
+                    actionError = null,
+                )
+            }
+            is PlanTripEvent.RemoveOrder -> _state.update { it.copy(orderIds = it.orderIds - event.id, actionError = null) }
             PlanTripEvent.Save -> save()
             PlanTripEvent.AskDelete -> if (tripId != null) _state.update { it.copy(asking = true) }
             PlanTripEvent.Dismiss -> _state.update { it.copy(asking = false) }
@@ -183,8 +215,9 @@ class PlanTripViewModel(
                 _state.update { it.copy(actionError = getString(Res.string.plan_need_leader)) }
                 return@launch
             }
-            if (!s.anything) {
-                _state.update { it.copy(actionError = getString(Res.string.plan_need_lines)) }
+            // Client, Phase 9 part 2: a trip may go out with nothing but orders on it.
+            if (!s.anything && !s.hasOrders) {
+                _state.update { it.copy(actionError = getString(Res.string.plan_need_lines_or_orders)) }
                 return@launch
             }
             _state.update { it.copy(busy = true, actionError = null) }
@@ -205,6 +238,7 @@ class PlanTripViewModel(
                     lines = s.lines.filter { it.total > 0 }.map {
                         TripLineQty(productId = it.product.id, cartons = it.cartons ?: 0, pieces = it.pieces ?: 0)
                     },
+                    orderIds = s.chosenOrders.map { it.id },
                 )
                 val saved = if (tripId == null) repository.plan(request) else repository.change(tripId, request)
                 app.message = if (tripId == null) getString(Res.string.plan_saved, saved.number) else getString(Res.string.plan_changed)
@@ -282,12 +316,19 @@ class PlanTripViewModel(
                 val drivers = repository.drivers()
                 val leaders = repository.possibleLeaders(codes)
                 val products = repository.products().filter { it.active && it.companyCode in codes }
+                // Orders this warehouse could send out. The trip's own orders stay in the list.
+                val open = repository.openOrders(facilityCode, tripId)
+                // An order already on the trip that the list no longer offers still shows, so that
+                // saving the trip again cannot quietly take it off.
+                val onTrip = existing?.orders.orEmpty().filter { o -> open.none { it.id == o.id } }.map { it.asOpenOrder() }
                 _state.update { s ->
                     s.copy(
                         loading = false,
                         vehicles = vehicles,
                         drivers = drivers,
                         leaders = leaders,
+                        openOrders = open + onTrip,
+                        orderIds = existing?.orders.orEmpty().map { it.id }.toSet().ifEmpty { s.orderIds },
                         companyCode = s.companyCode ?: codes.firstOrNull(),
                         lines = products.map { product ->
                             // On a trip being changed, start from what was planned.
@@ -305,3 +346,16 @@ class PlanTripViewModel(
         }
     }
 }
+
+// An order already on a trip, shown like one from the open list.
+private fun TripOrder.asOpenOrder() = OpenOrder(
+    id = id,
+    number = number,
+    customerId = customerId,
+    customerName = customerName,
+    area = area,
+    wantedOn = wantedOn,
+    salesmanName = salesmanName,
+    amountLeft = amount ?: 0.0,
+    products = lines.size,
+)

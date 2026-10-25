@@ -14,8 +14,9 @@ data class TripDetailRoute(val id: Int)
 @Serializable
 data class PlanTripRoute(val id: Int? = null)
 
+// orderId is set when the leader is delivering one of the trip's orders.
 @Serializable
-data class TripSaleRoute(val tripId: Int)
+data class TripSaleRoute(val tripId: Int, val orderId: Int? = null)
 
 @Serializable
 data class TripExpenseRoute(val tripId: Int)

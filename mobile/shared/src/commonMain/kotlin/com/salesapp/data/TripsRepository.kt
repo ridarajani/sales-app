@@ -22,6 +22,9 @@ class TripsRepository(
     // True when something saved on this phone could not be read and the office needs telling.
     fun hasUnreadable(id: Int): Boolean = outbox.hasUnreadable(id)
 
+    // Orders booked ahead that a trip may take. Passing the trip keeps its own orders in the list.
+    suspend fun openOrders(facilityCode: String, tripId: Int?): List<OpenOrder> = api.openOrders(facilityCode, tripId)
+
     suspend fun plan(request: PlanTripRequest): TripDetail = api.planTrip(request)
 
     suspend fun change(id: Int, request: PlanTripRequest): TripDetail = api.changeTrip(id, request)
@@ -59,7 +62,7 @@ class TripsRepository(
             // The pack on the phone is only as fresh as its last download, so what this sale took
             // comes off it now. Otherwise the next form would offer goods that have already gone,
             // and a sale made after the network drops would be refused with the cash already taken.
-            outbox.takeOffPack(tripId, request.lines)
+            outbox.takeOffPack(tripId, request.lines, request.orderId)
             SaleOutcome.Sent(sale)
         } catch (e: ApiException) {
             // An outbox sale is already counted off by the outbox itself.

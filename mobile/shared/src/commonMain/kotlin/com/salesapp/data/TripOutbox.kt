@@ -35,9 +35,20 @@ data class TripOutbox(
 
     // How much of each product the phone has already sold but not sent, so the screen can take it
     // off what is on the vehicle.
-    fun soldPieces(perCarton: Map<Int, Int>): Map<Int, Int> {
+    fun soldPieces(perCarton: Map<Int, Int>): Map<Int, Int> = piecesOf(perCarton) { true }
+
+    // Sales at a stop only. These come off what is for sale; an order's delivery comes off that
+    // order and off what is held for the orders.
+    fun plainSoldPieces(perCarton: Map<Int, Int>): Map<Int, Int> = piecesOf(perCarton) { it.orderId == null }
+
+    // What is waiting for one of the trip's orders, or for all of them when orderId is null.
+    fun orderSoldPieces(perCarton: Map<Int, Int>, orderId: Int? = null): Map<Int, Int> =
+        piecesOf(perCarton) { it.orderId != null && (orderId == null || it.orderId == orderId) }
+
+    private fun piecesOf(perCarton: Map<Int, Int>, keep: (TripSaleRequest) -> Boolean): Map<Int, Int> {
         val out = mutableMapOf<Int, Int>()
         for (sale in sales) {
+            if (!keep(sale.request)) continue
             for (line in sale.request.lines) {
                 val size = (perCarton[line.productId] ?: 1).coerceAtLeast(1)
                 out[line.productId] = (out[line.productId] ?: 0) + line.cartons * size + line.pieces
@@ -149,29 +160,69 @@ class TripOutboxStore(private val files: Files) {
     }
 
     // Takes what one sale carried off the pack kept on the phone, so the van count stays right
-    // between downloads. Called once the server has taken the sale.
-    fun takeOffPack(tripId: Int, lines: List<TripSaleLineQty>) {
+    // between downloads. Called once the server has taken the sale. A sale that delivered one of
+    // the trip's orders comes off that order and off what the van holds for the orders; a sale at
+    // a stop comes off what is for sale.
+    fun takeOffPack(tripId: Int, lines: List<TripSaleLineQty>, orderId: Int? = null) {
         val pack = loadPack(tripId) ?: return
-        val perCarton = pack.trip.lines.associate { it.productId to it.piecesPerCarton.coerceAtLeast(1) }
+        savePack(pack.copy(trip = takeOff(pack.trip, lines, orderId)))
+    }
+
+    // The same sum on a trip in hand, so the screens and the saved pack agree.
+    private fun takeOff(trip: TripDetail, lines: List<TripSaleLineQty>, orderId: Int?): TripDetail {
+        val perCarton = trip.lines.associate { it.productId to it.piecesPerCarton.coerceAtLeast(1) }
         val sold = lines.associate { line ->
             line.productId to (line.cartons * (perCarton[line.productId] ?: 1) + line.pieces)
         }
-        val next = pack.trip.lines.map { line ->
+        val nextLines = trip.lines.map { line ->
             val off = sold[line.productId] ?: 0
             if (off == 0) {
                 line
             } else {
                 val left = (line.onVehicle - off).coerceAtLeast(0)
                 val soldNow = line.sold + off
+                // Goods for an order were never for sale, so only one of the two goes down.
+                val forOrders = if (orderId == null) line.forOrders else (line.forOrders - off).coerceAtLeast(0)
+                val forSale = if (orderId == null) (line.forSale - off).coerceAtLeast(0) else line.forSale
                 line.copy(
                     sold = soldNow,
                     soldQty = split(soldNow, line.piecesPerCarton),
                     onVehicle = left,
                     onVehicleQty = split(left, line.piecesPerCarton),
+                    forOrders = forOrders,
+                    forOrdersQty = split(forOrders, line.piecesPerCarton),
+                    forSale = forSale,
+                    forSaleQty = split(forSale, line.piecesPerCarton),
                 )
             }
         }
-        savePack(pack.copy(trip = pack.trip.copy(lines = next)))
+        val nextOrders = if (orderId == null) {
+            trip.orders
+        } else {
+            trip.orders.map { order ->
+                if (order.id != orderId) {
+                    order
+                } else {
+                    order.copy(
+                        lines = order.lines.map { line ->
+                            val off = sold[line.productId] ?: 0
+                            if (off == 0) {
+                                line
+                            } else {
+                                val toDeliver = (line.toDeliver - off).coerceAtLeast(0)
+                                line.copy(
+                                    delivered = line.delivered + off,
+                                    onVehicle = (line.onVehicle - off).coerceAtLeast(0),
+                                    toDeliver = toDeliver,
+                                    toDeliverQty = split(toDeliver, line.piecesPerCarton),
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        return trip.copy(lines = nextLines, orders = nextOrders)
     }
 
     private fun split(pieces: Int, piecesPerCarton: Int): PieceQty {

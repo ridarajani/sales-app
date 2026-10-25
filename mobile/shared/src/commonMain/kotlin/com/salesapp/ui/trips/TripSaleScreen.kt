@@ -23,10 +23,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.salesapp.core.formatIsoDate
 import com.salesapp.core.formatMwk
 import com.salesapp.data.PackCompany
 import com.salesapp.data.PackCustomer
 import com.salesapp.data.PackPrice
+import com.salesapp.data.PieceQty
+import com.salesapp.data.TripOrder
+import com.salesapp.data.TripOrderLine
 import com.salesapp.data.TripSaleDetail
 import com.salesapp.data.TripSaleInvoice
 import com.salesapp.resources.Res
@@ -45,6 +49,15 @@ import com.salesapp.resources.sale_invoice_type
 import com.salesapp.resources.sale_invoices
 import com.salesapp.resources.sale_no_access
 import com.salesapp.resources.sale_on_vehicle
+import com.salesapp.resources.sale_order_card
+import com.salesapp.resources.sale_order_gone
+import com.salesapp.resources.sale_order_help
+import com.salesapp.resources.sale_order_invoice
+import com.salesapp.resources.sale_order_nothing
+import com.salesapp.resources.sale_order_on_vehicle
+import com.salesapp.resources.sale_order_price
+import com.salesapp.resources.sale_order_title
+import com.salesapp.resources.sale_order_too_much
 import com.salesapp.resources.sale_paid_by
 import com.salesapp.resources.sale_pieces
 import com.salesapp.resources.sale_plain
@@ -64,6 +77,7 @@ import com.salesapp.resources.sale_too_much
 import com.salesapp.resources.sale_total
 import com.salesapp.resources.sale_vat
 import com.salesapp.resources.sale_where
+import com.salesapp.resources.trip_order_wanted
 import com.salesapp.resources.trip_saved_offline
 import com.salesapp.ui.cash.PhotoField
 import com.salesapp.ui.components.ChoiceButton
@@ -91,7 +105,9 @@ import org.koin.core.parameter.parametersOf
 fun TripSalePage(
     tripId: Int,
     onBack: () -> Unit,
-    viewModel: TripSaleViewModel = koinViewModel { parametersOf(tripId) },
+    // Set when the leader is delivering one of the trip's orders.
+    orderId: Int? = null,
+    viewModel: TripSaleViewModel = koinViewModel { parametersOf(tripId, orderId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     TripSaleScreen(state, viewModel::onEvent, onBack)
@@ -102,12 +118,14 @@ fun TripSalePage(
 @Composable
 fun TripSaleScreen(state: TripSaleState, onEvent: (TripSaleEvent) -> Unit, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(stringResource(Res.string.sale_title), onBack = onBack)
+        TopBar(stringResource(if (state.isOrder) Res.string.sale_order_title else Res.string.sale_title), onBack = onBack)
         when {
             !state.allowed -> Say(stringResource(Res.string.sale_no_access), error = true, modifier = Modifier.padding(16.dp))
             state.saved != null || state.savedOffline -> Saved(state, onEvent, onBack)
             state.loading -> LoadingState()
             state.error != null -> ErrorState(state.error, onRetry = { onEvent(TripSaleEvent.Retry) })
+            // The office took the order off the trip while the phone was away.
+            state.orderGone -> Say(stringResource(Res.string.sale_order_gone), error = true, modifier = Modifier.padding(16.dp))
             state.customerId == null -> PickCustomer(state, onEvent)
             else -> Form(state, onEvent)
         }
@@ -172,11 +190,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.Form(state: TripSaleS
                 }
             }
         }
-        SecondaryButton(
-            stringResource(Res.string.sale_customer),
-            onClick = { onEvent(TripSaleEvent.ChangeCustomer) },
-            enabled = !state.busy,
-        )
+        if (state.isOrder) {
+            OrderCard(state.order)
+        } else {
+            SecondaryButton(
+                stringResource(Res.string.sale_customer),
+                onClick = { onEvent(TripSaleEvent.ChangeCustomer) },
+                enabled = !state.busy,
+            )
+        }
         val stops = state.trip?.stops.orEmpty()
         if (stops.isNotEmpty()) {
             SectionLabel(stringResource(Res.string.sale_where))
@@ -192,14 +214,26 @@ private fun androidx.compose.foundation.layout.ColumnScope.Form(state: TripSaleS
             }
         }
         SectionLabel(stringResource(Res.string.sale_invoice_type))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("vat" to stringResource(Res.string.sale_vat), "plain" to stringResource(Res.string.sale_plain)).forEach { (code, label) ->
-                ChoiceButton(
-                    text = label,
-                    selected = state.invoiceType == code,
-                    onClick = { onEvent(TripSaleEvent.InvoiceTypeChosen(code)) },
-                    enabled = !state.busy,
-                )
+        if (state.isOrder) {
+            // The invoice is the one the order was booked with, so there is nothing to pick.
+            Text(
+                stringResource(
+                    Res.string.sale_order_invoice,
+                    stringResource(if (state.invoiceType == "plain") Res.string.sale_plain else Res.string.sale_vat),
+                ),
+                color = scheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("vat" to stringResource(Res.string.sale_vat), "plain" to stringResource(Res.string.sale_plain)).forEach { (code, label) ->
+                    ChoiceButton(
+                        text = label,
+                        selected = state.invoiceType == code,
+                        onClick = { onEvent(TripSaleEvent.InvoiceTypeChosen(code)) },
+                        enabled = !state.busy,
+                    )
+                }
             }
         }
         SectionLabel(stringResource(Res.string.sale_paid_by))
@@ -236,6 +270,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.Form(state: TripSaleS
             )
         }
         SectionLabel(stringResource(Res.string.sale_products))
+        // Nothing of the order is on the van: there is nothing to hand over here.
+        if (state.isOrder && state.lines.isEmpty()) Say(stringResource(Res.string.sale_order_nothing), error = true)
         state.lines.forEach { line -> LineCard(line, state.busy, onEvent) }
         if (state.total > 0) {
             ListCard(onClick = null) {
@@ -294,7 +330,10 @@ private fun LineCard(line: SaleLine, busy: Boolean, onEvent: (TripSaleEvent) -> 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(line.line.label, color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                stringResource(Res.string.sale_on_vehicle, splitText(line.onVehicle, line.perCarton)),
+                stringResource(
+                    if (line.fixedPrice) Res.string.sale_order_on_vehicle else Res.string.sale_on_vehicle,
+                    splitText(line.onVehicle, line.perCarton),
+                ),
                 color = scheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -316,18 +355,59 @@ private fun LineCard(line: SaleLine, busy: Boolean, onEvent: (TripSaleEvent) -> 
                     )
                 }
             }
-            MwkField(
-                label = stringResource(Res.string.sale_price),
-                amount = line.price,
-                onAmountChange = { onEvent(TripSaleEvent.EditPrice(productId, it)) },
-            )
+            if (line.fixedPrice) {
+                // The order's own price: shown so the leader can read it out, never typed.
+                Text(
+                    stringResource(Res.string.sale_order_price, formatMwk(line.price ?: 0)),
+                    color = scheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                MwkField(
+                    label = stringResource(Res.string.sale_price),
+                    amount = line.price,
+                    onAmountChange = { onEvent(TripSaleEvent.EditPrice(productId, it)) },
+                )
+            }
             // Never more than is left on the van.
             if (line.tooMuch) {
-                Say(stringResource(Res.string.sale_too_much, splitText(line.onVehicle, line.perCarton)), error = true)
+                Say(
+                    stringResource(
+                        if (line.fixedPrice) Res.string.sale_order_too_much else Res.string.sale_too_much,
+                        splitText(line.onVehicle, line.perCarton),
+                    ),
+                    error = true,
+                )
             } else if (line.amount > 0) {
                 Text(formatMwk(line.amount), color = scheme.onSurface, style = MaterialTheme.typography.bodyMedium)
             }
         }
+    }
+}
+
+// Which order is being delivered, and the rule the leader works to.
+@Composable
+private fun OrderCard(order: TripOrder?) {
+    if (order == null) return
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        ListCard(onClick = null) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(Res.string.sale_order_card, order.number),
+                    color = scheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (order.wantedOn.isNotBlank()) {
+                    Text(
+                        stringResource(Res.string.trip_order_wanted, formatIsoDate(order.wantedOn)),
+                        color = scheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        Text(stringResource(Res.string.sale_order_help), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -373,11 +453,14 @@ private fun androidx.compose.foundation.layout.ColumnScope.Saved(
         }
     }
     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        SecondaryButton(
-            stringResource(Res.string.sale_another),
-            onClick = { onEvent(TripSaleEvent.Another) },
-            modifier = Modifier.weight(1f),
-        )
+        // After an order the leader goes back to the trip, where the order card says what is left.
+        if (!state.isOrder) {
+            SecondaryButton(
+                stringResource(Res.string.sale_another),
+                onClick = { onEvent(TripSaleEvent.Another) },
+                modifier = Modifier.weight(1f),
+            )
+        }
         PrimaryButton(stringResource(Res.string.sale_done), onClick = onBack, modifier = Modifier.weight(1f))
     }
 }
@@ -415,6 +498,49 @@ private fun sampleSale(cashOnly: Boolean = false, filled: Boolean = true) = Trip
         ),
     ),
 )
+
+private val sampleOrder = TripOrder(
+    id = 31,
+    number = "LV-ORD-000031",
+    customerId = 1,
+    customerName = "Salima Shop",
+    area = "Salima",
+    invoiceType = "plain",
+    wantedOn = "2026-10-27",
+    lines = listOf(
+        TripOrderLine(
+            orderLineId = 1, productId = 1, brand = "Lucky", name = "Milk", packSize = "500 ml", companyCode = "LV",
+            piecesPerCarton = 12, pricePerCarton = 25_000.0, pieces = 120, onVehicle = 120, toDeliver = 120,
+            toDeliverQty = PieceQty(pieces = 120, cartons = 10), amount = 250_000.0,
+        ),
+    ),
+)
+
+private fun sampleDelivery() = sampleSale().copy(
+    order = sampleOrder,
+    invoiceType = "plain",
+    lines = listOf(
+        SaleLine(
+            line = com.salesapp.data.TripLine(productId = 1, brand = "Lucky", name = "Milk", packSize = "500 ml", piecesPerCarton = 12),
+            onVehicle = 120,
+            cartons = 10,
+            price = 25_000,
+            fixedPrice = true,
+        ),
+    ),
+)
+
+@Preview
+@Composable
+private fun TripSaleDeliverOrderPreview() {
+    SalesTheme { TripSaleScreen(sampleDelivery(), onEvent = {}, onBack = {}) }
+}
+
+@Preview
+@Composable
+private fun TripSaleOrderGonePreview() {
+    SalesTheme { TripSaleScreen(sampleDelivery().copy(orderGone = true), onEvent = {}, onBack = {}) }
+}
 
 @Preview
 @Composable
