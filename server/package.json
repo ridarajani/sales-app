@@ -7,6 +7,7 @@
     "start": "tsx src/main.ts",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "demo": "tsx src/db/demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -20,6 +20,8 @@ npm run dev               # http://localhost:3000/health
 npm test                  # uses the sales_test database
 ```
 
+To show or try the app, `npm run demo` fills an empty database with made-up staff for every job, shops, products and a month of orders, deliveries, payments, returns and a trip. Every name and phone number in it is invented. It prints the phones to sign in with; the PIN is `1111`. It refuses a database that already has orders and never runs in production. To start again, empty the database first (`docker compose down -v`, then `docker compose up -d`).
+
 Seeding also creates the first admin login. Its placeholder phone is `0990000000` and its PIN is `1234`. These are not real values. Before go-live, put your real phone and PIN in `.env` as `BOOTSTRAP_ADMIN_PHONE` and `BOOTSTRAP_ADMIN_PIN`. The server refuses the placeholder values in production.
 
 Two more keys in `.env`:
