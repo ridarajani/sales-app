@@ -55,3 +55,27 @@ fun localIsoDateFromUtcTimestamp(timestamp: String): String {
     val local = day * 1440 + minutes + currentUtcOffsetMinutes()
     return isoFromEpochDay(local.floorDiv(1440L))
 }
+
+// "2026-10-20" -> "20/10/2026", the way the reports write their dates.
+fun formatSlashDate(iso: String): String {
+    val parts = iso.take(10).split("-")
+    if (parts.size != 3) return iso
+    val day = parts[2].toIntOrNull() ?: return iso
+    val month = parts[1].toIntOrNull() ?: return iso
+    return "${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${parts[0]}"
+}
+
+// "2026-10" -> "Oct 2026". Anything else is shown as it is.
+fun formatMonth(month: String): String {
+    val year = month.take(4).toIntOrNull() ?: return month
+    val number = month.drop(5).take(2).toIntOrNull()?.takeIf { it in 1..12 } ?: return month
+    return "${monthNames[number - 1]} $year"
+}
+
+// A month before or after "2026-10".
+fun shiftMonth(month: String, by: Int): String {
+    val year = month.take(4).toIntOrNull() ?: return month
+    val number = month.drop(5).take(2).toIntOrNull()?.takeIf { it in 1..12 } ?: return month
+    val total = year * 12 + (number - 1) + by
+    return "${total / 12}-${(total % 12 + 1).toString().padStart(2, '0')}"
+}

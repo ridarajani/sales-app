@@ -45,6 +45,7 @@ import com.salesapp.ui.airtel.airtelGraph
 import com.salesapp.ui.cash.cashGraph
 import com.salesapp.ui.invoices.invoicesGraph
 import com.salesapp.ui.ledger.ledgerGraph
+import com.salesapp.ui.reports.reportsGraph
 import com.salesapp.ui.returns.returnsGraph
 import com.salesapp.ui.trips.tripsGraph
 import com.salesapp.ui.loading.loadingGraph
@@ -155,6 +156,7 @@ private fun AppContent() {
                     returnsGraph(nav)
                     ledgerGraph(nav)
                     tripsGraph(nav)
+                    reportsGraph(nav)
                     customersGraph(nav, onExit = { nav.popBackStack() })
                     catalogGraph(nav, onExit = { nav.popBackStack() })
                 }

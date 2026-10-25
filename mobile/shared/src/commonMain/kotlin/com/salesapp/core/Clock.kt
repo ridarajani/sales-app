@@ -12,3 +12,6 @@ expect fun currentUtcOffsetMinutes(): Int
 // The moment on the phone, as an ISO timestamp with its offset, which is what a sale made offline
 // carries so the server knows when it really happened.
 expect fun nowUtcTimestamp(): String
+
+// The month the phone is in, as "2026-10".
+fun thisMonth(): String = todayIsoDate().take(7)

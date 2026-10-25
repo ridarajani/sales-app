@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home -->
+    <string name="tile_reports_sub">Sales, cash and stock</string>
+    <string name="tile_targets">Targets</string>
+    <string name="tile_targets_sub">Each salesman\'s month</string>
+
+    <!-- The list of reports -->
+    <string name="reports_title">Reports</string>
+    <string name="reports_search">Search a report</string>
+    <string name="reports_none">No reports for you yet.</string>
+    <string name="reports_no_match">No report with that name.</string>
+    <string name="reports_targets">Targets</string>
+
+    <!-- One report -->
+    <string name="report_dates_from">From</string>
+    <string name="report_dates_to">To</string>
+    <string name="report_company">Company</string>
+    <string name="report_company_all">All</string>
+    <string name="report_customer">Customer</string>
+    <string name="report_customer_pick">Pick the customer</string>
+    <string name="report_customer_search">Search a shop name</string>
+    <string name="report_customer_none">No customers found.</string>
+    <string name="report_product">Product</string>
+    <string name="report_product_pick">Pick the product</string>
+    <string name="report_product_search">Search a product</string>
+    <string name="report_product_none">No products found.</string>
+    <string name="report_channel">Type of customer</string>
+    <string name="report_person_all">Everyone</string>
+    <string name="report_change">Change</string>
+    <string name="report_show">Show</string>
+    <string name="report_showing">Working...</string>
+    <string name="report_need_company">Please pick the company first.</string>
+    <string name="report_need_customer">Please pick the customer first.</string>
+    <string name="report_need_person">Please pick the person first.</string>
+    <string name="report_need_product">Please pick the product first.</string>
+    <string name="report_need_dates">Please pick the dates first.</string>
+    <string name="report_need_channel">Please pick the type of customer first.</string>
+    <string name="report_empty">Nothing for what was picked.</string>
+    <string name="report_truncated">Only the first %1$d rows are shown. Narrow the dates or the filters to see the rest.</string>
+    <string name="report_totals">Totals</string>
+    <string name="report_rows">%1$d rows</string>
+    <string name="report_rows_one">1 row</string>
+    <string name="report_excel">Excel</string>
+    <string name="report_pdf">PDF</string>
+    <string name="report_sharing">Getting it...</string>
+    <string name="report_no_viewer">This phone has nothing that opens the file.</string>
+
+    <!-- Targets -->
+    <string name="targets_title">Targets</string>
+    <string name="targets_help">Each salesman\'s sales target for the month, before VAT.</string>
+    <string name="targets_no_access">You cannot set targets.</string>
+    <string name="targets_none">No salesmen to set targets for.</string>
+    <string name="targets_amount">Target (MWK)</string>
+    <string name="targets_saved">Saved</string>
+    <string name="targets_month_back">Month before</string>
+    <string name="targets_month_next">Month after</string>
+
+    <!-- The product and customer forms -->
+    <string name="product_low_stock">Low stock level (cartons)</string>
+    <string name="product_low_stock_note">A product with less free to sell shows on the low stock report. Leave it empty for none.</string>
+    <string name="form_credit_limit">Credit limit (MWK)</string>
+    <string name="form_credit_limit_note">Shown on reports only. It never stops an order.</string>
+</resources>
