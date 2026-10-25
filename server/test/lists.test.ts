@@ -144,7 +144,7 @@ test('vehicles: admin adds them with a usual driver; everyone can list them', as
   expect(v.json()).toMatchObject({ plate: 'MZ 4421', defaultDriverName: 'Banda' });
   expect((await post(app, admin, '/vehicles', { plate: 'MZ 4421' })).statusCode).toBe(400);
   expect((await post(app, admin, '/vehicles', { plate: 'LL 1', defaultDriverId: 1 })).statusCode).toBe(400);
-  expect((await post(app, abbas, '/vehicles', { plate: 'LL 2' })).statusCode).toBe(403);
+  expect((await post(app, salesman, '/vehicles', { plate: 'LL 2' })).statusCode).toBe(403);
   expect((await get(app, salesman, '/vehicles')).json()).toHaveLength(1);
   expect((await get(app, abbas, '/drivers')).json().map((d: { name: string }) => d.name)).toEqual(['Banda']);
 });

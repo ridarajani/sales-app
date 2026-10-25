@@ -5,6 +5,7 @@ import { HttpError, notAllowed, requireAuth, requireRole, type AuthUser } from '
 import { hashPin } from '../auth/pin.js';
 import { deleteUserSessions } from '../auth/session.js';
 import type { Db } from '../db/pool.js';
+import { deleteOrMark } from '../lists/common.js';
 import { getUser, INT4_MAX, isValidPhone, listUsers, normalisePhone, parse, PHONE_MESSAGE, pinSchema, ROLES, type UserDto } from '../users.js';
 
 const createBody = z.object({
@@ -17,6 +18,7 @@ const createBody = z.object({
   companyManagers: z.record(z.string(), z.number().int().positive().max(INT4_MAX)).optional(),
   pin: pinSchema,
 });
+const updateBody = createBody.omit({ pin: true }).partial();
 const idParams = z.object({ id: z.coerce.number().int().positive().max(INT4_MAX) });
 const resetBody = z.object({ pin: pinSchema });
 const limitQuery = z.object({ limit: z.coerce.number().int().min(1).max(1000).optional() });
@@ -33,6 +35,55 @@ async function loadManageable(db: Db, actor: AuthUser, rawId: unknown): Promise<
   return target;
 }
 
+type Assignment = { role: (typeof ROLES)[number]; companies?: string[]; managerId?: number | null; companyManagers?: Record<string, number> };
+
+// Works out a user's companies and sales managers from their job. Used when adding and when editing a user.
+async function resolveAssignment(db: Db, actor: AuthUser, body: Assignment) {
+  if (actor.role === 'sales_manager') {
+    if (body.role !== 'salesman') throw notAllowed();
+    if (body.managerId != null && body.managerId !== actor.id) throw notAllowed();
+    if (body.companyManagers && Object.values(body.companyManagers).some((m) => m !== actor.id)) throw notAllowed();
+  }
+  if (body.companyManagers && body.role !== 'salesman') throw invalid('Only salesmen have a sales manager.');
+
+  const allCompanies = (await db.query<{ code: string }>('select code from companies order by sort_order')).rows.map((r) => r.code);
+  if (body.companies?.some((c) => !allCompanies.includes(c))) throw invalid('One of the companies is not known.');
+
+  let managerId: number | null = null;
+  let companies: string[];
+  const companyManager = new Map<string, number>();
+  if (body.role === 'admin' || body.role === 'management') {
+    if (body.managerId != null) throw invalid('Only salesmen have a sales manager.');
+    companies = allCompanies;
+  } else if (body.role === 'salesman') {
+    const perCompany = body.companyManagers ?? {};
+    const fallback = body.managerId ?? (actor.role === 'sales_manager' ? actor.id : null);
+    const ids = [...new Set([...Object.values(perCompany), ...(fallback == null ? [] : [fallback])])];
+    const found = new Map<number, UserDto>();
+    for (const mid of ids) {
+      const manager = await getUser(db, mid);
+      if (!manager || manager.role !== 'sales_manager' || !manager.active) throw invalid('That sales manager was not found.');
+      found.set(mid, manager);
+    }
+    companies = body.companies ?? (Object.keys(perCompany).length ? Object.keys(perCompany) : fallback != null ? found.get(fallback)!.companies : []);
+    if (Object.keys(perCompany).some((c) => !companies.includes(c))) throw invalid('A sales manager is given for a company the salesman does not have.');
+    for (const c of companies) {
+      const mid = perCompany[c] ?? fallback;
+      if (mid == null) throw invalid('A salesman needs a sales manager.');
+      if (!found.get(mid)!.companies.includes(c)) throw invalid("A salesman can only have the sales manager's companies.");
+      companyManager.set(c, mid);
+    }
+    managerId = fallback ?? (companies[0] ? companyManager.get(companies[0])! : null);
+    if (managerId == null) throw invalid('A salesman needs a sales manager.');
+  } else {
+    if (body.managerId != null) throw invalid('Only salesmen have a sales manager.');
+    companies = body.companies ?? [];
+  }
+  companies = [...new Set(companies)];
+  if (companies.length === 0) throw invalid('Pick at least one company.');
+  return { companies, managerId, companyManager };
+}
+
 export function userRoutes(app: FastifyInstance, db: Db) {
   const auth = requireAuth(db);
 
@@ -47,48 +98,7 @@ export function userRoutes(app: FastifyInstance, db: Db) {
     const phone = normalisePhone(body.phone);
     if (!isValidPhone(phone)) throw invalid(PHONE_MESSAGE);
 
-    if (actor.role === 'sales_manager') {
-      if (body.role !== 'salesman') throw notAllowed();
-      if (body.managerId != null && body.managerId !== actor.id) throw notAllowed();
-      if (body.companyManagers && Object.values(body.companyManagers).some((m) => m !== actor.id)) throw notAllowed();
-    }
-    if (body.companyManagers && body.role !== 'salesman') throw invalid('Only salesmen have a sales manager.');
-
-    const allCompanies = (await db.query<{ code: string }>('select code from companies order by sort_order')).rows.map((r) => r.code);
-    if (body.companies?.some((c) => !allCompanies.includes(c))) throw invalid('One of the companies is not known.');
-
-    let managerId: number | null = null;
-    let companies: string[];
-    const companyManager = new Map<string, number>();
-    if (body.role === 'admin' || body.role === 'management') {
-      if (body.managerId != null) throw invalid('Only salesmen have a sales manager.');
-      companies = allCompanies;
-    } else if (body.role === 'salesman') {
-      const perCompany = body.companyManagers ?? {};
-      const fallback = body.managerId ?? (actor.role === 'sales_manager' ? actor.id : null);
-      const ids = [...new Set([...Object.values(perCompany), ...(fallback == null ? [] : [fallback])])];
-      const found = new Map<number, UserDto>();
-      for (const mid of ids) {
-        const manager = await getUser(db, mid);
-        if (!manager || manager.role !== 'sales_manager' || !manager.active) throw invalid('That sales manager was not found.');
-        found.set(mid, manager);
-      }
-      companies = body.companies ?? (Object.keys(perCompany).length ? Object.keys(perCompany) : fallback != null ? found.get(fallback)!.companies : []);
-      if (Object.keys(perCompany).some((c) => !companies.includes(c))) throw invalid('A sales manager is given for a company the salesman does not have.');
-      for (const c of companies) {
-        const mid = perCompany[c] ?? fallback;
-        if (mid == null) throw invalid('A salesman needs a sales manager.');
-        if (!found.get(mid)!.companies.includes(c)) throw invalid("A salesman can only have the sales manager's companies.");
-        companyManager.set(c, mid);
-      }
-      managerId = fallback ?? (companies[0] ? companyManager.get(companies[0])! : null);
-      if (managerId == null) throw invalid('A salesman needs a sales manager.');
-    } else {
-      if (body.managerId != null) throw invalid('Only salesmen have a sales manager.');
-      companies = body.companies ?? [];
-    }
-    companies = [...new Set(companies)];
-    if (companies.length === 0) throw invalid('Pick at least one company.');
+    const { companies, managerId, companyManager } = await resolveAssignment(db, actor, body);
 
     const client = await db.connect();
     let id: number;
@@ -96,7 +106,7 @@ export function userRoutes(app: FastifyInstance, db: Db) {
       await client.query('begin');
       const inserted = await client.query<{ id: number }>(
         `insert into users (name, phone, role, pin_hash, manager_id) values ($1, $2, $3, $4, $5)
-         on conflict (phone) do nothing returning id`,
+         on conflict (phone) where deleted_at is null do nothing returning id`,
         [body.name, phone, body.role, await hashPin(body.pin), managerId],
       );
       if (!inserted.rows[0]) {
@@ -131,6 +141,94 @@ export function userRoutes(app: FastifyInstance, db: Db) {
       return getUser(db, target.id);
     });
   }
+
+  // Name and phone, or the job, companies and sales managers. Only what is sent changes.
+  app.put('/users/:id', { onRequest: auth, preHandler: requireRole('admin', 'sales_manager') }, async (request) => {
+    const actor = request.user;
+    const target = await loadManageable(db, actor, request.params);
+    const body = parse(updateBody, request.body);
+    let phone: string | undefined;
+    if (body.phone !== undefined) {
+      phone = normalisePhone(body.phone);
+      if (!isValidPhone(phone)) throw invalid(PHONE_MESSAGE);
+    }
+
+    let assignment: Awaited<ReturnType<typeof resolveAssignment>> | null = null;
+    if (body.role !== undefined || body.companies !== undefined || body.managerId !== undefined || body.companyManagers !== undefined) {
+      const role = body.role ?? (target.role as Assignment['role']);
+      if (target.id === actor.id && role !== target.role) throw invalid('You cannot change your own job.');
+      const wasSalesman = target.role === 'salesman';
+      const companies = body.companies ?? (role === 'salesman' && body.companyManagers ? undefined : target.companies);
+      assignment = await resolveAssignment(db, actor, {
+        role,
+        companies,
+        managerId: role !== 'salesman' ? body.managerId : body.managerId !== undefined ? body.managerId : wasSalesman ? target.managerId : undefined,
+        // A salesman keeps the sales manager of each company they still have, unless new ones are given.
+        companyManagers:
+          role !== 'salesman' || !wasSalesman || body.managerId !== undefined
+            ? body.companyManagers
+            : body.companyManagers ??
+              Object.fromEntries(target.managers.filter((m) => !companies || companies.includes(m.company)).map((m) => [m.company, m.managerId])),
+      });
+      // A sales manager's salesmen must not be left without one.
+      if (target.role === 'sales_manager') {
+        const { rows } = await db.query(
+          `select 1 from user_companies uc join users u on u.id = uc.user_id
+           where uc.manager_id = $1 and u.deleted_at is null and ($2 or not uc.company_code = any($3::text[])) limit 1`,
+          [target.id, role !== 'sales_manager', assignment.companies],
+        );
+        if (rows[0]) throw invalid('Some salesmen work under this sales manager. Move them to another sales manager first.');
+      }
+    }
+
+    const client = await db.connect();
+    try {
+      await client.query('begin');
+      await client.query('update users set name = coalesce($2, name), phone = coalesce($3, phone), updated_at = now() where id = $1', [
+        target.id,
+        body.name ?? null,
+        phone ?? null,
+      ]);
+      if (assignment) {
+        await client.query('update users set role = $2, manager_id = $3 where id = $1', [target.id, body.role ?? target.role, assignment.managerId]);
+        await client.query('delete from user_companies where user_id = $1', [target.id]);
+        for (const c of assignment.companies) {
+          await client.query('insert into user_companies (user_id, company_code, manager_id) values ($1, $2, $3)', [
+            target.id,
+            c,
+            assignment.companyManager.get(c) ?? null,
+          ]);
+        }
+      }
+      await client.query('commit');
+    } catch (e) {
+      await client.query('rollback');
+      if ((e as { code?: string }).code === '23505') throw new HttpError(409, 'phone_taken', 'That phone number already has a login.');
+      throw e;
+    } finally {
+      client.release();
+    }
+    await audit(db, { userId: actor.id, action: 'user_updated', targetUserId: target.id, details: { changes: Object.keys(body) } });
+    return getUser(db, target.id);
+  });
+
+  // Their login stops at once. Someone with history stays in old documents under their name.
+  app.delete('/users/:id', { onRequest: auth, preHandler: requireRole('admin', 'sales_manager') }, async (request) => {
+    const actor = request.user;
+    const target = await loadManageable(db, actor, request.params);
+    if (target.id === actor.id) throw invalid('You cannot delete your own login.');
+    const { rows } = await db.query(
+      `select 1 from users u where u.deleted_at is null and u.id <> $1
+         and (u.manager_id = $1 or exists (select 1 from user_companies uc where uc.user_id = u.id and uc.manager_id = $1)) limit 1`,
+      [target.id],
+    );
+    if (rows[0]) throw invalid('Some salesmen work under this sales manager. Move them to another sales manager first.');
+    await deleteUserSessions(db, target.id);
+    await db.query('update vehicles set default_driver_id = null where default_driver_id = $1', [target.id]);
+    const keptForHistory = await deleteOrMark(db, 'users', target.id);
+    await audit(db, { userId: actor.id, action: 'user_deleted', details: { userId: target.id, name: target.name, keptForHistory } });
+    return { deleted: true, keptForHistory };
+  });
 
   app.post('/users/:id/reset-pin', { onRequest: auth, preHandler: requireRole('admin', 'sales_manager') }, async (request) => {
     const target = await loadManageable(db, request.user, request.params);

@@ -9,7 +9,7 @@ import { logoPath } from '../files.js';
 import { idParams, notFound } from '../lists/common.js';
 import { INVOICE_MAKERS, lockPlan, planDetail } from '../loading/loading.js';
 import { nextNumber } from '../numbering.js';
-import { addEvent, DEFAULT_VAT_RATE, lineAmount, qtyText } from '../orders/orders.js';
+import { addEvent, DEFAULT_VAT_RATE, lineAmount, qtyText, vatOn } from '../orders/orders.js';
 import { invoicePdf } from '../print/pdf.js';
 import { ADJUSTERS } from '../returns/returns.js';
 import { inTransaction, TODAY } from '../stock/stock.js';
@@ -51,6 +51,7 @@ type LoadedItem = {
   lpoNo: string;
   productId: number;
   piecesPerCarton: number;
+  vatExempt: boolean;
   pricePerCarton: number;
   loaded: number;
 };
@@ -83,7 +84,7 @@ async function invoiceDetail(db: Db, user: AuthUser, invoiceId: number) {
          from invoice_notes n where n.invoice_id = iv.id), '[]') as notes,
        coalesce((select json_agg(json_build_object('lineId', il.id, 'productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
            'packSize', p.pack_size, 'piecesPerCarton', p.pieces_per_carton, 'pieces', il.pieces, 'pricePerCarton', il.price_per_carton,
-           'amount', il.amount::float8, 'orderNumber', o.number,
+           'amount', il.amount::float8, 'vatExempt', il.vat_exempt, 'orderNumber', o.number,
            'delivered', case when il.plan_item_id is null then il.pieces else pi.delivered end,
            'returned', coalesce((select sum(rl.pieces) from sales_return_lines rl join sales_returns rr on rr.id = rl.return_id
              where rl.invoice_line_id = il.id and rr.kind = 'after'), 0)) order by il.id)
@@ -129,7 +130,7 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
       const { rows: items } = await client.query<LoadedItem>(
         `select i.id as "itemId", l.id as "lineId", o.id as "orderId", o.number as "orderNumber", o.customer_id as "customerId",
            o.invoice_type as "invoiceType", o.salesman_id as "salesmanId", p.company_code as "companyCode",
-           coalesce(oc.lpo_no, '') as "lpoNo", p.id as "productId", p.pieces_per_carton as "piecesPerCarton",
+           coalesce(oc.lpo_no, '') as "lpoNo", p.id as "productId", p.pieces_per_carton as "piecesPerCarton", p.vat_exempt as "vatExempt",
            l.price_per_carton as "pricePerCarton", i.loaded
          from loading_plan_items i join order_lines l on l.id = i.order_line_id join orders o on o.id = l.order_id
            join products p on p.id = l.product_id
@@ -160,7 +161,7 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
         const vatRate = first.invoiceType === 'vat' ? terms[0]!.vatRate : 0;
         const amounts = its.map((it) => lineAmount(it.loaded, it.pricePerCarton, it.piecesPerCarton));
         const subtotal = amounts.reduce((t, a) => t + a, 0);
-        const vat = Math.round((subtotal * vatRate) / 100);
+        const vat = vatOn(its.map((it, i) => ({ amount: amounts[i]!, vatExempt: it.vatExempt })), vatRate);
         const number = await nextNumber(client, first.companyCode, 'INV');
         const { rows } = await client.query<{ id: number }>(
           `insert into invoices (number, company_code, customer_id, invoice_type, plan_id, lpo_no, invoice_date, due_date,
@@ -172,9 +173,9 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
         const invoiceId = rows[0]!.id;
         for (const [i, it] of its.entries()) {
           await client.query(
-            `insert into invoice_lines (invoice_id, order_line_id, plan_item_id, product_id, pieces, price_per_carton, amount)
-             values ($1, $2, $3, $4, $5, $6, $7)`,
-            [invoiceId, it.lineId, it.itemId, it.productId, it.loaded, it.pricePerCarton, amounts[i]],
+            `insert into invoice_lines (invoice_id, order_line_id, plan_item_id, product_id, pieces, price_per_carton, amount, vat_exempt)
+             values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [invoiceId, it.lineId, it.itemId, it.productId, it.loaded, it.pricePerCarton, amounts[i], it.vatExempt],
           );
         }
         for (const orderId of new Set(its.map((it) => it.orderId))) {
@@ -249,8 +250,9 @@ export function invoiceRoutes(app: FastifyInstance, db: Db, brandingDir: string)
       deliveryNoteNo: iv.deliveryNoteNo,
       company: { ...iv.company, logo: logoPath(brandingDir, iv.companyCode) },
       customer: iv.customer,
-      lines: iv.lines.map((l: { brand: string; name: string; packSize: string; quantity: string; pricePerCarton: number; amount: number }) => ({
-        description: `${l.brand} ${l.name} ${l.packSize}`,
+      lines: iv.lines.map((l: { brand: string; name: string; packSize: string; quantity: string; pricePerCarton: number; amount: number; vatExempt: boolean }) => ({
+        // No VAT is charged on this line, so a VAT invoice says so.
+        description: `${l.brand} ${l.name} ${l.packSize}${iv.invoiceType === 'vat' && l.vatExempt ? ' (VAT exempt)' : ''}`,
         quantity: l.quantity,
         unitPrice: l.pricePerCarton,
         amount: l.amount,

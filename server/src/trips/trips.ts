@@ -11,7 +11,7 @@ import { readImage, saveImage } from '../files.js';
 import { idParams, invalid, notFound } from '../lists/common.js';
 import { LOADERS } from '../loading/loading.js';
 import { nextNumber, nextSharedNumber } from '../numbering.js';
-import { DEFAULT_VAT_RATE, INVOICE_TYPES, lineAmount, MIN_SHELF_DAYS, qtyText } from '../orders/orders.js';
+import { DEFAULT_VAT_RATE, INVOICE_TYPES, lineAmount, MIN_SHELF_DAYS, qtyText, vatOn } from '../orders/orders.js';
 import { inTransaction, split } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
 
@@ -346,11 +346,12 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         productId: number;
         companyCode: string;
         piecesPerCarton: number;
+        vatExempt: boolean;
         label: string;
         left: number;
       }>(
         `select tl.id as "lineId", p.id as "productId", p.company_code as "companyCode", p.pieces_per_carton as "piecesPerCarton",
-           p.brand || ' ' || p.name || ' ' || p.pack_size as label, tl.loaded - tl.sold as left
+           p.vat_exempt as "vatExempt", p.brand || ' ' || p.name || ' ' || p.pack_size as label, tl.loaded - tl.sold as left
          from trip_lines tl join products p on p.id = tl.product_id where tl.trip_id = $1 order by tl.id for update of tl`,
         [trip.id],
       );
@@ -390,7 +391,7 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         if (!terms[0]!.linked) throw invalid(`${customer.name} does not buy from ${companyCode}. Please add the company to the customer first.`);
         const vatRate = invoiceType === 'vat' ? terms[0]!.vatRate : 0;
         const subtotal = its.reduce((t, l) => t + l.amount, 0);
-        const vat = Math.round((subtotal * vatRate) / 100);
+        const vat = vatOn(its, vatRate);
         const days = body.payment === 'credit' ? terms[0]!.days : 0;
         const number = await nextNumber(client, companyCode, 'INV');
         const { rows: inv } = await client.query<{ id: number }>(
@@ -402,8 +403,8 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         const invoiceId = inv[0]!.id;
         for (const l of its) {
           await client.query(
-            `insert into invoice_lines (invoice_id, product_id, pieces, price_per_carton, amount) values ($1, $2, $3, $4, $5)`,
-            [invoiceId, l.productId, l.pieces, l.pricePerCarton, l.amount],
+            `insert into invoice_lines (invoice_id, product_id, pieces, price_per_carton, amount, vat_exempt) values ($1, $2, $3, $4, $5, $6)`,
+            [invoiceId, l.productId, l.pieces, l.pricePerCarton, l.amount, l.vatExempt],
           );
           await takeFromVehicle(client, trip.id, saleId, l.lineId, l.pieces, number, user.id);
         }

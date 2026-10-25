@@ -70,10 +70,11 @@ const userSelect = `select u.id, u.name, u.phone, u.role, u.manager_id as "manag
                 order by c.sort_order)
               from user_companies uc join companies c on c.code = uc.company_code join users mm on mm.id = uc.manager_id
               where uc.user_id = u.id), '[]') as managers
-  from users u left join users m on m.id = u.manager_id`;
+  from users u left join users m on m.id = u.manager_id
+  where u.deleted_at is null`;
 
 export async function getUser(db: Db, id: number): Promise<UserDto | null> {
-  const { rows } = await db.query<UserDto>(`${userSelect} where u.id = $1`, [id]);
+  const { rows } = await db.query<UserDto>(`${userSelect} and u.id = $1`, [id]);
   return rows[0] ?? null;
 }
 
@@ -82,8 +83,8 @@ export async function listUsers(db: Db, onlyManagerId?: number): Promise<UserDto
     return (await db.query<UserDto>(`${userSelect} order by u.active desc, u.name`)).rows;
   }
   return (
-    await db.query<UserDto>(`${userSelect} where u.id = $1 or (u.role = 'salesman' and (u.manager_id = $1
-         or exists (select 1 from user_companies x where x.user_id = u.id and x.manager_id = $1))) order by u.active desc, u.name`, [
+    await db.query<UserDto>(`${userSelect} and (u.id = $1 or (u.role = 'salesman' and (u.manager_id = $1
+         or exists (select 1 from user_companies x where x.user_id = u.id and x.manager_id = $1)))) order by u.active desc, u.name`, [
       onlyManagerId,
     ])
   ).rows;
