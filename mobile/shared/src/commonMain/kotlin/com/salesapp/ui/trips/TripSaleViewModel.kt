@@ -8,6 +8,7 @@ import com.salesapp.core.nowUtcTimestamp
 import com.salesapp.core.randomUuid
 import com.salesapp.core.signaturePng
 import com.salesapp.core.toBase64
+import com.salesapp.data.ApiException
 import com.salesapp.data.AppState
 import com.salesapp.data.PackCustomer
 import com.salesapp.data.SaleOutcome
@@ -17,6 +18,7 @@ import com.salesapp.data.TripSaleDetail
 import com.salesapp.data.TripSaleLineQty
 import com.salesapp.data.TripSaleRequest
 import com.salesapp.data.TripsRepository
+import com.salesapp.data.keepForLater
 import com.salesapp.resources.Res
 import com.salesapp.resources.sale_need_customer
 import com.salesapp.resources.sale_need_lines
@@ -283,9 +285,13 @@ class TripSaleViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             try {
-                // What the phone already has first, so the form opens with no network at all.
-                val saved = repository.savedPack(tripId)
-                val pack = saved ?: repository.pack(tripId)
+                // A fresh pack first, so the van count is right; the phone's own copy is the fall
+                // back only when there is no network to ask.
+                val pack = try {
+                    repository.pack(tripId)
+                } catch (e: ApiException) {
+                    if (e.keepForLater) repository.savedPack(tripId) ?: throw e else throw e
+                }
                 val outbox = repository.outboxOf(tripId)
                 val perCarton = pack.trip.lines.associate { it.productId to it.piecesPerCarton }
                 val waiting = outbox.soldPieces(perCarton)
@@ -304,8 +310,6 @@ class TripSaleViewModel(
                         error = null,
                     )
                 }
-                // A fresh pack in the background, so prices and balances catch up when there is a signal.
-                if (saved != null) runCatching { repository.pack(tripId) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

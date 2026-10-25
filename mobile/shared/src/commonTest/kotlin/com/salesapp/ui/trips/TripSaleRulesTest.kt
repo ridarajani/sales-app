@@ -1,5 +1,6 @@
 package com.salesapp.ui.trips
 
+import com.salesapp.core.Files
 import com.salesapp.data.OutboxSale
 import com.salesapp.data.PackCompany
 import com.salesapp.data.PackCustomer
@@ -7,6 +8,8 @@ import com.salesapp.data.PackPrice
 import com.salesapp.data.TripDetail
 import com.salesapp.data.TripLine
 import com.salesapp.data.TripOutbox
+import com.salesapp.data.TripOutboxStore
+import com.salesapp.data.TripPack
 import com.salesapp.data.TripSaleLineQty
 import com.salesapp.data.TripSaleRequest
 import com.salesapp.data.User
@@ -76,6 +79,56 @@ class TripSaleRulesTest {
         // With only 24 left, two cartons are fine and three are not.
         assertFalse(state(shop, cartons = 2, onVehicle = left).lines[0].tooMuch)
         assertTrue(state(shop, cartons = 3, onVehicle = left).lines[0].tooMuch)
+    }
+
+    // The bug this guards: a sale that went straight to the server was not taken off the pack kept
+    // on the phone, so the next form offered goods that had already gone. If the network then
+    // dropped, the leader could sell them, take the cash, and have the sync refuse it.
+    @Test
+    fun anOnlineSaleLeavesTheVanCountRightForTheNextOne() {
+        val files = Memory()
+        val store = TripOutboxStore(files)
+        store.savePack(
+            TripPack(
+                trip = TripDetail(
+                    id = 7,
+                    number = "TRP-000007",
+                    status = "out",
+                    canSell = true,
+                    lines = listOf(milk),
+                ),
+            ),
+        )
+
+        // Two cartons sold while there was a network.
+        store.takeOffPack(7, listOf(TripSaleLineQty(productId = 1, cartons = 2, pricePerCarton = 25_000)))
+
+        // The network goes; the next form works from what the phone has.
+        val line = store.loadPack(7)!!.trip.lines.first()
+        val outbox = store.load(7)
+        val left = line.onVehicle - (outbox.soldPieces(mapOf(1 to 12))[1] ?: 0)
+
+        // Six cartons were on the van, two went, so four are left: two cartons less than before.
+        assertEquals(48, left)
+        assertEquals(milk.onVehicle - 24, left)
+        assertFalse(state(shop, cartons = 4, onVehicle = left).lines[0].tooMuch)
+        // Five is more than is there, and the phone says so before the customer pays.
+        assertTrue(state(shop, cartons = 5, onVehicle = left).lines[0].tooMuch)
+    }
+
+    // Stands in for the phone's files.
+    private class Memory : Files {
+        private val files = mutableMapOf<String, String>()
+
+        override fun read(name: String): String? = files[name]
+
+        override fun write(name: String, text: String) {
+            files[name] = text
+        }
+
+        override fun delete(name: String) {
+            files.remove(name)
+        }
     }
 
     @Test
