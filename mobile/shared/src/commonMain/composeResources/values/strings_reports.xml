@@ -2,6 +2,8 @@
 <resources>
     <!-- Home -->
     <string name="tile_reports_sub">Sales, cash and stock</string>
+    <string name="tile_reports_stock_sub">Stock reports</string>
+    <string name="tile_reports_mine_sub">My sales and targets</string>
     <string name="tile_targets">Targets</string>
     <string name="tile_targets_sub">Each salesman\'s month</string>
 

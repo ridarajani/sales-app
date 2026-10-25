@@ -118,9 +118,9 @@ data class ResetPinRequest(val pin: String)
 data class CustomerCompany(
     val code: String,
     val paymentTermsDays: Int = 0,
-    // Phase 10: how much this customer may owe this company. Null means no limit. It shows on the
-    // reports only and never stops an order.
-    val creditLimit: Int? = null,
+    // Phase 10: how much this customer may owe this company, in whole kwacha and well over what an
+    // Int holds. Null means no limit. It shows on the reports only and never stops an order.
+    val creditLimit: Long? = null,
 )
 
 @Serializable

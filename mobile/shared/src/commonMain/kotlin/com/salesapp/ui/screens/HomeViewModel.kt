@@ -114,6 +114,8 @@ import com.salesapp.resources.tile_trips_many
 import com.salesapp.resources.tile_trips_none
 import com.salesapp.resources.tile_trips_one
 import com.salesapp.resources.tile_trips_sub
+import com.salesapp.resources.tile_reports_mine_sub
+import com.salesapp.resources.tile_reports_stock_sub
 import com.salesapp.resources.tile_reports_sub
 import com.salesapp.resources.tile_targets
 import com.salesapp.resources.tile_targets_sub
@@ -192,8 +194,10 @@ private fun approvalsTile(subText: String?) =
 private fun more() = tile(Res.string.tile_more, Res.string.tile_more_sub, AppIcons.Grid)
 
 // Phase 10. The server decides which reports a person may open, so the square is left out
-// altogether for anyone it gives none to (a driver).
-private fun reportsTile() = tile(Res.string.tile_reports, Res.string.tile_reports_sub, AppIcons.Chart, ReportsRoute)
+// altogether for anyone it gives none to (a driver). The sub-line says what that person's reports
+// are about: the warehouse has only stock, a salesman only his own figures.
+private fun reportsTile(sub: StringResource = Res.string.tile_reports_sub) =
+    tile(Res.string.tile_reports, sub, AppIcons.Chart, ReportsRoute)
 
 private fun targetsTile() = tile(Res.string.tile_targets, Res.string.tile_targets_sub, AppIcons.Chart, TargetsRoute)
 
@@ -339,6 +343,7 @@ internal fun tilesFor(
             returnsTile(),
             ledgerTile(),
             tripsTile(tripsSub, tripsCount),
+            reportsTile(Res.string.tile_reports_mine_sub),
             more(),
         )
         "warehouse" -> listOf(
@@ -353,7 +358,7 @@ internal fun tilesFor(
             tripsTile(tripsSub, tripsCount),
             tile(Res.string.tile_products, Res.string.tile_products_sub, AppIcons.Box, ProductsRoute),
             tile(Res.string.tile_vehicles, Res.string.tile_vehicles_sub, AppIcons.Truck, VehiclesRoute),
-            reportsTile(),
+            reportsTile(Res.string.tile_reports_stock_sub),
             more(),
         )
         "driver" -> listOf(

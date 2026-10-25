@@ -182,7 +182,7 @@ class CustomerFormViewModel(
                         )
                     } else {
                         val limits = available.associateWith { code ->
-                            customer.companies.firstOrNull { c -> c.code == code }?.creditLimit?.toLong()
+                            customer.companies.firstOrNull { c -> c.code == code }?.creditLimit
                         }
                         val days = available.associateWith { code ->
                             val stored = customer.companies.firstOrNull { c -> c.code == code }?.paymentTermsDays
@@ -244,7 +244,7 @@ class CustomerFormViewModel(
                 CustomerCompany(
                     code = code,
                     paymentTermsDays = if (s.cashOnly) 0 else dayValues[i] ?: 0,
-                    creditLimit = s.limits[code]?.toInt(),
+                    creditLimit = s.limits[code],
                 )
             }
             try {
