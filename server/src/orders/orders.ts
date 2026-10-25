@@ -88,7 +88,7 @@ export const lineAmount = (pieces: number, pricePerCarton: number, piecesPerCart
 const isManager = (user: AuthUser) => (ORDER_MANAGERS as readonly string[]).includes(user.role);
 
 // Which orders a user may see. $1 = their companies, $2 = their id.
-function visibleWhere(user: AuthUser) {
+export function visibleWhere(user: AuthUser) {
   // Both branches name $1 and $2, so Postgres knows their types either way.
   if (user.role === 'salesman') return '$1::text[] is not null and (o.salesman_id = $2::int or o.booked_by = $2::int)';
   return '$2::int is not null and exists (select 1 from order_companies x where x.order_id = o.id and x.company_code = any($1::text[]))';

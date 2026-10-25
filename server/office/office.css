@@ -103,9 +103,23 @@ main { padding: 24px 28px 48px; min-width: 0; }
 /* Reports list */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .card { display: block; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); text-decoration: none; }
-.card:hover { border-color: var(--accent); }
+a.card:hover { border-color: var(--accent); }
 .card .title { font-weight: 600; }
 .card .sub { font-size: 13px; color: var(--muted); }
+
+/* Alerts */
+.alerts { display: grid; gap: 8px; margin-bottom: 16px; }
+.alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--gold); border-radius: 14px; }
+.alert.bad { border-left-color: var(--bad); }
+.alert.info { border-left-color: var(--muted); }
+.alert .title { font-weight: 600; }
+.alert .sub { font-size: 13px; color: var(--muted); }
+.alert .button { flex: none; }
+
+/* Unread trip sales */
+.fact { margin-bottom: 8px; }
+.fact label { margin: 0; }
+form.card { margin-top: 12px; }
 
 /* Report */
 .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 12px; align-items: end; }

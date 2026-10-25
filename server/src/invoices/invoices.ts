@@ -29,7 +29,7 @@ const listQuery = z.object({
 });
 
 // Which invoices a user may see. $1 = their companies, $2 = their id; every branch names both.
-function visibleWhere(user: AuthUser) {
+export function visibleWhere(user: AuthUser) {
   const mine = `iv.company_code = any($1::text[])`;
   if (user.role === 'salesman') return `${mine} and iv.salesman_id = $2::int`;
   if (user.role === 'driver') {

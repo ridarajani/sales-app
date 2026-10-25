@@ -26,6 +26,9 @@ import { tripRoutes } from './trips/trips.js';
 import { reportRoutes } from './reports/routes.js';
 import { targetRoutes } from './reports/targets.js';
 import { dashboardRoutes } from './reports/dashboard.js';
+import { searchRoutes } from './search/search.js';
+import { alertRoutes } from './alerts/alerts.js';
+import { outboxRoutes } from './trips/outbox.js';
 
 export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string; brandingDir?: string } = {}) {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -92,6 +95,9 @@ export function buildApp(db: Db, options: { apkDir?: string; uploadDir?: string;
   reportRoutes(app, db);
   targetRoutes(app, db);
   dashboardRoutes(app, db);
+  searchRoutes(app, db);
+  alertRoutes(app, db);
+  outboxRoutes(app, db);
 
   // The office website: plain files, signed in with the same phone and PIN as the app.
   app.register(fastifyStatic, {

@@ -20,7 +20,7 @@ import { INT4_MAX, parse } from '../users.js';
 export const TRIP_PLANNERS = ['admin', 'management', 'sales_manager'] as const;
 export const TRIP_VIEWERS = ['admin', 'management', 'sales_manager', 'salesman', 'warehouse', 'driver', 'cashier', 'accounts'] as const;
 // Who may lead a trip: they sell, hold the cash and close it.
-const LEADER_ROLES = ['salesman', 'sales_manager'];
+export const LEADER_ROLES = ['salesman', 'sales_manager'];
 // Besides the leader, these may close a trip, for example when the leader's phone is lost.
 const CLOSERS = ['admin', 'sales_manager'];
 export const TRIP_EXPENSE_KINDS = ['Fuel', 'Lodging', 'Food allowance', 'Loading labour', 'Vehicle repair', 'Other'] as const;
@@ -107,7 +107,7 @@ const listQuery = z.object({
 const totalPieces = (q: { cartons: number; pieces: number }, piecesPerCarton: number) => q.cartons * piecesPerCarton + q.pieces;
 
 // Which trips a user may see. $1 = their companies, $2 = their id; every branch names both.
-function visibleWhere(user: AuthUser) {
+export function visibleWhere(user: AuthUser) {
   if (user.role === 'salesman') return `$1::text[] is not null and t.leader_id = $2::int`;
   if (user.role === 'driver') return `$1::text[] is not null and t.driver_id = $2::int and t.status <> 'planned'`;
   return `$2::int is not null and exists (select 1 from companies x where x.facility_code = t.facility_code and x.code = any($1::text[]))`;
@@ -135,6 +135,9 @@ async function lockTrip(client: PoolClient, user: AuthUser, tripId: number): Pro
   if (!rows[0]) throw notFound('trip');
   return rows[0];
 }
+
+const outboxOpen = () =>
+  new HttpError(409, 'outbox_problem', 'Some sales saved on the phone could not be read. Admin must look at them and clear them before the trip is closed.');
 
 const notOut = (trip: TripHead) =>
   trip.status === 'planned'
@@ -211,6 +214,12 @@ export async function tripDetail(db: Db | PoolClient, user: AuthUser, tripId: nu
   );
 
   const orders = await tripOrders(db, tripId, trip.status);
+  // Sales a phone could not read back and sent to the office. The trip cannot close while one is open.
+  const { rows: outboxProblems } = await db.query<{ id: number; requestId: string; reportedAt: string; cleared: boolean }>(
+    `select id, request_id as "requestId", reported_at as "reportedAt", cleared_at is not null as cleared
+     from outbox_problems where trip_id = $1 order by id`,
+    [tripId],
+  );
   const forOrdersOf = (productId: number) =>
     orders.reduce((t, o) => t + o.lines.filter((l) => l.productId === productId).reduce((u, l) => u + l.toDeliver, 0), 0);
 
@@ -248,6 +257,8 @@ export async function tripDetail(db: Db | PoolClient, user: AuthUser, tripId: nu
     canLoad: (LOADERS as readonly string[]).includes(user.role) && trip.status === 'planned',
     canSell: isLeader && out,
     canClose: out && (isLeader || CLOSERS.includes(user.role)),
+    outboxProblems,
+    openOutboxProblems: outboxProblems.filter((p) => !p.cleared).length,
   };
   // The warehouse loads and sees what came back, never the money.
   if (user.role === 'warehouse') {
@@ -1001,6 +1012,8 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
       const trip = await lockTrip(client, user, tripId);
       if (trip.status !== 'out') throw notOut(trip);
       if (trip.leaderId !== user.id && !CLOSERS.includes(user.role)) throw notAllowed();
+      const { rows: problems } = await client.query('select 1 from outbox_problems where trip_id = $1 and cleared_at is null', [trip.id]);
+      if (problems.length) throw outboxOpen();
       const { rows: lines } = await client.query<{ id: number; productId: number; left: number; piecesPerCarton: number; label: string }>(
         `select tl.id, tl.product_id as "productId", tl.loaded - tl.sold as left, p.pieces_per_carton as "piecesPerCarton",
            p.brand || ' ' || p.name || ' ' || p.pack_size as label
