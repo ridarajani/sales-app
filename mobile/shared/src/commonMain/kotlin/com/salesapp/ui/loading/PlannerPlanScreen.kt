@@ -93,6 +93,7 @@ import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.components.VehiclePicker
 import com.salesapp.ui.theme.SalesTheme
 import com.salesapp.ui.theme.caption
 import org.jetbrains.compose.resources.stringResource
@@ -207,20 +208,20 @@ private fun VehicleAndDriver(state: PlannerPlanState, onEvent: (PlannerPlanEvent
         if (state.vehicles.isEmpty()) {
             Say(stringResource(Res.string.loading_pl_no_vehicle))
         } else {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.vehicles.forEach { vehicle ->
-                    ChoiceButton(
-                        text = if (vehicle.description.isBlank()) {
-                            vehicle.plate
-                        } else {
-                            stringResource(Res.string.loading_pl_vehicle_with, vehicle.plate, vehicle.description)
-                        },
-                        selected = state.chosenVehicle == vehicle.id,
-                        onClick = { onEvent(PlannerPlanEvent.VehicleChosen(vehicle.id)) },
-                        enabled = !state.busy,
-                    )
-                }
-            }
+            // Only the vehicles this person uses, with the rest behind "Show all vehicles".
+            VehiclePicker(
+                vehicles = state.vehicles,
+                chosenId = state.chosenVehicle,
+                onChoose = { onEvent(PlannerPlanEvent.VehicleChosen(it)) },
+                enabled = !state.busy,
+                label = { vehicle ->
+                    if (vehicle.description.isBlank()) {
+                        vehicle.plate
+                    } else {
+                        stringResource(Res.string.loading_pl_vehicle_with, vehicle.plate, vehicle.description)
+                    }
+                },
+            )
         }
         SectionLabel(stringResource(Res.string.loading_pl_driver))
         if (state.drivers.isEmpty()) {

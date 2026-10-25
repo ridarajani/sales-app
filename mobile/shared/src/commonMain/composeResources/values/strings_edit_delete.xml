@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deleting a product, customer, vehicle or user -->
+    <string name="delete_action">Delete</string>
+    <string name="delete_title">Delete %1$s?</string>
+    <string name="delete_text">This cannot be undone.</string>
+    <string name="delete_confirm">Delete</string>
+    <string name="delete_deleting">Deleting...</string>
+    <string name="delete_done">%1$s deleted.</string>
+    <string name="delete_kept">%1$s has past records, so it stays on old documents but is removed from the lists.</string>
+
+    <!-- VAT exempt products -->
+    <string name="product_vat_exempt">VAT exempt</string>
+    <string name="product_vat_exempt_no">No</string>
+    <string name="product_vat_exempt_yes">Yes</string>
+    <string name="product_vat_exempt_help">No VAT is worked out on this product.</string>
+    <string name="line_vat_exempt">(VAT exempt)</string>
+
+    <!-- Editing a user -->
+    <string name="user_edit">Edit</string>
+    <string name="user_edit_title">Edit %1$s</string>
+    <string name="user_edit_save">Save changes</string>
+    <string name="user_edit_saving">Saving...</string>
+    <string name="user_edit_saved">%1$s saved.</string>
+    <string name="user_edit_no_change">Nothing has changed.</string>
+    <string name="user_edit_role_locked">Only an admin can change what job someone does.</string>
+    <string name="user_edit_no_access">You cannot change this person.</string>
+
+    <!-- Vehicles -->
+    <string name="vehicle_facility_question">Which warehouse uses it?</string>
+    <string name="vehicle_facility_both">Both</string>
+    <string name="vehicle_facility_both_help">A vehicle both warehouses share.</string>
+    <string name="vehicle_dormant_help">Vehicles you do not use sit at the bottom of the list.</string>
+    <string name="vehicle_show_all">Show all vehicles</string>
+    <string name="vehicle_show_fewer">Show fewer</string>
+</resources>

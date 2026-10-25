@@ -156,6 +156,11 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun createUser(request: NewUserRequest): UserRow = post<UserRow, NewUserRequest>("/users", request)
 
+    // Only the fields sent are changed.
+    suspend fun updateUser(id: Int, request: UserUpdateRequest): UserRow = put<UserRow, UserUpdateRequest>("/users/$id", request)
+
+    suspend fun deleteUser(id: Int): DeleteResult = delete("/users/$id")
+
     suspend fun switchOff(id: Int): UserRow = post<UserRow, Unit>("/users/$id/switch-off", null)
 
     suspend fun switchOn(id: Int): UserRow = post<UserRow, Unit>("/users/$id/switch-on", null)
@@ -184,6 +189,8 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun updateCustomer(id: Int, request: CustomerRequest): Customer = put<Customer, CustomerRequest>("/customers/$id", request)
 
+    suspend fun deleteCustomer(id: Int): DeleteResult = delete("/customers/$id")
+
     suspend fun products(q: String?, company: String?, includeInactive: Boolean): List<Product> =
         get("/products", mapOf("q" to q?.trim()?.ifEmpty { null }, "company" to company, "includeInactive" to if (includeInactive) "true" else null))
 
@@ -193,6 +200,8 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     suspend fun updateProduct(id: Int, request: ProductRequest): Product = put<Product, ProductRequest>("/products/$id", request)
 
+    suspend fun deleteProduct(id: Int): DeleteResult = delete("/products/$id")
+
     suspend fun vehicles(): List<Vehicle> = get("/vehicles")
 
     suspend fun drivers(): List<Driver> = get("/drivers")
@@ -201,6 +210,12 @@ class Api(private val baseUrlProvider: () -> String, private val tokenProvider: 
 
     // Build the body with vehicleChange(...).
     suspend fun updateVehicle(id: Int, change: JsonObject): Vehicle = put<Vehicle, JsonObject>("/vehicles/$id", change)
+
+    suspend fun deleteVehicle(id: Int): DeleteResult = delete("/vehicles/$id")
+
+    // Each person marks the vehicles they do not use; it is their own mark, not everyone's.
+    suspend fun setVehicleDormant(id: Int, dormant: Boolean): Vehicle =
+        put<Vehicle, DormantRequest>("/vehicles/$id/dormant", DormantRequest(dormant))
 
     suspend fun companyDetails(code: String): CompanyDetails = get("/companies/$code")
 

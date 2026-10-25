@@ -2,6 +2,7 @@ package com.salesapp.di
 
 import com.salesapp.data.UsersRepository
 import com.salesapp.ui.screens.AddUserViewModel
+import com.salesapp.ui.screens.EditUserViewModel
 import com.salesapp.ui.screens.ResetPinViewModel
 import com.salesapp.ui.screens.UserDetailViewModel
 import com.salesapp.ui.screens.UsersViewModel
@@ -14,5 +15,6 @@ val usersModule = module {
     viewModel { UsersViewModel(get(), get()) }
     viewModel { AddUserViewModel(get(), get()) }
     viewModel { (id: Int) -> UserDetailViewModel(id, get(), get()) }
+    viewModel { (id: Int) -> EditUserViewModel(id, get(), get()) }
     viewModel { (id: Int) -> ResetPinViewModel(id, get(), get()) }
 }

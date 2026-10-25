@@ -67,6 +67,7 @@ import com.salesapp.resources.invoice_salesman
 import com.salesapp.resources.invoice_share
 import com.salesapp.resources.invoice_subtotal
 import com.salesapp.resources.invoice_total
+import com.salesapp.resources.line_vat_exempt
 import com.salesapp.resources.invoice_trip
 import com.salesapp.resources.invoice_trip_plain
 import com.salesapp.resources.invoice_vat_at
@@ -265,7 +266,9 @@ private fun Lines(invoice: InvoiceDetail) {
                 invoice.lines.forEach { line ->
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            listOf(line.brand, line.name, line.packSize).filter { it.isNotBlank() }.joinToString(" "),
+                            // The line keeps the rule it was invoiced under, so it says so here.
+                            listOf(line.brand, line.name, line.packSize).filter { it.isNotBlank() }.joinToString(" ")
+                                .let { if (line.vatExempt) "$it ${stringResource(Res.string.line_vat_exempt)}" else it },
                             color = scheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,

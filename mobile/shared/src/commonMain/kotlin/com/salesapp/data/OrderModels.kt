@@ -152,6 +152,9 @@ data class OrderLine(
     // Pieces loaded on a vehicle and not yet delivered, and pieces on a plan not yet loaded.
     val onVehicle: Int = 0,
     val planned: Int = 0,
+    // Added last so the older positional uses keep working. No VAT is worked out on this line;
+    // the totals still come from the server.
+    val vatExempt: Boolean = false,
 )
 
 @Serializable

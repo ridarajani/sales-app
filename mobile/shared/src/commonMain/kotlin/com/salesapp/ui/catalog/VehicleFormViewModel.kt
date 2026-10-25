@@ -7,8 +7,11 @@ import com.salesapp.data.Driver
 import com.salesapp.data.ListsRepository
 import com.salesapp.data.Optional
 import com.salesapp.data.Vehicle
+import com.salesapp.data.canDeleteVehicles
 import com.salesapp.data.VehicleRequest
 import com.salesapp.data.vehicleChange
+import com.salesapp.resources.delete_done
+import com.salesapp.resources.delete_kept
 import com.salesapp.resources.Res
 import com.salesapp.resources.catalog_added
 import com.salesapp.resources.catalog_saved
@@ -35,6 +38,9 @@ data class VehicleFormState(
     val facility: String? = null,
     val driverId: Int? = null,
     val active: Boolean = true,
+    val canDelete: Boolean = false,
+    val asking: Boolean = false,
+    val deleting: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -46,6 +52,9 @@ sealed interface VehicleFormEvent {
     data class DriverChosen(val id: Int?) : VehicleFormEvent
     data class Active(val value: Boolean) : VehicleFormEvent
     data object Save : VehicleFormEvent
+    data object AskDelete : VehicleFormEvent
+    data object Dismiss : VehicleFormEvent
+    data object Delete : VehicleFormEvent
     data object Retry : VehicleFormEvent
 }
 
@@ -74,6 +83,9 @@ class VehicleFormViewModel(
             is VehicleFormEvent.DriverChosen -> _state.update { it.copy(driverId = event.id) }
             is VehicleFormEvent.Active -> _state.update { it.copy(active = event.value) }
             VehicleFormEvent.Save -> save()
+            VehicleFormEvent.AskDelete -> if (_state.value.canDelete) _state.update { it.copy(asking = true) }
+            VehicleFormEvent.Dismiss -> _state.update { it.copy(asking = false) }
+            VehicleFormEvent.Delete -> delete()
             VehicleFormEvent.Retry -> load()
         }
     }
@@ -97,6 +109,8 @@ class VehicleFormViewModel(
                             facility = vehicle.facilityCode,
                             driverId = vehicle.defaultDriverId,
                             active = vehicle.active,
+                            // Client, 24 Oct: both sales managers look after vehicles too.
+                            canDelete = app.user?.canDeleteVehicles() == true,
                         )
                     }
                 }
@@ -104,6 +118,30 @@ class VehicleFormViewModel(
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, loadError = app.handleApiError(e)) }
+            }
+        }
+    }
+
+    // A vehicle nothing refers to goes; one with history keeps its plate on old documents.
+    private fun delete() {
+        val vehicleId = id ?: return
+        val s = _state.value
+        if (s.deleting || !s.canDelete) return
+        _state.update { it.copy(deleting = true, asking = false, error = null) }
+        viewModelScope.launch {
+            try {
+                val result = repository.deleteVehicle(vehicleId)
+                app.message = if (result.keptForHistory) {
+                    getString(Res.string.delete_kept, s.plate)
+                } else {
+                    getString(Res.string.delete_done, s.plate)
+                }
+                _effects.tryEmit(FormEffect.Done)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The server says when a trip or plan still uses it.
+                _state.update { it.copy(deleting = false, error = app.handleApiError(e)) }
             }
         }
     }

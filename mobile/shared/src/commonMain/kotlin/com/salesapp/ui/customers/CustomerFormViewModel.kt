@@ -6,9 +6,12 @@ import com.salesapp.core.isValidPhone
 import com.salesapp.core.normalisePhoneInput
 import com.salesapp.data.AppState
 import com.salesapp.data.Customer
+import com.salesapp.data.canDeleteCustomers
 import com.salesapp.data.CustomerCompany
 import com.salesapp.data.CustomerRequest
 import com.salesapp.data.ListsRepository
+import com.salesapp.resources.delete_done
+import com.salesapp.resources.delete_kept
 import com.salesapp.resources.Res
 import com.salesapp.resources.form_added
 import com.salesapp.resources.form_err_company
@@ -52,6 +55,10 @@ data class CustomerFormState(
     val active: Boolean = true,
     val error: String? = null,
     val saving: Boolean = false,
+    // Only on an existing customer the server also says this person may change.
+    val canDelete: Boolean = false,
+    val asking: Boolean = false,
+    val deleting: Boolean = false,
 )
 
 sealed interface CustomerFormEvent {
@@ -70,6 +77,9 @@ sealed interface CustomerFormEvent {
     data class NeedsLpoChanged(val value: Boolean) : CustomerFormEvent
     data class ActiveChanged(val value: Boolean) : CustomerFormEvent
     data object Save : CustomerFormEvent
+    data object AskDelete : CustomerFormEvent
+    data object Dismiss : CustomerFormEvent
+    data object Delete : CustomerFormEvent
 }
 
 sealed interface CustomerFormEffect {
@@ -88,6 +98,29 @@ class CustomerFormViewModel(
     val effects: SharedFlow<CustomerFormEffect> = _effects.asSharedFlow()
 
     private var original: Customer? = null
+
+    // A customer nothing refers to goes; one with orders or a balance keeps its name on them.
+    private fun delete() {
+        val customerId = id ?: return
+        val s = _state.value
+        if (s.deleting || !s.canDelete) return
+        _state.update { it.copy(deleting = true, asking = false, error = null) }
+        viewModelScope.launch {
+            try {
+                val result = repository.deleteCustomer(customerId)
+                app.message = if (result.keptForHistory) {
+                    getString(Res.string.delete_kept, s.name)
+                } else {
+                    getString(Res.string.delete_done, s.name)
+                }
+                _effects.tryEmit(CustomerFormEffect.Done)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(deleting = false, error = app.handleApiError(e)) }
+            }
+        }
+    }
 
     init {
         load()
@@ -110,6 +143,9 @@ class CustomerFormViewModel(
             is CustomerFormEvent.DaysChanged -> edit { it.copy(days = it.days + (event.code to event.value.filter(Char::isDigit).take(3))) }
             is CustomerFormEvent.CashOnlyChanged -> edit { it.copy(cashOnly = event.value) }
             is CustomerFormEvent.NeedsLpoChanged -> edit { it.copy(needsLpo = event.value) }
+            CustomerFormEvent.AskDelete -> if (_state.value.canDelete) _state.update { it.copy(asking = true) }
+            CustomerFormEvent.Dismiss -> _state.update { it.copy(asking = false) }
+            CustomerFormEvent.Delete -> delete()
             is CustomerFormEvent.ActiveChanged -> edit { it.copy(active = event.value) }
             CustomerFormEvent.Save -> save()
         }
@@ -160,6 +196,8 @@ class CustomerFormViewModel(
                             cashOnly = customer.cashOnly,
                             needsLpo = customer.needsLpo,
                             active = customer.active,
+                            // The server's own canEdit on this customer decides, not the role alone.
+                            canDelete = app.user?.canDeleteCustomers(customer) == true,
                         )
                     }
                 }

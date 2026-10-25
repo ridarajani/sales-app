@@ -77,6 +77,7 @@ import com.salesapp.ui.components.Say
 import com.salesapp.ui.components.SecondaryButton
 import com.salesapp.ui.components.SectionLabel
 import com.salesapp.ui.components.TopBar
+import com.salesapp.ui.components.VehiclePicker
 import com.salesapp.ui.theme.SalesTheme
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -177,16 +178,12 @@ fun PlanTripScreen(state: PlanTripState, onEvent: (PlanTripEvent) -> Unit, onBac
                     Stops(state, onEvent)
                     if (state.vehicles.isNotEmpty()) {
                         SectionLabel(stringResource(Res.string.plan_vehicle))
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            state.vehicles.forEach { vehicle ->
-                                ChoiceButton(
-                                    text = vehicle.plate,
-                                    selected = state.vehicleId == vehicle.id,
-                                    onClick = { onEvent(PlanTripEvent.VehicleChosen(vehicle.id)) },
-                                    enabled = !state.busy,
-                                )
-                            }
-                        }
+                        VehiclePicker(
+                            vehicles = state.vehicles,
+                            chosenId = state.vehicleId,
+                            onChoose = { onEvent(PlanTripEvent.VehicleChosen(it)) },
+                            enabled = !state.busy,
+                        )
                     }
                     if (state.drivers.isNotEmpty()) {
                         SectionLabel(stringResource(Res.string.plan_driver))

@@ -2,6 +2,8 @@ package com.salesapp.ui.catalog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,10 +36,15 @@ import com.salesapp.resources.product_pack_note
 import com.salesapp.resources.product_pieces
 import com.salesapp.resources.product_selling
 import com.salesapp.resources.product_selling_note
+import com.salesapp.resources.product_vat_exempt
+import com.salesapp.resources.product_vat_exempt_help
+import com.salesapp.resources.product_vat_exempt_no
+import com.salesapp.resources.product_vat_exempt_yes
 import com.salesapp.resources.products_add
 import com.salesapp.resources.products_edit
 import com.salesapp.ui.components.ChoiceButton
 import com.salesapp.ui.components.ChoiceColumn
+import com.salesapp.ui.components.DeleteButton
 import com.salesapp.ui.components.ErrorState
 import com.salesapp.ui.components.Field
 import com.salesapp.ui.components.LoadingState
@@ -63,6 +72,7 @@ fun ProductFormPage(
     ProductFormScreen(state, viewModel::onEvent, onBack)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProductFormScreen(state: ProductFormState, onEvent: (ProductFormEvent) -> Unit, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().imePadding()) {
@@ -114,6 +124,25 @@ fun ProductFormScreen(state: ProductFormState, onEvent: (ProductFormEvent) -> Un
                     note = stringResource(Res.string.product_code_note),
                     enabled = !state.busy,
                 )
+                // Client, 24 Oct: VAT is worked out only on the lines that are not exempt.
+                SectionLabel(stringResource(Res.string.product_vat_exempt))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(false to Res.string.product_vat_exempt_no, true to Res.string.product_vat_exempt_yes).forEach { (value, label) ->
+                        ChoiceButton(
+                            text = stringResource(label),
+                            selected = state.vatExempt == value,
+                            onClick = { onEvent(ProductFormEvent.VatExempt(value)) },
+                            enabled = !state.busy,
+                        )
+                    }
+                }
+                if (state.vatExempt) {
+                    Text(
+                        stringResource(Res.string.product_vat_exempt_help),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 if (state.isEdit) {
                     ToggleRow(
                         stringResource(Res.string.product_selling),
@@ -131,8 +160,18 @@ fun ProductFormScreen(state: ProductFormState, onEvent: (ProductFormEvent) -> Un
                 PrimaryButton(
                     stringResource(Res.string.catalog_save),
                     onClick = { onEvent(ProductFormEvent.Save) },
-                    enabled = !state.busy,
+                    enabled = !state.busy && !state.deleting,
                 )
+                if (state.canDelete) {
+                    DeleteButton(
+                        name = listOf(state.brand, state.name, state.packSize).filter { it.isNotBlank() }.joinToString(" "),
+                        asking = state.asking,
+                        busy = state.deleting,
+                        onAsk = { onEvent(ProductFormEvent.AskDelete) },
+                        onConfirm = { onEvent(ProductFormEvent.Delete) },
+                        onDismiss = { onEvent(ProductFormEvent.Dismiss) },
+                    )
+                }
               }
             }
         }
@@ -153,6 +192,8 @@ private fun ProductFormPreview() {
                 packSize = "7.5g x 400",
                 pieces = "400",
                 code = "LV-KG-075",
+                vatExempt = true,
+                canDelete = true,
             ),
             onEvent = {},
             onBack = {},

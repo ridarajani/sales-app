@@ -156,6 +156,8 @@ data class Product(
     val name: String,
     val packSize: String = "",
     val piecesPerCarton: Int = 1,
+    // Client, 24 Oct: VAT is worked out only on the lines that are not exempt.
+    val vatExempt: Boolean = false,
     val active: Boolean = true,
 )
 
@@ -167,6 +169,7 @@ data class ProductRequest(
     val name: String? = null,
     val packSize: String? = null,
     val piecesPerCarton: Int? = null,
+    val vatExempt: Boolean? = null,
     val active: Boolean? = null,
 )
 
@@ -179,7 +182,12 @@ data class Vehicle(
     val defaultDriverId: Int? = null,
     val defaultDriverName: String? = null,
     val active: Boolean = true,
-)
+    // Marked by the signed-in person as one they do not use; kept at the bottom of their list.
+    val dormant: Boolean = false,
+) {
+    // Who picks a vehicle sees the ones in use; the rest are behind "Show all vehicles".
+    val inUse: Boolean get() = active && !dormant
+}
 
 // For adding a vehicle. Changing one uses a hand-built JSON object (see vehicleChange) so that
 // facilityCode and defaultDriverId can be sent as null to clear them.
@@ -473,3 +481,22 @@ data class CountResult(
     val differences: List<CountDifference> = emptyList(),
     val linesCounted: Int = 0,
 )
+
+// What a delete answers. keptForHistory means the row has past records, so it stays on old
+// documents but is gone from every list.
+@Serializable
+data class DeleteResult(val deleted: Boolean = true, val keptForHistory: Boolean = false)
+
+// Changing a user: only the fields sent are changed, so every one is optional.
+@Serializable
+data class UserUpdateRequest(
+    val name: String? = null,
+    val phone: String? = null,
+    val role: String? = null,
+    val companies: List<String>? = null,
+    val managerId: Int? = null,
+    val companyManagers: Map<String, Int>? = null,
+)
+
+@Serializable
+data class DormantRequest(val dormant: Boolean)
