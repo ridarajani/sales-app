@@ -11,7 +11,8 @@ import { readImage, saveImage } from '../files.js';
 import { idParams, invalid, notFound } from '../lists/common.js';
 import { LOADERS } from '../loading/loading.js';
 import { nextNumber, nextSharedNumber } from '../numbering.js';
-import { DEFAULT_VAT_RATE, INVOICE_TYPES, lineAmount, MIN_SHELF_DAYS, qtyText, vatOn } from '../orders/orders.js';
+import { addEvent, DEFAULT_VAT_RATE, INVOICE_TYPES, lineAmount, MIN_SHELF_DAYS, qtyText, reserveStock, vatOn } from '../orders/orders.js';
+import type { Channel } from '../lists/common.js';
 import { inTransaction, split } from '../stock/stock.js';
 import { INT4_MAX, parse } from '../users.js';
 
@@ -51,12 +52,17 @@ const planBody = z.object({
   staff: z.string().trim().max(300).default(''),
   note: z.string().trim().max(1000).default(''),
   float: kwacha('float').default(0),
-  lines: productLines.min(1, 'Add at least one product to load.'),
+  // Stock to sell at the stops, besides the orders the trip delivers.
+  lines: productLines.default([]),
+  // Orders booked ahead that this trip delivers.
+  orderIds: z.array(id).max(100).default([]),
 });
 const loadBody = z.object({ vehicleId: id.nullish(), lines: productLines.default([]) });
 const saleBody = z.object({
   requestId,
   customerId: id,
+  // Set when the sale delivers one of the trip's orders: the order's prices and invoice type apply.
+  orderId: id.optional(),
   stop: z.string().trim().max(100).default(''),
   invoiceType: z.enum(INVOICE_TYPES).optional(),
   payment: z.enum(['cash', 'airtel', 'credit'], 'Please pick how the customer paid.'),
@@ -72,7 +78,8 @@ const saleBody = z.object({
       z.object({
         productId: id,
         ...quantity,
-        pricePerCarton: z.number('Please type the price per carton.').int('Prices are whole kwacha.').positive('Please type the price per carton.').max(INT4_MAX),
+        // Not needed when delivering an order: the order's price is used.
+        pricePerCarton: z.number('Please type the price per carton.').int('Prices are whole kwacha.').positive('Please type the price per carton.').max(INT4_MAX).optional(),
       }),
     )
     .max(200),
@@ -90,6 +97,7 @@ const closeBody = z.object({
   note: z.string().trim().max(1000).default(''),
 });
 const syncBody = z.object({ sales: z.array(z.unknown()).max(300).default([]), expenses: z.array(z.unknown()).max(300).default([]) });
+const openOrdersQuery = z.object({ facility: z.string(), tripId: z.coerce.number().int().positive().max(INT4_MAX).optional() });
 const listQuery = z.object({
   status: z.enum(['planned', 'out', 'closed']).optional(),
   kind: z.enum(['minibus', 'upcountry']).optional(),
@@ -202,14 +210,25 @@ export async function tripDetail(db: Db | PoolClient, user: AuthUser, tripId: nu
     [tripId],
   );
 
+  const orders = await tripOrders(db, tripId, trip.status);
+  const forOrdersOf = (productId: number) =>
+    orders.reduce((t, o) => t + o.lines.filter((l) => l.productId === productId).reduce((u, l) => u + l.toDeliver, 0), 0);
+
   const isLeader = trip.leaderId === user.id;
   const out = trip.status === 'out';
   const detail = {
     ...trip,
     lines: lines.map((l) => {
       const onVehicle = trip.status === 'closed' ? 0 : l.loaded - l.sold;
+      // Goods on the vehicle for the trip's orders cannot be sold to anyone else.
+      const forOrders = forOrdersOf(l.productId);
+      const forSale = trip.status === 'out' ? Math.max(0, onVehicle - forOrders) : 0;
       return {
         ...l,
+        forOrders,
+        forOrdersQty: split(forOrders, l.piecesPerCarton),
+        forSale,
+        forSaleQty: split(forSale, l.piecesPerCarton),
         plannedQty: split(l.planned, l.piecesPerCarton),
         loadedQty: split(l.loaded, l.piecesPerCarton),
         soldQty: split(l.sold, l.piecesPerCarton),
@@ -218,6 +237,7 @@ export async function tripDetail(db: Db | PoolClient, user: AuthUser, tripId: nu
         quantity: qtyText(trip.status === 'planned' ? l.planned : l.loaded, l.piecesPerCarton),
       };
     }),
+    orders,
     sales,
     expenses,
     salesTotal: sales.reduce((t, s) => t + s.total, 0),
@@ -233,12 +253,104 @@ export async function tripDetail(db: Db | PoolClient, user: AuthUser, tripId: nu
   if (user.role === 'warehouse') {
     const { sales: _s, expenses: _e, salesTotal: _t, expensesTotal: _x, cashNow: _n, float: _f, cashSales: _c, cashExpenses: _ce,
       cashExpected: _ex, cashCounted: _cc, cashDifference: _cd, ...rest } = detail;
-    return rest;
+    return { ...rest, orders: orders.map((o) => ({ ...o, lines: o.lines.map(({ pricePerCarton: _p, amount: _a, ...l }) => l) })) };
   }
   return detail;
 }
 
-async function checkPlan(client: PoolClient, user: AuthUser, body: z.infer<typeof planBody>) {
+// Orders this trip may carry: from its warehouse, open, with something left to deliver, and on no loading plan,
+// vehicle or other trip. Locked, so two plans cannot take the same order.
+async function checkOrders(client: PoolClient, user: AuthUser, facilityCode: string, orderIds: number[], tripId: number | null) {
+  if (new Set(orderIds).size !== orderIds.length) throw invalid('An order is on the list twice.');
+  if (orderIds.length === 0) return;
+  const { rows } = await client.query<{
+    id: number;
+    number: string;
+    status: string;
+    facilityCode: string;
+    left: number;
+    onVehicle: number;
+    onPlan: boolean;
+    otherTrip: string | null;
+    mine: boolean;
+  }>(
+    `select o.id, o.number, o.status, o.facility_code as "facilityCode",
+       (select coalesce(sum(l.pieces - l.delivered), 0) from order_lines l where l.order_id = o.id)::int as left,
+       (select coalesce(sum(l.on_vehicle), 0) from order_lines l where l.order_id = o.id)::int as "onVehicle",
+       exists (select 1 from loading_plan_items i join loading_plans lp on lp.id = i.plan_id join order_lines l on l.id = i.order_line_id
+         where l.order_id = o.id and lp.status = 'planned') as "onPlan",
+       (select t.number from trip_orders tro join trips t on t.id = tro.trip_id
+         where tro.order_id = o.id and t.status <> 'closed' and t.id is distinct from $3 limit 1) as "otherTrip",
+       not exists (select 1 from order_lines l join products p on p.id = l.product_id where l.order_id = o.id and not p.company_code = any($2)) as mine
+     from orders o where o.id = any($1) order by o.id for update of o`,
+    [orderIds, user.companies, tripId],
+  );
+  for (const orderId of orderIds) {
+    const o = rows.find((x) => x.id === orderId);
+    if (!o || !o.mine) throw notFound('order');
+    if (o.facilityCode !== facilityCode) throw invalid(`Order ${o.number} is for the other warehouse.`);
+    if (o.status !== 'open') throw invalid(`Order ${o.number} is ${o.status === 'hold' ? 'on hold' : 'not open'}.`);
+    if (o.left === 0) throw invalid(`Order ${o.number} is already delivered.`);
+    if (o.otherTrip) throw invalid(`Order ${o.number} is already on trip ${o.otherTrip}.`);
+    if (o.onPlan || o.onVehicle > 0) throw invalid(`Order ${o.number} is on a loading plan or a vehicle. Take it off first.`);
+  }
+}
+
+// Every product of the trip's orders has a line on the trip, so it is loaded and counted back like the rest.
+async function ensureOrderLines(client: PoolClient, tripId: number) {
+  await client.query(
+    `insert into trip_lines (trip_id, product_id, planned)
+     select distinct $1::int, l.product_id, 0 from trip_orders tro join order_lines l on l.order_id = tro.order_id
+     where tro.trip_id = $1 and l.pieces > l.delivered
+     on conflict (trip_id, product_id) do nothing`,
+    [tripId],
+  );
+}
+
+// The orders a trip carries, with what of each line goes on it: all that is left while planned, what is on the
+// vehicle once loaded.
+async function tripOrders(db: Db | PoolClient, tripId: number, status: string) {
+  const { rows } = await db.query<{
+    id: number;
+    number: string;
+    lines: { productId: number; toDeliver: number; pricePerCarton?: number; amount?: number; piecesPerCarton: number }[];
+  }>(
+    `select o.id, o.number, o.status, o.customer_id as "customerId", c.name as "customerName", c.area, c.cash_only as "cashOnly",
+       o.invoice_type as "invoiceType", s.name as "salesmanName", to_char(o.wanted_on, 'YYYY-MM-DD') as "wantedOn",
+       coalesce((select json_agg(json_build_object('orderLineId', l.id, 'productId', p.id, 'code', p.code, 'brand', p.brand, 'name', p.name,
+           'packSize', p.pack_size, 'companyCode', p.company_code, 'piecesPerCarton', p.pieces_per_carton, 'vatExempt', p.vat_exempt,
+           'pricePerCarton', l.price_per_carton, 'pieces', l.pieces, 'delivered', l.delivered, 'onVehicle', l.on_vehicle,
+           'toDeliver', case when $2 = 'planned' then l.pieces - l.delivered - l.on_vehicle when $2 = 'out' then l.on_vehicle else 0 end)
+           order by l.id)
+         from order_lines l join products p on p.id = l.product_id where l.order_id = o.id and l.pieces > l.delivered), '[]') as lines
+     from trip_orders tro join orders o on o.id = tro.order_id join customers c on c.id = o.customer_id left join users s on s.id = o.salesman_id
+     where tro.trip_id = $1 order by o.id`,
+    [tripId, status],
+  );
+  return rows.map((o) => ({
+    ...o,
+    lines: o.lines.map((l) => ({
+      ...l,
+      toDeliverQty: split(l.toDeliver, l.piecesPerCarton),
+      amount: lineAmount(l.toDeliver, l.pricePerCarton!, l.piecesPerCarton),
+    })),
+  }));
+}
+
+async function saveOrders(client: PoolClient, tripId: number, orderIds: number[], userId: number, tripNumber: string) {
+  const { rows: before } = await client.query<{ orderId: number }>('select order_id as "orderId" from trip_orders where trip_id = $1', [tripId]);
+  await client.query('delete from trip_orders where trip_id = $1', [tripId]);
+  for (const orderId of orderIds) await client.query('insert into trip_orders (trip_id, order_id) values ($1, $2)', [tripId, orderId]);
+  await ensureOrderLines(client, tripId);
+  for (const orderId of orderIds.filter((o) => !before.some((b) => b.orderId === o))) {
+    await addEvent(client, orderId, userId, 'On a trip', `Will go out on trip ${tripNumber}`);
+  }
+  for (const { orderId } of before.filter((b) => !orderIds.includes(b.orderId))) {
+    await addEvent(client, orderId, userId, 'Taken off a trip', `No longer on trip ${tripNumber}`);
+  }
+}
+
+async function checkPlan(client: PoolClient, user: AuthUser, body: z.infer<typeof planBody>, tripId: number | null = null) {
   const companies = await facilityCompanies(client, body.facilityCode);
   if (companies.length === 0) throw invalid('That warehouse is not known.');
   const mine = companies.filter((c) => user.companies.includes(c));
@@ -262,6 +374,8 @@ async function checkPlan(client: PoolClient, user: AuthUser, body: z.infer<typeo
     [body.leaderId, LEADER_ROLES, companies],
   );
   if (!leader[0]) throw invalid('Please pick the salesman or sales manager who leads the trip.');
+  if (body.lines.length === 0 && body.orderIds.length === 0) throw invalid('Add at least one product to load or an order to deliver.');
+  await checkOrders(client, user, body.facilityCode, body.orderIds, tripId);
   const ids = body.lines.map((l) => l.productId);
   if (new Set(ids).size !== ids.length) throw invalid('A product is on the list twice.');
   const { rows: products } = await client.query<{ id: number; piecesPerCarton: number }>(
@@ -339,7 +453,32 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
       const customer = customers[0];
       if (!customer) throw notFound('customer');
       if (customer.cashOnly && body.payment === 'credit') throw invalid(`${customer.name} pays cash only. Please take cash or Airtel Money.`);
-      const invoiceType = body.invoiceType ?? customer.lastInvoiceType ?? 'vat';
+
+      // Delivering one of the trip's orders: its own prices, invoice type, LPO and salesman.
+      type TripOrder = { id: number; number: string; customerId: number; invoiceType: 'vat' | 'plain'; salesmanId: number | null };
+      let order = null as TripOrder | null;
+      let orderLines: { id: number; productId: number; pricePerCarton: number; onVehicle: number; lpoNo: string }[] = [];
+      if (body.orderId) {
+        const { rows: found } = await client.query<TripOrder>(
+          `select o.id, o.number, o.customer_id as "customerId", o.invoice_type as "invoiceType", o.salesman_id as "salesmanId"
+           from orders o join trip_orders tro on tro.order_id = o.id where o.id = $1 and tro.trip_id = $2 for update of o`,
+          [body.orderId, trip.id],
+        );
+        order = found[0] ?? null;
+        if (!order) throw invalid('That order is not on this trip.');
+        if (order.customerId !== customer.id) throw invalid(`Order ${order.number} is for another customer.`);
+        orderLines = (
+          await client.query<(typeof orderLines)[number]>(
+            `select l.id, l.product_id as "productId", l.price_per_carton as "pricePerCarton", l.on_vehicle as "onVehicle",
+               coalesce(oc.lpo_no, '') as "lpoNo"
+             from order_lines l join products p on p.id = l.product_id
+               left join order_companies oc on oc.order_id = l.order_id and oc.company_code = p.company_code
+             where l.order_id = $1 for update of l`,
+            [order.id],
+          )
+        ).rows;
+      }
+      const invoiceType = order?.invoiceType ?? body.invoiceType ?? customer.lastInvoiceType ?? 'vat';
 
       const { rows: van } = await client.query<{
         lineId: number;
@@ -349,9 +488,13 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         vatExempt: boolean;
         label: string;
         left: number;
+        held: number;
       }>(
         `select tl.id as "lineId", p.id as "productId", p.company_code as "companyCode", p.pieces_per_carton as "piecesPerCarton",
-           p.vat_exempt as "vatExempt", p.brand || ' ' || p.name || ' ' || p.pack_size as label, tl.loaded - tl.sold as left
+           p.vat_exempt as "vatExempt", p.brand || ' ' || p.name || ' ' || p.pack_size as label, tl.loaded - tl.sold as left,
+           -- On the vehicle for the trip's orders, so not for sale to anyone else.
+           coalesce((select sum(l.on_vehicle) from trip_orders tro join order_lines l on l.order_id = tro.order_id
+             where tro.trip_id = tl.trip_id and l.product_id = tl.product_id), 0)::int as held
          from trip_lines tl join products p on p.id = tl.product_id where tl.trip_id = $1 order by tl.id for update of tl`,
         [trip.id],
       );
@@ -359,21 +502,33 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         const line = van.find((v) => v.productId === w.productId);
         if (!line) throw invalid('That product is not on this vehicle.');
         const pieces = totalPieces(w, line.piecesPerCarton);
-        if (pieces > line.left) {
-          throw new HttpError(409, 'not_on_vehicle',
-            line.left > 0 ? `${line.label}: only ${qtyText(line.left, line.piecesPerCarton)} is left on the vehicle.` : `${line.label}: none is left on the vehicle.`);
+        if (order) {
+          const ol = orderLines.find((l) => l.productId === w.productId);
+          if (!ol) throw invalid(`${line.label} is not on order ${order.number}.`);
+          if (pieces > ol.onVehicle) {
+            throw new HttpError(409, 'not_on_vehicle',
+              ol.onVehicle > 0 ? `${line.label}: only ${qtyText(ol.onVehicle, line.piecesPerCarton)} is on the vehicle for this order.` : `${line.label}: none is on the vehicle for this order.`);
+          }
+          return { ...line, pieces, orderLine: ol, pricePerCarton: ol.pricePerCarton, amount: lineAmount(pieces, ol.pricePerCarton, line.piecesPerCarton) };
         }
-        return { ...line, pieces, pricePerCarton: w.pricePerCarton, amount: lineAmount(pieces, w.pricePerCarton, line.piecesPerCarton) };
+        const free = line.left - line.held;
+        if (pieces > free) {
+          throw new HttpError(409, 'not_on_vehicle',
+            free > 0 ? `${line.label}: only ${qtyText(free, line.piecesPerCarton)} is left on the vehicle.` : `${line.label}: none is left on the vehicle.`);
+        }
+        if (w.pricePerCarton == null) throw invalid(`${line.label}: please type the price per carton.`);
+        const orderLine: (typeof orderLines)[number] | null = null;
+        return { ...line, pieces, orderLine, pricePerCarton: w.pricePerCarton, amount: lineAmount(pieces, w.pricePerCarton, line.piecesPerCarton) };
       });
 
       const { rows: sale } = await client.query<{ id: number; soldAt: string; day: string }>(
         `insert into trip_sales (trip_id, customer_id, stop, payment, reference, total, received_by, signature_file, proof_file, sold_at,
-           created_by, request_id)
-         select $1, $2, $3, $4, $5, 0, $6, $7, $8, least(greatest(coalesce($9::timestamptz, now()), t.loaded_at), now()), $10, $11
+           created_by, request_id, order_id)
+         select $1, $2, $3, $4, $5, 0, $6, $7, $8, least(greatest(coalesce($9::timestamptz, now()), t.loaded_at), now()), $10, $11, $12
          from trips t where t.id = $1
          returning id, sold_at as "soldAt", to_char((sold_at at time zone 'Africa/Blantyre')::date, 'YYYY-MM-DD') as day`,
         [trip.id, customer.id, body.stop, body.payment, body.reference, body.receivedBy, signatureFile, proofFile, body.soldAt ?? null,
-          user.id, body.requestId],
+          user.id, body.requestId, order?.id ?? null],
       );
       const saleId = sale[0]!.id;
       const day = sale[0]!.day;
@@ -396,17 +551,22 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         const number = await nextNumber(client, companyCode, 'INV');
         const { rows: inv } = await client.query<{ id: number }>(
           `insert into invoices (number, company_code, customer_id, invoice_type, trip_sale_id, invoice_date, due_date,
-             subtotal, vat_rate, vat, total, salesman_id, created_by)
-           values ($1, $2, $3, $4, $5, $6::date, $6::date + $7::int, $8, $9, $10, $11, $12, $12) returning id`,
-          [number, companyCode, customer.id, invoiceType, saleId, day, days, subtotal, vatRate, vat, subtotal + vat, user.id],
+             subtotal, vat_rate, vat, total, salesman_id, created_by, lpo_no)
+           values ($1, $2, $3, $4, $5, $6::date, $6::date + $7::int, $8, $9, $10, $11, $12, $13, $14) returning id`,
+          [number, companyCode, customer.id, invoiceType, saleId, day, days, subtotal, vatRate, vat, subtotal + vat,
+            order?.salesmanId ?? user.id, user.id, its[0]!.orderLine?.lpoNo ?? ''],
         );
         const invoiceId = inv[0]!.id;
         for (const l of its) {
           await client.query(
-            `insert into invoice_lines (invoice_id, product_id, pieces, price_per_carton, amount, vat_exempt) values ($1, $2, $3, $4, $5, $6)`,
-            [invoiceId, l.productId, l.pieces, l.pricePerCarton, l.amount, l.vatExempt],
+            `insert into invoice_lines (invoice_id, order_line_id, product_id, pieces, price_per_carton, amount, vat_exempt)
+             values ($1, $2, $3, $4, $5, $6, $7)`,
+            [invoiceId, l.orderLine?.id ?? null, l.productId, l.pieces, l.pricePerCarton, l.amount, l.vatExempt],
           );
           await takeFromVehicle(client, trip.id, saleId, l.lineId, l.pieces, number, user.id);
+          if (l.orderLine) {
+            await client.query('update order_lines set delivered = delivered + $2, on_vehicle = on_vehicle - $2 where id = $1', [l.orderLine.id, l.pieces]);
+          }
         }
         total += subtotal + vat;
 
@@ -439,6 +599,16 @@ async function recordSale(db: Db, user: AuthUser, tripId: number, body: SaleInpu
         }
       }
       await client.query('update trip_sales set total = $2 where id = $1', [saleId, total]);
+      if (order) {
+        const { rows: o } = await client.query<{ left: number }>(
+          'select coalesce(sum(pieces - delivered), 0)::int as left from order_lines where order_id = $1',
+          [order.id],
+        );
+        const done = o[0]!.left === 0;
+        await addEvent(client, order.id, user.id, done ? 'Delivered' : 'Part delivered',
+          [`From trip ${trip.number}`, body.stop && `at ${body.stop}`, `received by ${body.receivedBy}`].filter(Boolean).join(' · '));
+        if (done) await client.query(`update orders set status = 'done' where id = $1 and status in ('open', 'hold')`, [order.id]);
+      }
       if (customer.lastInvoiceType !== invoiceType) {
         await client.query('update customers set last_invoice_type = $2 where id = $1', [customer.id, invoiceType]);
       }
@@ -589,11 +759,37 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
                  from invoice_lines il join invoices iv on iv.id = il.invoice_id
                  where iv.customer_id = c.id and il.product_id = any($3) order by il.product_id, il.id desc) x), '[]') as "lastPrices"
        from customers c
-       where c.active and c.channel = $2 and exists (select 1 from customer_companies cc where cc.customer_id = c.id and cc.company_code = any($1))
+       where c.active and (c.channel = $2 or c.id = any($4))
+         and exists (select 1 from customer_companies cc where cc.customer_id = c.id and cc.company_code = any($1))
        order by c.name limit 3000`,
-      [companies, trip.kind, productIds],
+      [companies, trip.kind, productIds, trip.orders.map((o: { customerId: number }) => o.customerId)],
     );
     return { trip, customers, expenseKinds: TRIP_EXPENSE_KINDS };
+  });
+
+  // Orders a trip could carry: open, from this warehouse, with something left to deliver and on no loading plan,
+  // vehicle or other trip. tripId keeps the orders already on that trip in the list.
+  app.get('/trips/open-orders', { onRequest: auth, preHandler: planners }, async (request) => {
+    const { facility, tripId } = parse(openOrdersQuery, request.query);
+    const { rows } = await db.query(
+      `select o.id, o.number, o.customer_id as "customerId", c.name as "customerName", c.area, c.channel,
+         to_char(o.wanted_on, 'YYYY-MM-DD') as "wantedOn", s.name as "salesmanName",
+         (select coalesce(sum(round(l.price_per_carton::numeric * (l.pieces - l.delivered) / p.pieces_per_carton)), 0)
+            from order_lines l join products p on p.id = l.product_id where l.order_id = o.id)::float8 as "amountLeft",
+         (select count(*) from order_lines l where l.order_id = o.id and l.pieces > l.delivered)::int as products
+       from orders o join customers c on c.id = o.customer_id left join users s on s.id = o.salesman_id
+       where o.facility_code = $1 and o.status = 'open'
+         and exists (select 1 from order_lines l where l.order_id = o.id and l.pieces > l.delivered)
+         and not exists (select 1 from order_lines l where l.order_id = o.id and l.on_vehicle > 0)
+         and not exists (select 1 from loading_plan_items i join loading_plans lp on lp.id = i.plan_id join order_lines l on l.id = i.order_line_id
+           where l.order_id = o.id and lp.status = 'planned')
+         and not exists (select 1 from trip_orders tro join trips t on t.id = tro.trip_id
+           where tro.order_id = o.id and t.status <> 'closed' and t.id is distinct from $3::int)
+         and not exists (select 1 from order_lines l join products p on p.id = l.product_id where l.order_id = o.id and not p.company_code = any($2))
+       order by o.wanted_on, o.id limit 300`,
+      [facility, request.user.companies, tripId ?? null],
+    );
+    return rows;
   });
 
   app.post('/trips', { onRequest: auth, preHandler: planners }, async (request, reply) => {
@@ -610,6 +806,7 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
           body.driverId ?? null, body.leaderId, body.staff, body.note, body.float, user.id],
       );
       await saveLines(client, rows[0]!.id, plan.lines);
+      await saveOrders(client, rows[0]!.id, body.orderIds, user.id, number);
       return rows[0]!.id;
     });
     const trip = await tripDetail(db, user, tripId);
@@ -626,7 +823,7 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
       const trip = await lockTrip(client, user, tripId);
       if (trip.status !== 'planned') throw new HttpError(409, 'already_loaded', 'This vehicle has already been loaded. The plan cannot change now.');
       if (body.facilityCode !== trip.facilityCode) throw invalid('The warehouse of a trip cannot change. Please plan a new trip.');
-      const plan = await checkPlan(client, user, body);
+      const plan = await checkPlan(client, user, body, trip.id);
       await client.query(
         `update trips set kind = $2, company_code = $3, trip_date = $4, route = $5, stops = $6, vehicle_id = $7, driver_id = $8, leader_id = $9,
            staff = $10, note = $11, float_amount = $12, updated_at = now() where id = $1`,
@@ -634,6 +831,7 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
           body.leaderId, body.staff, body.note, body.float],
       );
       await saveLines(client, trip.id, plan.lines);
+      await saveOrders(client, trip.id, body.orderIds, user.id, trip.number);
       return trip.number;
     });
     await audit(db, { userId: user.id, action: 'trip_changed', details: { tripId, number } });
@@ -646,6 +844,7 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
     const number = await inTransaction(db, async (client) => {
       const trip = await lockTrip(client, user, tripId);
       if (trip.status !== 'planned') throw new HttpError(409, 'already_loaded', 'This vehicle has already been loaded. The trip cannot be deleted.');
+      await saveOrders(client, trip.id, [], user.id, trip.number);
       await client.query('delete from trips where id = $1', [trip.id]);
       return trip.number;
     });
@@ -671,6 +870,20 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
         );
         if (!rows[0]) throw invalid('That vehicle cannot be used for this warehouse.');
       }
+      // The orders go on first: the stock set aside for them is let go and loaded like the rest, oldest expiry first.
+      const { rows: orders } = await client.query<{ id: number; channel: Channel }>(
+        `select o.id, c.channel from trip_orders tro join orders o on o.id = tro.order_id join customers c on c.id = o.customer_id
+         where tro.trip_id = $1 order by o.id for update of o`,
+        [trip.id],
+      );
+      const { rows: orderLines } = await client.query<{ id: number; orderId: number; productId: number; need: number }>(
+        `select l.id, l.order_id as "orderId", l.product_id as "productId", l.pieces - l.delivered - l.on_vehicle as need
+         from order_lines l where l.order_id = any($1) and l.pieces > l.delivered + l.on_vehicle order by l.order_id, l.id`,
+        [orders.map((o) => o.id)],
+      );
+      await client.query('delete from order_allocations where line_id = any($1)', [orderLines.map((l) => l.id)]);
+      await ensureOrderLines(client, trip.id);
+      const forOrders = (productId: number) => orderLines.filter((l) => l.productId === productId).reduce((t, l) => t + l.need, 0);
       const { rows: lines } = await client.query<{ id: number; productId: number; planned: number; piecesPerCarton: number; label: string }>(
         `select tl.id, tl.product_id as "productId", tl.planned, p.pieces_per_carton as "piecesPerCarton",
            p.brand || ' ' || p.name || ' ' || p.pack_size as label
@@ -694,7 +907,7 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
       let total = 0;
       for (const l of lines) {
         const typed = body.lines.find((x) => x.productId === l.productId);
-        let need = typed ? totalPieces(typed, l.piecesPerCarton) : l.planned;
+        let need = typed ? totalPieces(typed, l.piecesPerCarton) : l.planned + forOrders(l.productId);
         const want = need;
         for (const b of oldestFirst) {
           if (need === 0) break;
@@ -706,11 +919,29 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
           await client.query('insert into trip_line_batches (line_id, batch_id, pieces) values ($1, $2, $3)', [l.id, b.id, take]);
         }
         await client.query('update trip_lines set loaded = $2 where id = $1', [l.id, want - need]);
+        // What went on is for the orders first, in the order they were booked.
+        let forThem = want - need;
+        for (const ol of orderLines.filter((x) => x.productId === l.productId)) {
+          const give = Math.min(forThem, ol.need);
+          if (give === 0) continue;
+          forThem -= give;
+          await client.query('update order_lines set on_vehicle = on_vehicle + $2 where id = $1', [ol.id, give]);
+        }
         total += want - need;
         if (need > 0) short.push({ product: l.label, ...split(need, l.piecesPerCarton) });
       }
       if (total === 0) throw invalid('Nothing could be loaded: none of it is free on the shelves.');
       const gatePassNo = await nextSharedNumber(client, 'GP');
+      for (const o of orders) {
+        const { rows: on } = await client.query<{ onVehicle: number }>(
+          'select coalesce(sum(on_vehicle), 0)::int as "onVehicle" from order_lines where order_id = $1',
+          [o.id],
+        );
+        // Whatever did not fit is set aside for the order again.
+        const short = await reserveStock(client, o.id, o.channel);
+        await addEvent(client, o.id, user.id, on[0]!.onVehicle > 0 ? 'On the vehicle' : 'Not loaded',
+          `Trip ${trip.number} · gate pass ${gatePassNo}${short > 0 || on[0]!.onVehicle === 0 ? ' · not all of it was free to load' : ''}`);
+      }
       await client.query(
         `update trips set status = 'out', vehicle_id = $2, gate_pass_no = $3, loaded_at = now(), loaded_by = $4,
            float_custody = case when float_amount > 0 then 'with' else 'na' end, updated_at = now()
@@ -819,6 +1050,17 @@ export function tripRoutes(app: FastifyInstance, db: Db, uploadDir: string) {
           }
         }
         await client.query('update trip_lines set returned = $2, missing = $3 where id = $1', [l.id, l.back, l.missing]);
+      }
+      // What an order did not get is back on the shelf, and set aside for it again.
+      const { rows: undelivered } = await client.query<{ id: number; status: string; channel: Channel }>(
+        `select o.id, o.status, c.channel from trip_orders tro join orders o on o.id = tro.order_id join customers c on c.id = o.customer_id
+         where tro.trip_id = $1 and exists (select 1 from order_lines l where l.order_id = o.id and l.on_vehicle > 0) order by o.id for update of o`,
+        [trip.id],
+      );
+      for (const o of undelivered) {
+        await client.query('update order_lines set on_vehicle = 0 where order_id = $1', [o.id]);
+        if (o.status === 'open' || o.status === 'hold') await reserveStock(client, o.id, o.channel);
+        await addEvent(client, o.id, user.id, 'Back from the trip', `Not all of it was delivered on trip ${trip.number}. It can go out again.`);
       }
       await client.query(
         `update trips set status = 'closed', cash_expected = $2, cash_counted = $3, cash_difference = $4, close_note = $5,

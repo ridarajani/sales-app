@@ -247,6 +247,8 @@ erDiagram
     trip_lines ||--o{ trip_line_batches : "from"
     stock_batches ||--o{ trip_line_batches : "loaded"
     trips ||--o{ trip_sales : "sells"
+    trips ||--o{ trip_orders : "delivers"
+    orders ||--o{ trip_orders : "goes out on"
     customers ||--o{ trip_sales : "buys"
     trip_sales ||--o{ invoices : "makes"
     trip_sales ||--o{ collections : "paid by"
@@ -453,6 +455,10 @@ erDiagram
         int pieces
         int sold
     }
+    trip_orders {
+        int trip_id PK, FK
+        int order_id PK, FK
+    }
     trip_sales {
         int id PK
         int trip_id FK
@@ -535,6 +541,7 @@ erDiagram
 | `trip_lines` | Phase 9 | Products on a trip: planned, loaded, sold, brought back and missing |
 | `trip_line_batches` | Phase 9 | Which batches each product was loaded from, and how much of each is sold |
 | `trip_sales` | Phase 9 | Each sale at a stop: customer, payment, signature and the phone's time |
+| `trip_orders` | Phase 9 | Orders booked ahead that a trip delivers |
 | `user_dormant_vehicles` | 24 Oct answers | Vehicles a person does not use, kept at the bottom of their list |
 
 ## Phase 1 notes
@@ -656,7 +663,7 @@ erDiagram
 - **Closing** (`POST /trips/:id/close`, the leader or a sales manager or Admin): the cartons that came back of each product and the cash counted. What came back goes on the shelf again; what is neither sold nor back is missing and comes off the books (adjusted, reason lost). The cash expected is cash sales plus the float less cash expenses; a cash difference or missing stock needs a note. The cash, float included, stays with the leader until handed to the cashier, where handovers now show `floats`.
 - **Invoices** from a trip have no order behind them (`invoice_lines.order_line_id` is empty); the invoice shows the trip, the stop and the vehicle, and the ledger says "trip TRP-000001". Goods from a trip invoice that are given back later go into the batches they were sold from.
 - **Who:** Admin, Management and sales managers plan; the warehouse loads and sees no money; salesmen see only the trips they lead; drivers see their own trips once loaded.
-- **Not yet:** advance orders on a trip (confirmed orders delivered at a stop) come in Phase 9 part 2.
+- **Orders on a trip** (Phase 9 part 2): a trip can carry orders booked ahead (`trip_orders`, `orderIds` on `POST`/`PUT /trips`; `GET /trips/open-orders?facility=F1` lists the ones it may take: open, from that warehouse, with something left to deliver and on no loading plan, vehicle or other trip). While the trip is planned their goods count as planned, so no loading plan takes them, and putting an order on hold takes it off. At loading the stock set aside for them is let go and loaded first, oldest expiry first, and goes on `order_lines.on_vehicle`; what did not fit is set aside again. Each trip line shows `forOrders` and `forSale`, and a sale to anyone else can only take `forSale`. The leader delivers an order with a sale that names `orderId`: the order's prices, invoice type, LPO and salesman are used, `invoice_lines.order_line_id` is set and the order is part delivered or done. At close, what an order did not get comes back like the rest of the stock and is set aside for the order again, so it can go out on another vehicle.
 - **Audit actions:** `trip_planned`, `trip_changed`, `trip_deleted`, `trip_loaded`, `trip_sale`, `trip_expense`, `trip_closed`.
 
 ## Client answers of 24 October

@@ -137,12 +137,15 @@ async function releaseStock(client: PoolClient, orderId: number) {
   await client.query('delete from order_allocations where line_id in (select id from order_lines where order_id = $1)', [orderId]);
 }
 
-// Pieces of each line on loading plans that have not been loaded yet.
+// Pieces of each line on loading plans that have not been loaded yet, or on a trip that has not left yet
+// (a trip carries all of what is still to deliver).
 export const PLANNED_SQL = (line: string) =>
-  `coalesce((select sum(i.pieces) from loading_plan_items i join loading_plans lp on lp.id = i.plan_id
-     where i.order_line_id = ${line} and lp.status = 'planned'), 0)::int`;
+  `(coalesce((select sum(i.pieces) from loading_plan_items i join loading_plans lp on lp.id = i.plan_id
+     where i.order_line_id = ${line} and lp.status = 'planned'), 0)
+   + coalesce((select max(tl.pieces - tl.delivered - tl.on_vehicle) from order_lines tl join trip_orders tro on tro.order_id = tl.order_id
+     join trips tt on tt.id = tro.trip_id where tl.id = ${line} and tt.status = 'planned'), 0))::int`;
 
-// Takes an order off every loading plan that is not loaded yet (on hold, cancel or close).
+// Takes an order off every loading plan and trip that is not loaded yet (on hold, cancel or close).
 // A plan already sent to the warehouse shows the change as new. The caller holds the order's lock; plan code
 // takes order locks too before changing items, so plans and orders never wait on each other the other way round.
 export async function dropFromPlans(client: PoolClient, orderId: number, userId: number) {
@@ -160,7 +163,12 @@ export async function dropFromPlans(client: PoolClient, orderId: number, userId:
       [r.planId, userId, r.productId, r.lineId, r.pieces, !r.sent],
     );
   }
-  return rows.length > 0;
+  // A trip that has not left yet simply stops carrying it.
+  const offTrips = await client.query(
+    `delete from trip_orders where order_id = $1 and trip_id in (select id from trips where status = 'planned')`,
+    [orderId],
+  );
+  return rows.length > 0 || (offTrips.rowCount ?? 0) > 0;
 }
 
 // Where an open order stands, worked out from its lines.
