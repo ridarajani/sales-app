@@ -20,6 +20,7 @@ erDiagram
     companies ||--o{ user_companies : "visible to"
     users ||--o{ user_companies : "sees"
     users ||--o{ sessions : "signed in as"
+    users ||--o{ sales_targets : "aims for"
     customers ||--o{ customer_companies : "buys from"
     companies ||--o{ customer_companies : "sells to"
     companies ||--o{ products : "sells"
@@ -88,6 +89,7 @@ erDiagram
         int customer_id PK, FK
         text company_code PK, FK
         int payment_terms_days "0 to 365"
+        bigint credit_limit "reports only"
     }
     products {
         int id PK
@@ -98,6 +100,7 @@ erDiagram
         text pack_size
         int pieces_per_carton
         boolean vat_exempt
+        int low_stock_cartons
         boolean active
         timestamptz deleted_at
     }
@@ -459,6 +462,12 @@ erDiagram
         int trip_id PK, FK
         int order_id PK, FK
     }
+    sales_targets {
+        int salesman_id PK, FK
+        date month PK "first day"
+        bigint amount "before VAT"
+        int set_by FK
+    }
     trip_sales {
         int id PK
         int trip_id FK
@@ -543,6 +552,7 @@ erDiagram
 | `trip_sales` | Phase 9 | Each sale at a stop: customer, payment, signature and the phone's time |
 | `trip_orders` | Phase 9 | Orders booked ahead that a trip delivers |
 | `user_dormant_vehicles` | 24 Oct answers | Vehicles a person does not use, kept at the bottom of their list |
+| `sales_targets` | Phase 10 | Each salesman's sales target for a month, in kwacha before VAT |
 
 ## Phase 1 notes
 
@@ -673,3 +683,13 @@ erDiagram
 - **Users:** `PUT /users/:id` changes the name, phone, job, companies or sales managers; only what is sent changes. A sales manager edits and deletes their own salesmen only. Deleting a user ends their login at once and clears them as a vehicle's usual driver. A sales manager with salesmen cannot be deleted, moved to another job or lose a company their salesmen use until the salesmen are moved.
 - **Vehicles** are shared by all four companies. Both sales managers, as well as Admin, add, edit and delete them. Each person marks the ones they do not use with `PUT /vehicles/:id/dormant { dormant }`; `GET /vehicles` gives `dormant` for the caller and lists those last.
 - **Invoices** carry no bank details. Audit actions: `product_deleted`, `customer_deleted`, `vehicle_deleted`, `user_updated`, `user_deleted`.
+
+## Phase 10 notes
+
+- **Reports** (`src/reports/`): 53 reports in nine groups (sales, orders, deliveries, invoices, what customers owe, cash, stock, trips and checks), from the client's list of 7 October. `GET /reports` gives the ones the person may open, by group, with the filters each takes (`dates`, `company`, `person`, `customer`, `channel`, `product`), those that must be picked, what the person filter is called (salesman, collected by, leader) and where the dates start by default; plus the staff of the person's companies to pick from. `GET /reports/:key?from=&to=&company=&person=&customer=&channel=&product=` runs one: `{ title, picked, columns, rows, totals, truncated }`. Each column has a kind: `text`, `money` (whole kwacha), `int`, `percent`, `date` (YYYY-MM-DD) or `qty` (already written as cartons and pieces). `&format=xlsx` gives an Excel file and `&format=pdf` a landscape A4 printout with the filters picked written at the top. At most 10,000 rows (`truncated`).
+- **Who sees what:** every report covers only the person's companies. A salesman sees only his own figures: his sales, orders, customers, collections and trips, whatever he asks for; he picks no person, and sees no stock reports. The warehouse sees the stock reports and the trip loads and returns, never money. Cashiers see invoices, what is owed and cash. User activity is for Admin and Management.
+- **What the reports count:** sales are invoices, by invoice date, before VAT unless the column says total. Cancelled invoices are those taken back in full by booked returns and credit notes, as invoices are never deleted. Cash invoices are those due on the day they were made. The route is the trip's route, or the customer's area for other sales. Aging sorts what is still to pay on each invoice by days past its due date. Cash in hand is what each person holds and has not handed over, as on their cash screen. Cancelled payments are left out.
+- **Targets** (migration 026): `sales_targets`, one per salesman per month, in kwacha before VAT. `GET /targets?month=2026-10` lists the salesmen the person may set (Admin and Management: all of their companies; a sales manager: his own) with their target; `PUT /targets { salesmanId, month, amount }` sets it, and `amount: null` takes it away. The target report sets each month's target against sales.
+- **Low-stock level:** `products.low_stock_cartons`, set with the product (`lowStockCartons`, empty means none). A product with less free to sell shows on the low stock report.
+- **Credit limit:** `customer_companies.credit_limit`, per company, set with the customer (`companies[].creditLimit`, empty means none; left out on an edit, it stays). It shows on the reports only and never stops an order.
+- **Audit actions:** `target_set`.

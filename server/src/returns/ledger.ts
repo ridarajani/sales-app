@@ -30,7 +30,7 @@ type Movement = {
   invoiceId: number | null;
 };
 
-async function ledger(db: Db, user: AuthUser, customerId: number, query: z.infer<typeof ledgerQuery>) {
+export async function ledger(db: Db, user: AuthUser, customerId: number, query: z.infer<typeof ledgerQuery>) {
   assertCompany(user, query.company);
   if (query.from && query.to && query.from > query.to) throw invalid('The start date is after the end date.');
   const { rows: heads } = await db.query(

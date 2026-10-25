@@ -7,7 +7,8 @@ import type { Db } from '../db/pool.js';
 import { parse } from '../users.js';
 import { assertCanEditCompanies, CHANNELS, companyCodes, deleteOrMark, idParams, invalid, notFound, optionalPhone } from './common.js';
 
-export type CustomerCompany = { code: string; paymentTermsDays: number };
+// creditLimit: how much the customer may owe this company, shown on reports only. Null means no limit.
+export type CustomerCompany = { code: string; paymentTermsDays: number; creditLimit?: number | null };
 export type Customer = {
   id: number;
   name: string;
@@ -28,6 +29,8 @@ export type Customer = {
 const companyEntry = z.object({
   code: z.string(),
   paymentTermsDays: z.number().int().min(0, 'Payment terms cannot be below 0 days.').max(365, 'Payment terms cannot be over 365 days.'),
+  // Left out on an update, the limit stays as it was.
+  creditLimit: z.number().int('Amounts are whole kwacha.').min(0, 'The credit limit cannot be below 0.').max(100_000_000_000).nullish(),
 });
 
 const customerFields = z.object({
@@ -62,7 +65,8 @@ const listQuery = z.object({
 
 // The user sees a customer if they share a company, and only those companies' terms.
 const customerSelect = `select c.id, c.name, c.channel, c.area, c.address, c.city, c.tpin, c.reg_no as "regNo", c.phone, c.needs_lpo as "needsLpo", c.cash_only as "cashOnly", c.active,
-    coalesce((select json_agg(json_build_object('code', cc.company_code, 'paymentTermsDays', cc.payment_terms_days) order by co.sort_order)
+    coalesce((select json_agg(json_build_object('code', cc.company_code, 'paymentTermsDays', cc.payment_terms_days,
+                'creditLimit', cc.credit_limit::float8) order by co.sort_order)
               from customer_companies cc join companies co on co.code = cc.company_code
               where cc.customer_id = c.id and cc.company_code = any($1)), '[]') as companies,
     (select array_agg(cc.company_code) from customer_companies cc where cc.customer_id = c.id) as "allCompanies"
@@ -115,10 +119,11 @@ export async function insertCustomer(client: PoolClient, c: CleanCustomer): Prom
   const id = rows[0]?.id;
   if (id == null) return null;
   for (const co of c.companies) {
-    await client.query('insert into customer_companies (customer_id, company_code, payment_terms_days) values ($1, $2, $3)', [
+    await client.query('insert into customer_companies (customer_id, company_code, payment_terms_days, credit_limit) values ($1, $2, $3, $4)', [
       id,
       co.code,
       co.paymentTermsDays,
+      co.creditLimit ?? null,
     ]);
   }
   return id;
@@ -223,6 +228,10 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       }
       // Replace only the companies this user can see (and any they name); the rest stay as they are.
       const mergedCodes = merged.companies.map((c) => c.code);
+      const { rows: limits } = await client.query<{ code: string; creditLimit: number | null }>(
+        'select company_code as code, credit_limit::float8 as "creditLimit" from customer_companies where customer_id = $1',
+        [id],
+      );
       await client.query('delete from customer_companies where customer_id = $1 and (company_code = any($2) or company_code = any($3))', [
         id,
         request.user.companies,
@@ -230,10 +239,12 @@ export function customerRoutes(app: FastifyInstance, db: Db) {
       ]);
       if (merged.cashOnly) await client.query('update customer_companies set payment_terms_days = 0 where customer_id = $1', [id]);
       for (const co of merged.companies) {
-        await client.query('insert into customer_companies (customer_id, company_code, payment_terms_days) values ($1, $2, $3)', [
+        const limit = co.creditLimit !== undefined ? co.creditLimit : (limits.find((l) => l.code === co.code)?.creditLimit ?? null);
+        await client.query('insert into customer_companies (customer_id, company_code, payment_terms_days, credit_limit) values ($1, $2, $3, $4)', [
           id,
           co.code,
           co.paymentTermsDays,
+          limit,
         ]);
       }
       await client.query('commit');

@@ -76,10 +76,10 @@ test('customers: sales managers add for their own companies only, and see only t
 
   // Abbas sees the shared customer with only the LV terms; Kashif sees only the ZF terms.
   const forAbbas = (await get(app, abbas, `/customers/${sharedId}`)).json();
-  expect(forAbbas.companies).toEqual([{ code: 'LV', paymentTermsDays: 45 }]);
+  expect(forAbbas.companies).toEqual([{ code: 'LV', paymentTermsDays: 45, creditLimit: null }]);
   const forKashif = (await get(app, kashif, '/customers')).json();
   expect(forKashif.map((c: { name: string }) => c.name)).toEqual(['City Centre Mart']);
-  expect(forKashif[0].companies).toEqual([{ code: 'ZF', paymentTermsDays: 30 }]);
+  expect(forKashif[0].companies).toEqual([{ code: 'ZF', paymentTermsDays: 30, creditLimit: null }]);
 
   // A sales manager cannot change a customer shared with a company they do not run.
   expect((await put(abbas, `/customers/${sharedId}`, { area: 'Moved' })).statusCode).toBe(403);
@@ -97,7 +97,7 @@ test('customer names are unique, cash-only customers get 0 days, search works', 
     cashOnly: true,
     companies: [{ code: 'ZT', paymentTermsDays: 30 }],
   });
-  expect(cash.json().companies).toEqual([{ code: 'ZT', paymentTermsDays: 0 }]);
+  expect(cash.json().companies).toEqual([{ code: 'ZT', paymentTermsDays: 0, creditLimit: null }]);
 
   const found = (await get(app, admin, '/customers?q=kauma')).json();
   expect(found.map((c: { name: string }) => c.name)).toEqual(['Kauma Market Traders']);
@@ -229,7 +229,7 @@ test('customer import: shows every problem and saves nothing until the file is c
   expect((await upload(accounts, '/import/customers/save', good)).json()).toEqual({ saved: 2 });
   const bwaila = (await get(app, admin, '/customers?q=bwaila')).json()[0];
   expect(bwaila).toMatchObject({ channel: 'wholesaler', phone: '0995501340', needsLpo: true, companies: [{ code: 'LV', paymentTermsDays: 30 }, { code: 'ZT', paymentTermsDays: 30 }] });
-  expect((await get(app, admin, '/customers?q=salima')).json()[0].companies).toEqual([{ code: 'GL', paymentTermsDays: 0 }]);
+  expect((await get(app, admin, '/customers?q=salima')).json()[0].companies).toEqual([{ code: 'GL', paymentTermsDays: 0, creditLimit: null }]);
 });
 
 test('product import, and who may use the import', async () => {
@@ -269,7 +269,7 @@ test('a partial update keeps the fields it does not send', async () => {
   const off = await put(admin, `/customers/${c.json().id}`, { active: false });
   expect(off.statusCode).toBe(200);
   expect(off.json()).toMatchObject({ active: false, area: 'Area 25', needsLpo: true, cashOnly: false });
-  expect(off.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 14 }, { code: 'ZF', paymentTermsDays: 30 }]);
+  expect(off.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 14, creditLimit: null }, { code: 'ZF', paymentTermsDays: 30, creditLimit: null }]);
 });
 
 test('an accounts user with fewer companies cannot delete the ones they cannot see', async () => {
@@ -284,10 +284,10 @@ test('an accounts user with fewer companies cannot delete the ones they cannot s
   const id = c.json().id;
   const r = await put(token, `/customers/${id}`, { companies: [{ code: 'LV', paymentTermsDays: 10 }] });
   expect(r.statusCode).toBe(200);
-  expect(r.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 10 }]);
+  expect(r.json().companies).toEqual([{ code: 'LV', paymentTermsDays: 10, creditLimit: null }]);
   expect((await get(app, admin, `/customers/${id}`)).json().companies).toEqual([
-    { code: 'LV', paymentTermsDays: 10 },
-    { code: 'ZT', paymentTermsDays: 21 },
+    { code: 'LV', paymentTermsDays: 10, creditLimit: null },
+    { code: 'ZT', paymentTermsDays: 21, creditLimit: null },
   ]);
   const name = await put(token, `/customers/${id}`, { area: 'New area' });
   expect(name.statusCode).toBe(200);
