@@ -35,7 +35,7 @@ In-house sales and distribution app for four companies in Lilongwe, Malawi: Luck
 - Prices are typed on each order; the customer signs for every delivery and every payment collection.
 - Money is whole Malawi kwacha (MWK), shown with thousands separators.
 - Phone numbers are mostly Malawi mobiles. Store them as 0 plus 9 digits (for example `0991234567`). Accept `0991 234 567`, `991234567` or `+265 991 234 567`, ignoring spaces and dashes. Show them as `0991 234 567`. A number from abroad keeps its country code (`+971501234567`) and is shown as typed. Login phone numbers are unique.
-- The app is not on Google Play or the App Store: Android installs from a private download page with an in-app update check; iPhone uses TestFlight.
+- The app is not on Google Play or the App Store: Android installs from a private download page with an in-app update check; iPhone installs with SideStore and a free Apple ID (no paid Apple account).
 - This repo is public: never commit client data, TPINs, phone numbers, passwords or keys.
 
 ### Screen style (decided by Rida, 20 October 2026)

@@ -1,0 +1,5 @@
+// Copy to Local.xcconfig (never committed) and fill in.
+// The live server's name only: no https:// and no slash at the end.
+SALES_API_HOST = sales.example.com
+// Your Apple team ID, only if you have a paid account. Leave it out for SideStore.
+// TEAM_ID =

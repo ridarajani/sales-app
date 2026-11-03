@@ -2,7 +2,7 @@
 
 The steps to put the app on a live server, load the client's real lists, and get staff using it. Do them in this order.
 
-Everything secret stays off GitHub: `deploy/.env`, the backups, the logos, the Android signing key and the Apple team ID.
+Everything secret stays off GitHub: `deploy/.env`, the backups, the logos, the Android signing key, `mobile/local.properties`, `mobile/keystore.properties` and `mobile/iosApp/Configuration/Local.xcconfig`.
 
 ## 1. The server
 
@@ -72,12 +72,12 @@ Then, in the phone app as the Admin:
 
 ### Android (field staff)
 
-1. On the Mac, build the release app (`./gradlew :androidApp:assembleRelease`) with the server address set to `https://sales.yourdomain.com`. Keep the signing key file and its password safe and off GitHub: every later update must be signed with the same key, or phones will refuse it.
+1. On the Mac, set the live address and the signing key as in the README (**Release builds**), then build the release app (`./gradlew :androidApp:assembleRelease`). Keep the signing key file and its password safe and off GitHub: every later update must be signed with the same key, or phones will refuse it.
 2. Put it on the server:
 
    ```sh
    cd sales-app/deploy
-   bash add-apk.sh ~/sales-1.0.0.apk 2 1.0.0 "First version"
+   bash add-apk.sh ~/sales-1.0.0-release.apk 2 1.0.0 "First version"
    ```
 
    The second number is the version code. Each new version needs a bigger one than the last.
@@ -86,8 +86,14 @@ Then, in the phone app as the Admin:
 
 ### iPhone (management)
 
-1. On the Mac, in Xcode: set the server address, pick **Any iOS Device**, then **Product > Archive > Distribute App > TestFlight**.
-2. In App Store Connect, add the managers as testers. They install **TestFlight** from the App Store, open the invite, and install the app.
+There is no paid Apple account, so managers install the app for free with **SideStore** and their own Apple ID. A free install lasts 7 days and SideStore renews it on the phone by itself while LocalDevVPN is connected.
+
+1. On the Mac, set `SALES_API_HOST = sales.yourdomain.com` in `mobile/iosApp/Configuration/Local.xcconfig` (no `https://`), then run `bash mobile/iosApp/make-ipa.sh`. It puts `SalesApp.ipa` on the Desktop.
+2. For each manager's iPhone (iOS 15 or newer), once, with the phone plugged into the Mac: install **LocalDevVPN** from the App Store; on the Mac, use **iloader** (iloader.app) to sign in with the manager's Apple ID and install SideStore; on the phone, trust the developer in **Settings > General > VPN & Device Management**, turn on **Developer Mode**, connect LocalDevVPN, and sign in to SideStore.
+3. AirDrop `SalesApp.ipa` to the phone and add it in SideStore with **+** under **My Apps**.
+4. For later versions, raise the version, run `make-ipa.sh` again and add the new file in SideStore the same way. The sign-in is kept.
+
+A free Apple ID allows 3 such apps on a phone (SideStore included). If this becomes too much work, a US$99-a-year Apple Developer account replaces it with TestFlight.
 
 ## 6. Test run and training
 

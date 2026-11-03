@@ -33,9 +33,39 @@ Two more keys in `.env`:
 ## Run the phone app
 
 - **Android:** open the `mobile` folder in Android Studio and run `androidApp`.
-- **iPhone:** on a Mac, open `mobile/iosApp/iosApp.xcodeproj` in Xcode and press Run. To install on a real iPhone or upload to TestFlight, set your Apple team ID in `mobile/iosApp/Configuration/Config.xcconfig`.
+- **iPhone:** on a Mac, open `mobile/iosApp/iosApp.xcodeproj` in Xcode and press Run. To run on a real iPhone, put your Apple team ID in `mobile/iosApp/Configuration/Local.xcconfig` (copy `Local.xcconfig.example`; the file stays off GitHub).
 
-The app is not published on Google Play or the App Store. Android phones install it from a private download page; iPhones install it through TestFlight.
+The app is not published on Google Play or the App Store. Android phones install it from a private download page; iPhones install it with SideStore and the manager's own free Apple ID (see `docs/GO-LIVE.md`).
+
+### Release builds (the live app)
+
+Release builds only talk to the live server over `https://`. Test builds (debug) still accept `http://` addresses on the office network.
+
+**Android:**
+
+1. Put the live address in `mobile/local.properties` (it stays off GitHub):
+
+   ```properties
+   salesApiUrl=https://sales.yourdomain.com
+   ```
+
+2. Make the signing key once and keep it somewhere safe, off GitHub. Every later update must be signed with the same key, or phones refuse it and staff must uninstall and reinstall.
+
+   ```sh
+   cd mobile
+   keytool -genkeypair -v -keystore sales-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias sales
+   cp keystore.properties.example keystore.properties   # then fill in the passwords
+   ```
+
+3. Build: `./gradlew :androidApp:assembleRelease`. The file is `androidApp/build/outputs/apk/release/sales-1.0.0-release.apk`. The build stops with a message if the address or the key is missing.
+4. Put it on the server with `deploy/add-apk.sh` (see `docs/GO-LIVE.md`).
+
+**iPhone:**
+
+1. In `mobile/iosApp/Configuration/Local.xcconfig`, set the live address without `https://`, for example `SALES_API_HOST = sales.yourdomain.com`.
+2. Run `bash mobile/iosApp/make-ipa.sh`. It makes an unsigned `SalesApp.ipa` on the Desktop; SideStore signs it on the phone.
+
+For each new version, raise the version in `mobile/androidApp/build.gradle.kts` (`appVersionName`, `versionCode`) and in `mobile/iosApp/iosApp/Info.plist`.
 
 Server address:
 

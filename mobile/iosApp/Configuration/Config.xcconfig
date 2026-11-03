@@ -1,3 +1,8 @@
 TEAM_ID=
 BUNDLE_ID=com.salesapp.SalesApp
 APP_NAME=Sales App
+
+// The live server's name (no https://, no slash), used by Release builds. Set it, and TEAM_ID if you
+// have one, in Local.xcconfig next to this file. That file is never committed.
+SALES_API_HOST =
+#include? "Local.xcconfig"

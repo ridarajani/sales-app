@@ -23,6 +23,7 @@
     <string name="server_save">Save</string>
     <string name="server_use_default">Use default</string>
     <string name="server_must_start_http">The address must start with http:// or https://</string>
+    <string name="server_must_start_https">For safety the address must start with https://</string>
     <string name="server_saved">Server address saved.</string>
     <string name="server_using_default">Using the default address.</string>
 

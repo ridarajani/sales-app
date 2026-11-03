@@ -1,6 +1,6 @@
 package com.salesapp.core
 
-// iPhone updates come through TestFlight, so there is nothing to do here.
+// iPhone updates come through SideStore (a new SalesApp.ipa), so there is nothing to do here.
 actual class Updater actual constructor() {
     actual fun downloadAndInstall(
         url: String,
