@@ -98,14 +98,14 @@ Then, in the phone app as the Admin:
 
 ## 7. Backups
 
-The backup container saves the database and the saved files (signatures, photos, logos, app files) every night at 02:00 Malawi time into `deploy/backups`, keeping `KEEP_DAYS` days.
+The backup container saves the database every night at 02:00 Malawi time into `deploy/backups`, keeping `KEEP_DAYS` days of dated `.dump` files. The saved files (signatures, photos, logos, app files) are kept in one folder, `deploy/backups/files`, and each night only new or changed files are added to it, so it doesn't fill the disk.
 
-- **Copy them off the server** too, so a dead server does not take the backups with it. For example, from your computer each week: `scp -r root@sales.yourdomain.com:sales-app/deploy/backups ~/sales-backups`.
+- **Copy them off the server** too, so a dead server does not take the backups with it. For example, from your computer each week: `rsync -a root@sales.yourdomain.com:sales-app/deploy/backups/ ~/sales-backups/`. It only copies what is new since last time.
 - **A backup now**: `docker compose exec backup bash /scripts/backup.sh`
 - **Put a backup back** (replaces everything on the live server; it asks you to type RESTORE):
 
   ```sh
-  bash restore.sh backups/sales-2026-11-02-0200.dump backups/files-2026-11-02-0200.tar.gz
+  bash restore.sh backups/sales-2026-11-02-0200.dump backups/files
   ```
 
 Try a restore once on a spare server before go-live, so you know it works.

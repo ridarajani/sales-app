@@ -713,7 +713,7 @@ erDiagram
 ## Phase 11 notes (go-live)
 
 - **Live server:** `deploy/` runs the database, the server, Caddy (HTTPS, made by itself for `DOMAIN`) and a nightly backup with Docker Compose. Steps in `docs/GO-LIVE.md`. In production the server refuses a `PUBLIC_URL` that is not `https://`, and seeds the companies and first Admin each time it starts (only what is missing).
-- **Backups:** `deploy/backup.sh` writes `sales-STAMP.dump` (`pg_dump` custom format) and `files-STAMP.tar.gz` (signatures, photos, logos and app files) into `deploy/backups` at 02:00 Malawi time, keeping `KEEP_DAYS` days. `deploy/restore.sh` puts one back after you type RESTORE.
+- **Backups:** `deploy/backup.sh` writes `sales-STAMP.dump` (`pg_dump` custom format) into `deploy/backups` at 02:00 Malawi time, keeping `KEEP_DAYS` days, and adds new or changed files (signatures, photos, logos and app files) to the one folder `deploy/backups/files`. `deploy/restore.sh` puts one back after you type RESTORE.
 - **New Android version:** `deploy/add-apk.sh FILE CODE NAME [NOTES]` copies the `.apk` into the server and adds its `app_versions` row.
 - **Go-live imports:** two more Excel imports, same three steps as the others (`/import/{kind}/template`, `/check`, `/save`, all rows or none):
   - `opening-balances` (Admin, Accounts): Customer name, Company, Amount owed, As of date. The customer must buy from that company and the person must work for it. A balance already entered is never changed here; the admin corrects it on the customer. Audit action `opening_balances_imported`.
