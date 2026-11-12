@@ -3,9 +3,12 @@ package com.salesapp.ui.screens
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesapp.core.AppConfig
+import com.salesapp.core.Platform
+import com.salesapp.core.serverAddressAllowed
 import com.salesapp.data.AppState
 import com.salesapp.resources.Res
 import com.salesapp.resources.server_must_start_http
+import com.salesapp.resources.server_must_start_https
 import com.salesapp.resources.server_saved
 import com.salesapp.resources.server_using_default
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -51,8 +54,9 @@ class ServerAddressViewModel(private val app: AppState) : ViewModel() {
     private fun save() {
         val clean = _state.value.url.trim().trimEnd('/')
         viewModelScope.launch {
-            if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-                _state.update { it.copy(error = getString(Res.string.server_must_start_http)) }
+            if (!serverAddressAllowed(clean, Platform.isDebugBuild)) {
+                val message = if (Platform.isDebugBuild) Res.string.server_must_start_http else Res.string.server_must_start_https
+                _state.update { it.copy(error = getString(message)) }
             } else {
                 app.changeApiUrl(clean)
                 app.message = getString(Res.string.server_saved)

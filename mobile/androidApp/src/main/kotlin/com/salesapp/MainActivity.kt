@@ -10,6 +10,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppContext.context = applicationContext
+        AppContext.apiUrl = BuildConfig.API_URL
+        AppContext.isDebugBuild = BuildConfig.DEBUG
         // The camera needs an activity to give its answer back to.
         AppContext.activity = this
         enableEdgeToEdge()

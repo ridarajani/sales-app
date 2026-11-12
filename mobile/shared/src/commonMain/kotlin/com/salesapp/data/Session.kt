@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.salesapp.core.AppConfig
 import com.salesapp.core.KeyValueStore
+import com.salesapp.core.Platform
+import com.salesapp.core.usableApiUrl
 import com.salesapp.resources.Res
 import com.salesapp.resources.err_generic
 import com.salesapp.resources.err_signed_out
@@ -72,7 +74,7 @@ class SessionStore(private val store: KeyValueStore) {
 class AppState(val store: KeyValueStore, val session: SessionStore) {
 
     var user by mutableStateOf(session.loadUser().takeIf { session.token != null })
-    var apiUrl by mutableStateOf(store.get(AppConfig.API_URL_KEY) ?: AppConfig.DEFAULT_API_URL)
+    var apiUrl by mutableStateOf(usableApiUrl(store.get(AppConfig.API_URL_KEY), AppConfig.DEFAULT_API_URL, Platform.isDebugBuild))
         private set
     var message by mutableStateOf<String?>(null)
 

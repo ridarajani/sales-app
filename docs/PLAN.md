@@ -27,7 +27,7 @@ The app runs on Android and iPhone from one codebase (Kotlin Multiplatform). Sta
 
 
 - **Android, private download page:** the app stays off the Play Store. Our server hosts a download page, only for staff, where they get the app.
-- **iPhone, TestFlight:** management installs the app through TestFlight, Apple's private test channel, so it stays off the public App Store. TestFlight shows each new version as an update.
+- **iPhone, SideStore:** management installs the app with SideStore and their own free Apple ID, so there is no paid Apple account and the app stays off the App Store. The install lasts 7 days and SideStore renews it by itself; new versions are added the same way (Rida, 25 October 2026).
 - **Automatic updates (Android):** each time the app opens, it checks the server for a newer version. If there is one, it downloads it and asks the user to tap Install.
 - **Only staff can sign in:** someone the admin hasn't added can install the app, but can't use it.
 

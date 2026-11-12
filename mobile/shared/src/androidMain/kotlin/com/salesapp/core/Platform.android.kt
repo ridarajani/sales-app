@@ -11,4 +11,6 @@ actual object Platform {
 
     actual val appVersionCode: Int get() = info.versionCode
     actual val appVersionName: String get() = info.versionName ?: ""
+
+    actual val isDebugBuild: Boolean get() = AppContext.isDebugBuild
 }

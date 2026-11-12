@@ -10,4 +10,9 @@ object AppContext {
 
     // Set while MainActivity is alive; null once it is gone.
     var activity: ComponentActivity? = null
+
+    // Set by MainActivity from the app's BuildConfig: the live server address for a release build,
+    // the Mac's address for a debug build.
+    var apiUrl: String = "http://10.0.2.2:3000"
+    var isDebugBuild: Boolean = true
 }

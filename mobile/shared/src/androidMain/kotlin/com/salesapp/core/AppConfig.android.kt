@@ -1,4 +1,5 @@
 package com.salesapp.core
 
-// The Android emulator reaches the Mac through this special address.
-actual fun defaultApiUrl(): String = "http://10.0.2.2:3000"
+// Comes from the app's build: the live server for a release build, the Mac (seen from the
+// Android emulator at 10.0.2.2) for a debug build.
+actual fun defaultApiUrl(): String = AppContext.apiUrl
